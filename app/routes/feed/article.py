@@ -41,13 +41,15 @@ async def article_endpoint(
             # Route to apifeedwp30 handler
             # Get feededit from query params directly (workaround for parameter scope issue)
             feededit_param = request.query_params.get('feedit')
+            serveup_param = request.query_params.get('serveup', '0')
             return await handle_apifeedwp30(
                 domain=domain,
                 apiid=apiid,
                 apikey=apikey,
                 kkyy=kkyy,
                 feededit=feededit_param,
-                debug=debug
+                debug=debug,
+                serveup=serveup_param
             )
         # Add other kkyy routing as needed
         elif kkyy == 'Nq8dVL6XRTpvmySOVdQLLuxcZpIOp45z94':
@@ -255,17 +257,26 @@ async def handle_apifeedwp30(
         footer_html = build_footer_wp(domainid, domain_data, domain_settings)
         
         # Return JSON with footer (matching PHP format)
-        # PHP: json_encode(htmlentities($return)) when serveup is not set
-        # This returns a JSON string containing the HTML-escaped footer
+        # PHP: if serveup: json_encode(array('footer' => htmlentities($return)))
+        #      else: json_encode(htmlentities($return))
         import json
         import html
         # HTML escape the footer (like PHP htmlentities)
         escaped_html = html.escape(footer_html)
-        # Return as JSON string
-        return Response(
-            content=json.dumps(escaped_html),
-            media_type="application/json"
-        )
+        
+        # Check serveup parameter
+        if serveup == '1':
+            # Return as object with 'footer' key
+            return Response(
+                content=json.dumps({'footer': escaped_html}),
+                media_type="application/json"
+            )
+        else:
+            # Return as JSON string (default)
+            return Response(
+                content=json.dumps(escaped_html),
+                media_type="application/json"
+            )
     
     elif feededit == '1':
         # Handle feededit=1 (pages array)

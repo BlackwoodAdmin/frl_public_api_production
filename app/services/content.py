@@ -549,6 +549,17 @@ def build_page_wp(
         wpage += f'<div class="vid-container dddd"><iframe title="{title_attr}" style="max-width:100%;margin-bottom:20px;" src="//www.youtube.com/embed/{video_id}" width="900" height="480"></iframe></div>'
         wpage += '<div class="seo-automation-spacer"></div>'
     
+    # Check if resfulltext contains Bootstrap container classes and add Bootstrap CSS/JS if needed
+    resfulltext = res.get('resfulltext', '')
+    if resfulltext and 'container justify-content-center' in resfulltext.lower():
+        wpage += '''
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<style>.wr-fulltext img {height: auto !important;min-width:100%;}@media (min-width: 992px){.wr-fulltext img {min-width:0;}}.container.justify-content-center {max-width:100%;margin-bottom:15px;}.ngodkrbsitr-spacer{clear:both;}.seo-automation-main-table h1:after, .seo-automation-main-table h2:after, .seo-automation-main-table h3:after, .seo-automation-main-table h4:after, .seo-automation-main-table h5:after, .seo-automation-main-table h6:after {display: none !important;clear: none !important;} .seo-automation-main-table h1, .seo-automation-main-table h2, .seo-automation-main-table h3, .seo-automation-main-table h4, .seo-automation-main-table h5, .seo-automation-main-table h6 {clear: none !important;}.seo-automation-main-table .row .col-md-6 {	/* display:list-item; */ } </style>
+'''
+    
     if res.get('resfulltext'):
         # Unescape HTML entities (convert &quot; to ", &amp; to &, etc.)
         content = html.unescape(str(res['resfulltext']))
