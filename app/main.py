@@ -30,11 +30,9 @@ async def health():
     return {"status": "healthy"}
 
 
-# Import routes (will be added as we implement)
-# from app.routes.feed import article, articles, apifeed
-# app.include_router(article.router, prefix="/feed", tags=["feed"])
-# app.include_router(articles.router, prefix="/feed", tags=["feed"])
-# app.include_router(apifeed.router, prefix="/feed", tags=["feed"])
+# Import routes
+from app.routes.feed import article
+app.include_router(article.router, prefix="/feed", tags=["feed"])
 
 
 if __name__ == "__main__":
