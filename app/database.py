@@ -9,11 +9,24 @@ logger = logging.getLogger(__name__)
 
 
 class Database:
-    """Database connection manager."""
+    """Database connection manager with lazy connection."""
     
     def __init__(self):
-        self.connection_pool = None
-        self._init_connection()
+        self.connection = None
+        # Don't connect at initialization - connect on first use
+    
+    def _ensure_connection(self):
+        """Ensure database connection is established (lazy connection)."""
+        if self.connection is None:
+            self._init_connection()
+        # Check if connection is still alive
+        try:
+            self.connection.ping(reconnect=False)
+        except Exception:
+            # Connection is dead, reconnect
+            logger.warning("Database connection lost, reconnecting...")
+            self.connection = None
+            self._init_connection()
     
     def _init_connection(self):
         """Initialize database connection."""
@@ -39,6 +52,7 @@ class Database:
     @contextmanager
     def get_cursor(self):
         """Get database cursor with automatic cleanup."""
+        self._ensure_connection()
         try:
             cursor = self.connection.cursor()
             yield cursor
@@ -84,13 +98,15 @@ class Database:
     def execute(self, query: str, params: Optional[tuple] = None) -> int:
         """Execute a query and return affected rows."""
         try:
+            self._ensure_connection()
             with self.get_cursor() as cursor:
                 affected = cursor.execute(query, params)
                 self.connection.commit()
                 return affected
         except Exception as e:
             logger.error(f"Query error: {e}\nQuery: {query}")
-            self.connection.rollback()
+            if self.connection:
+                self.connection.rollback()
             raise
     
     def close(self):
