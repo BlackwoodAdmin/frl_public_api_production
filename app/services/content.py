@@ -529,9 +529,12 @@ def build_page_wp(
         return ""
     
     # Build basic page HTML (placeholder - needs full implementation)
+    # Note: For WordPress plugin (wp_plugin=1), do NOT add H1 - WordPress handles the title
+    # For PHP plugin, H1 is added elsewhere
     import html
     wpage = '<div class="seo-automation-main-table">'
-    wpage += f'<h1>{clean_title(seo_filter_text_custom(res.get("restitle", "")))}</h1>'
+    # WordPress plugin does not add H1 - title is handled by WordPress
+    # wpage += f'<h1>{clean_title(seo_filter_text_custom(res.get("restitle", "")))}</h1>'
     
     # Handle YouTube video embedding (replicates PHP lines 366-386)
     # Priority: resvideo -> resvideobubble -> domain_data['wr_video']
