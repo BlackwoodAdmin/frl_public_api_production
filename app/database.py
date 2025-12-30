@@ -26,7 +26,10 @@ class Database:
                 port=settings.db_port,
                 charset=settings.db_charset,
                 cursorclass=pymysql.cursors.DictCursor,
-                autocommit=True
+                autocommit=True,
+                connect_timeout=10,
+                read_timeout=30,
+                write_timeout=30
             )
             logger.info("Database connection established")
         except Exception as e:
