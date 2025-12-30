@@ -5,7 +5,7 @@ from typing import Optional
 import logging
 from app.database import db
 from app.services.auth import validate_api_credentials
-from app.services.content import build_footer_wp
+from app.services.content import build_footer_wp, build_pages_array
 
 logger = logging.getLogger(__name__)
 
@@ -77,13 +77,102 @@ async def article_endpoint(
     if not Action:
         Action = ''
     
-    # Handle different actions
+    # Get full domain data for Action handlers
+    domain_full_sql = """
+        SELECT d.*, s.servicetype, s.keywords as service_keywords
+        FROM bwp_domains d
+        LEFT JOIN bwp_services s ON d.servicetype = s.id
+        WHERE d.id = %s AND d.deleted != 1
+    """
+    domain_category = db.fetch_row(domain_full_sql, (domainid,))
+    
+    if not domain_category:
+        raise HTTPException(status_code=404, detail="Domain not found")
+    
+    # Get domain settings
+    domain_settings = db.fetch_row(
+        "SELECT * FROM bwp_domain_settings WHERE domainid = %s",
+        (domainid,)
+    )
+    
+    if not domain_settings:
+        db.execute(
+            "INSERT INTO bwp_domain_settings SET domainid = %s",
+            (domainid,)
+        )
+        domain_settings = db.fetch_row(
+            "SELECT * FROM bwp_domain_settings WHERE domainid = %s",
+            (domainid,)
+        )
+    
+    # Handle WordPress plugin actions (when wp_plugin=1 and script_version >= 5)
+    if domain_category.get('wp_plugin') == 1 and (domain_category.get('script_version', 0) >= 5 or True):  # Assume version 5+ for now
+        # Extract pageid from slug if needed
+        pageid_param = pageid or ''
+        keyword_param = k or key or ''
+        
+        # Parse pageid from slug format (keyword-pageid or keyword-pageidbc or keyword-pageiddc)
+        bubbleid = None
+        if pageid_param:
+            try:
+                bubbleid = int(pageid_param)
+            except ValueError:
+                # Try to extract from slug
+                if 'bc' in pageid_param:
+                    bubbleid = int(pageid_param.replace('bc', ''))
+                elif 'dc' in pageid_param:
+                    bubbleid = int(pageid_param.replace('dc', ''))
+                else:
+                    bubbleid = int(pageid_param)
+        
+        if Action == '1':
+            # Website Reference page
+            from app.services.content import build_page_wp
+            wpage = build_page_wp(
+                bubbleid=bubbleid,
+                domainid=domainid,
+                debug=debug == '1',
+                agent=agent or '',
+                keyword=keyword_param,
+                domain_data=domain_category,
+                domain_settings=domain_settings
+            )
+            return HTMLResponse(content=wpage)
+        
+        elif Action == '2':
+            # Business Collective page
+            from app.services.content import build_bcpage_wp
+            wpage = build_bcpage_wp(
+                bubbleid=bubbleid,
+                domainid=domainid,
+                debug=debug == '1',
+                agent=agent or '',
+                domain_data=domain_category,
+                domain_settings=domain_settings
+            )
+            return HTMLResponse(content=wpage)
+        
+        elif Action == '3':
+            # Bubba page
+            from app.services.content import build_bubba_page_wp
+            wpage = build_bubba_page_wp(
+                bubbleid=bubbleid,
+                domainid=domainid,
+                debug=debug == '1',
+                agent=agent or '',
+                keyword=keyword_param,
+                domain_data=domain_category,
+                domain_settings=domain_settings
+            )
+            return HTMLResponse(content=wpage)
+    
+    # Handle other actions (non-WP plugin)
     if Action == '1':
-        # Website Reference
-        pass
+        # Website Reference (non-WP)
+        return {"message": "Action=1 (non-WP) not yet implemented", "domain": domain, "action": Action}
     elif Action == '2':
-        # Business Collective
-        pass
+        # Business Collective (non-WP)
+        return {"message": "Action=2 (non-WP) not yet implemented", "domain": domain, "action": Action}
     # ... other actions
     
     return {"message": "Endpoint not yet implemented", "domain": domain, "action": Action}
@@ -166,13 +255,78 @@ async def handle_apifeedwp30(
     
     elif feededit == '1':
         # Handle feededit=1 (pages array)
-        # TODO: Implement pages array generation
-        pass
+        pagesarray = build_pages_array(domainid, domain_data, domain_settings, domain_data.get('template_file'))
+        return JSONResponse(content=pagesarray)
     
     elif feededit == 'add':
-        # Handle feededit=add
-        # TODO: Implement add functionality
-        pass
+        # Handle feededit=add - Returns domain info with cade data, sets wp_plugin=1
+        # Get cade_level from domain_settings
+        cade_level = domain_settings.get('cade_level', 0)
+        if cade_level is None:
+            cade_level = 0
+        
+        # Get service info
+        service_sql = "SELECT servicetype, keywords FROM bwp_services WHERE id = %s"
+        service = db.fetch_row(service_sql, (domain_data.get('servicetype'),))
+        
+        if not service:
+            return JSONResponse(content={"error": "Service not found"}, status_code=404)
+        
+        servicetypename = service.get('servicetype', '')
+        keywords = int(service.get('keywords', 0))
+        
+        # Check if SEOM or BRON service type
+        from app.services.content import is_seom, is_bron
+        if is_seom(domain_data.get('servicetype')) or is_bron(domain_data.get('servicetype')):
+            keywords = keywords * 3
+        
+        # Build response
+        rdomains = [{
+            'domainid': domain_data['domainid'],
+            'status': domain_data['status'],
+            'wr_name': domain_data.get('wr_name', ''),
+            'owneremail': domain_data.get('owneremail', ''),
+            'servicetype': domain_data.get('servicetype'),
+            'cade': {
+                'level': cade_level,
+                'keywords': keywords,
+                'servicetype': servicetypename
+            }
+        }]
+        
+        # Update wp_plugin=1, spydermap=0
+        db.execute(
+            "UPDATE bwp_domains SET wp_plugin=1, spydermap=0 WHERE id = %s",
+            (domainid,)
+        )
+        
+        return JSONResponse(content=rdomains)
+    
+    elif feededit == 'head':
+        # Handle feededit=head - Returns head scripts (umami analytics)
+        umamiid = domain_settings.get('umamiid')
+        
+        if umamiid and umamiid.strip():
+            return_script = f'<script async src="https://analytics.umami.is/script.js" data-website-id="{umamiid}"></script>'
+        else:
+            return_script = 'No Scripts'
+        
+        # Return as JSON-encoded HTML-escaped string
+        import json
+        import html
+        escaped_script = html.escape(return_script)
+        return Response(
+            content=json.dumps(escaped_script),
+            media_type="application/json"
+        )
+    
+    elif feededit == '5':
+        # Handle feededit=5 - Deactivate domain (sets wp_plugin=0, spydermap=0)
+        db.execute(
+            "UPDATE bwp_domains SET wp_plugin=0, spydermap=0 WHERE id = %s",
+            (domainid,)
+        )
+        return Response(content="success", media_type="text/plain")
     
     else:
         # Default: return domain data as JSON

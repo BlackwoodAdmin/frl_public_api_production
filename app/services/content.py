@@ -210,3 +210,392 @@ def is_bron(servicetype: Optional[int]) -> bool:
     result = db.fetch_all(sql, (servicetype,))
     return bool(result)
 
+
+def is_seom(servicetype: Optional[int]) -> bool:
+    """Check if service type is SEOM."""
+    if not servicetype:
+        return False
+    sql = "SELECT * FROM bwp_services WHERE servicetype LIKE 'SEOM %%' AND servicetype != 'SEOM 5' AND id = %s"
+    result = db.fetch_all(sql, (servicetype,))
+    return bool(result)
+
+
+def strip_html(text: str) -> str:
+    """Strip HTML tags from text."""
+    from html.parser import HTMLParser
+    class MLStripper(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.reset()
+            self.strict = False
+            self.convert_charrefs = True
+            self.fed = []
+        def handle_data(self, d):
+            self.fed.append(d)
+        def get_data(self):
+            return ''.join(self.fed)
+    s = MLStripper()
+    s.feed(text)
+    return s.get_data()
+
+
+def build_excerpt(text: str, max_words: int = 20) -> str:
+    """Build excerpt from text (first N words)."""
+    if not text or len(text) < 50:
+        return ''
+    import re
+    import html
+    # Clean content
+    content = re.sub(r'Table of Contents\s+', '', text)
+    content = re.sub(r'\s+', ' ', content)
+    content = re.sub(r'\r|\n', ' ', content)
+    content = html.unescape(content)
+    content = seo_filter_text_custom(content)
+    content = strip_html(content)
+    words = content.split()[:max_words]
+    return ' '.join(words) + '... ' if words else ''
+
+
+def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_settings: Dict[str, Any], template_file: Optional[str] = None) -> list:
+    """
+    Build pages array for WordPress plugin (feedit=1).
+    Returns array of page objects matching PHP format.
+    """
+    pagesarray = []
+    servicetype = domain_data.get('servicetype')
+    
+    # 1. Get bubblefeed entries (main pages)
+    if domain_data.get('resourcesactive'):
+        sql = """
+            SELECT b.*, c.category AS bubblecat, c.bubblefeedid AS bubblecatid, c.id AS bubblecatsid
+            FROM bwp_bubblefeed b
+            LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
+            WHERE b.active = 1 AND b.domainid = %s AND b.deleted != 1
+        """
+        page_ex = db.fetch_all(sql, (domainid,))
+        
+        for page in page_ex:
+            if not is_bron(servicetype) or len(page.get('linkouturl', '')) < 5:
+                pageid = page['id']
+                keyword = clean_title(seo_filter_text_custom(page['restitle']))
+                
+                # Build meta title and keywords
+                if page.get('metatitle') and page['metatitle'].strip():
+                    metaTitle = clean_title(seo_filter_text_custom(page['metatitle']))
+                    metaKeywords = seo_filter_text_custom(page['restitle']).lower()
+                    if page.get('bubblecat'):
+                        bubbles_sql = "SELECT restitle FROM bwp_bubblefeed WHERE domainid = %s AND categoryid = %s"
+                        bubbles = db.fetch_all(bubbles_sql, (domainid, page.get('categoryid')))
+                        for bub in bubbles:
+                            if bub['restitle'] != page['restitle']:
+                                metaKeywords += ', ' + seo_filter_text_custom(bub['restitle']).lower()
+                else:
+                    metaTitle = clean_title(seo_filter_text_custom(page['restitle']))
+                    metaKeywords = seo_filter_text_custom(page['restitle']).lower()
+                    if page.get('bubblecat'):
+                        bubbles_sql = "SELECT restitle FROM bwp_bubblefeed WHERE domainid = %s AND categoryid = %s"
+                        bubbles = db.fetch_all(bubbles_sql, (domainid, page.get('categoryid')))
+                        for bub in bubbles:
+                            if bub['restitle'] != page['restitle']:
+                                metaTitle += ' - ' + clean_title(seo_filter_text_custom(bub['restitle']))
+                                metaKeywords += ', ' + seo_filter_text_custom(bub['restitle']).lower()
+                    
+                    if len(domain_data.get('wr_phone', '')) > 9 and domain_settings.get('phoneintitle') == 1:
+                        metaTitle = domain_data['wr_phone'] + ' - ' + metaTitle
+                
+                # Build excerpt
+                if page.get('metadescription') and page['metadescription'].strip():
+                    sorttext = seo_filter_text_custom(page['metadescription'])
+                    words = sorttext.split()[:20]
+                    sorttext = ' '.join(words) + '... '
+                else:
+                    sorttext = build_excerpt(page.get('resfulltext', ''))
+                
+                sorttext = strip_html(seo_filter_text_custom(sorttext))
+                slug = seo_slug(keyword) + '-' + str(pageid) + '/'
+                
+                pagearray = {
+                    'pageid': str(pageid),
+                    'post_title': keyword,
+                    'canonical': '',
+                    'post_type': 'page',
+                    'post_content': '',
+                    'comment_status': 'closed',
+                    'ping_status': 'closed',
+                    'post_date': page.get('createdDate', ''),
+                    'post_excerpt': sorttext,
+                    'post_name': slug,
+                    'post_status': 'publish',
+                    'post_metatitle': metaTitle,
+                    'post_metakeywords': metaKeywords,
+                    'template_file': template_file or ''
+                }
+                pagesarray.append(pagearray)
+    
+    # 2. Get bubblefeedsupport entries (support pages) - only for SEOM/BRON
+    if is_seom(servicetype) or is_bron(servicetype):
+        sql = """
+            SELECT ba.id, ba.restitle, ba.resshorttext, ba.resfulltext, ba.createdDate, ba.metatitle, ba.metadescription
+            FROM bwp_bubblefeedsupport ba
+            LEFT JOIN bwp_bubblefeed bb ON bb.id = ba.bubblefeedid
+            WHERE ba.active = 1 AND ba.domainid = %s
+            AND CHAR_LENGTH(ba.resfulltext) > 300
+            AND bb.active = 1
+            AND ba.deleted != 1
+            AND bb.deleted != 1
+        """
+        page_exs = db.fetch_all(sql, (domainid,))
+        
+        for page in page_exs:
+            pageid = page['id']
+            keyword = clean_title(seo_filter_text_custom(page['restitle']))
+            
+            if page.get('metatitle') and page['metatitle'].strip():
+                metaTitle = clean_title(seo_filter_text_custom(page['metatitle']))
+                metaKeywords = seo_filter_text_custom(page['restitle']).lower()
+            else:
+                metaTitle = clean_title(seo_filter_text_custom(page['restitle']))
+                metaKeywords = seo_filter_text_custom(page['restitle']).lower()
+                if len(domain_data.get('wr_phone', '')) > 9 and domain_settings.get('phoneintitle') == 1:
+                    metaTitle = domain_data['wr_phone'] + ' - ' + metaTitle
+            
+            # Build excerpt
+            if page.get('metadescription') and page['metadescription'].strip():
+                sorttext = seo_filter_text_custom(page['metadescription'])
+                words = sorttext.split()[:20]
+                sorttext = ' '.join(words) + '... '
+            else:
+                sorttext = build_excerpt(page.get('resfulltext', ''))
+            
+            sorttext = strip_html(seo_filter_text_custom(sorttext))
+            slug = seo_slug(keyword) + '-' + str(pageid) + '/'
+            
+            pagearray = {
+                'pageid': str(pageid),
+                'canonical': '',
+                'post_title': keyword,
+                'post_type': 'page',
+                'post_content': '',
+                'comment_status': 'closed',
+                'ping_status': 'closed',
+                'post_date': page.get('createdDate', ''),
+                'post_excerpt': sorttext,
+                'post_name': slug,
+                'post_status': 'publish',
+                'post_metatitle': clean_title(seo_filter_text_custom(metaTitle)),
+                'post_metakeywords': seo_filter_text_custom(page['restitle']).lower(),
+                'template_file': template_file or ''
+            }
+            pagesarray.append(pagearray)
+    
+    # 3. Get business collective pages (bc pages)
+    sql = """
+        SELECT b.*
+        FROM bwp_bubblefeed b
+        WHERE b.active = 1 AND b.domainid = %s AND b.deleted != 1
+    """
+    bcpage_ex = db.fetch_all(sql, (domainid,))
+    
+    for bcpage in bcpage_ex:
+        pageid = bcpage['id']
+        if len(bcpage.get('resfeedtext', '')) > 50:
+            sorttext = seo_filter_text_custom(bcpage['resfeedtext'])
+            import html
+            sorttext = html.unescape(sorttext)
+            sorttext = strip_html(sorttext)
+            words = sorttext.split()[:20]
+            sorttext = ' '.join(words) + '... '
+        else:
+            sorttext = ''
+        
+        keyword = clean_title(seo_filter_text_custom(bcpage['restitle']))
+        
+        if is_bron(servicetype):
+            slug = str(pageid) + 'bc/'
+            metaTitle = domain_data['domain_name'] + ' - ' + str(pageid) + ' - Resources'
+            keyword = domain_data['domain_name'] + ' - ' + str(pageid)
+        else:
+            slug = seo_slug(keyword) + '-' + str(pageid) + 'bc/'
+            metaTitle = keyword.lower() + ' - Resources'
+        
+        sorttext = strip_html(seo_filter_text_custom(sorttext))
+        
+        if len(domain_data.get('wr_phone', '')) > 9 and domain_settings.get('phoneintitle') == 1:
+            metaTitle = domain_data['wr_phone'] + ' - ' + metaTitle
+        
+        bcpagearray = {
+            'pageid': str(pageid) + 'bc',
+            'post_title': keyword.lower() + ' - Resources',
+            'post_type': 'page',
+            'post_content': '',
+            'comment_status': 'closed',
+            'ping_status': 'closed',
+            'post_date': bcpage.get('createdDate', ''),
+            'post_excerpt': sorttext,
+            'post_name': slug,
+            'post_status': 'publish',
+            'post_metatitle': metaTitle,
+            'post_metakeywords': keyword.lower() + ' Resources',
+            'template_file': template_file or ''
+        }
+        pagesarray.append(bcpagearray)
+    
+    return pagesarray
+
+
+def build_page_wp(
+    bubbleid: int,
+    domainid: int,
+    debug: bool,
+    agent: str,
+    keyword: str,
+    domain_data: Dict[str, Any],
+    domain_settings: Dict[str, Any],
+    artpageid: int = 0,
+    artdomainid: int = 0,
+    support: int = 0,
+    offpageid: int = 0,
+    offdomainid: int = 0
+) -> str:
+    """
+    Build Website Reference page HTML (Action=1).
+    Replicates seo_automation_build_page from websitereference-wp.php
+    
+    TODO: Full implementation needed - this is a placeholder
+    """
+    if not bubbleid or not domainid:
+        return ""
+    
+    # Get bubblefeed data
+    sql = """
+        SELECT b.id, b.restitle, b.title, b.resfulltext, b.resshorttext, b.linkouturl, 
+               b.resphone, b.resvideo, b.resaddress, b.resgooglemaps, b.resname,
+               IFNULL(c.id, '') AS categoryid, IFNULL(c.category, '') AS category
+        FROM bwp_bubblefeed b
+        LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
+        WHERE b.id = %s AND b.domainid = %s AND b.deleted != 1
+    """
+    res = db.fetch_row(sql, (bubbleid, domainid))
+    
+    if not res:
+        return ""
+    
+    # Build basic page HTML (placeholder - needs full implementation)
+    wpage = f'<div class="seo-automation-main-table">'
+    wpage += f'<h1>{clean_title(seo_filter_text_custom(res.get("restitle", "")))}</h1>'
+    
+    if res.get('resfulltext'):
+        wpage += f'<div class="seo-content">{seo_filter_text_custom(res["resfulltext"])}</div>'
+    elif res.get('resshorttext'):
+        wpage += f'<div class="seo-content">{seo_filter_text_custom(res["resshorttext"])}</div>'
+    
+    wpage += '</div>'
+    
+    return wpage
+
+
+def build_bcpage_wp(
+    bubbleid: int,
+    domainid: int,
+    debug: bool,
+    agent: str,
+    domain_data: Dict[str, Any],
+    domain_settings: Dict[str, Any],
+    artpageid: int = 0,
+    artdomainid: int = 0
+) -> str:
+    """
+    Build Business Collective page HTML (Action=2).
+    Replicates seo_automation_build_bcpage from businesscollective-wp.php
+    
+    TODO: Full implementation needed - this is a placeholder
+    """
+    if not bubbleid or not domainid:
+        return ""
+    
+    # Get bubblefeed data
+    sql = """
+        SELECT b.id, b.restitle, b.resfulltext, b.resshorttext, b.resfeedtext, b.linkouturl,
+               IFNULL(c.id, '') AS categoryid, IFNULL(c.category, '') AS category
+        FROM bwp_bubblefeed b
+        LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
+        WHERE b.domainid = %s AND b.deleted != 1 AND b.id = %s
+    """
+    res = db.fetch_row(sql, (domainid, bubbleid))
+    
+    if not res:
+        return ""
+    
+    # Build basic page HTML (placeholder - needs full implementation)
+    bcpage = '<div class="seo-automation-main-table">'
+    bcpage += f'<h1>{clean_title(seo_filter_text_custom(res.get("restitle", "")))} - Resources</h1>'
+    
+    if res.get('resfeedtext'):
+        shorttext = res['resfeedtext']
+        shorttext = shorttext.replace('Table of Contents', '').strip()
+    elif res.get('resshorttext'):
+        shorttext = res['resshorttext']
+        shorttext = shorttext.replace('Table of Contents', '').strip()
+    else:
+        shorttext = ''
+    
+    if shorttext:
+        bcpage += f'<div class="seo-content">{seo_filter_text_custom(shorttext)}</div>'
+    
+    bcpage += '</div>'
+    
+    return bcpage
+
+
+def build_bubba_page_wp(
+    bubbleid: int,
+    domainid: int,
+    debug: bool,
+    agent: str,
+    keyword: str,
+    domain_data: Dict[str, Any],
+    domain_settings: Dict[str, Any]
+) -> str:
+    """
+    Build Bubba page HTML (Action=3).
+    Replicates seo_automation_build_bubba_page from websitereferencebubba-wp.php
+    
+    TODO: Full implementation needed - this is a placeholder
+    """
+    if not bubbleid or not domainid:
+        return ""
+    
+    # Get bubbafeed data
+    sql = """
+        SELECT ba.*, c.category, c.bubblefeedid AS catbubbleid, bb.categoryid
+        FROM bwp_bubbafeed ba
+        LEFT JOIN bwp_bubblefeed bb ON bb.id = ba.bubblefeedid
+        LEFT JOIN bwp_bubblefeedcategory c ON c.id = bb.categoryid AND c.deleted != 1
+        WHERE ba.id = %s AND ba.domainid = %s AND bb.deleted != 1 AND ba.deleted != 1
+    """
+    res = db.fetch_row(sql, (bubbleid, domainid))
+    
+    if not res:
+        # Try by keyword
+        sql = """
+            SELECT ba.*, c.category, c.bubblefeedid AS catbubbleid, bb.categoryid
+            FROM bwp_bubbafeed ba
+            LEFT JOIN bwp_bubblefeed bb ON bb.id = ba.bubblefeedid
+            LEFT JOIN bwp_bubblefeedcategory c ON c.id = bb.categoryid AND c.deleted != 1
+            WHERE ba.bubbatitle = %s AND ba.domainid = %s AND bb.deleted != 1 AND ba.deleted != 1
+        """
+        res = db.fetch_row(sql, (keyword, domainid))
+    
+    if not res:
+        return ""
+    
+    # Build basic page HTML (placeholder - needs full implementation)
+    wpage = '<div class="seo-automation-main-table">'
+    wpage += f'<h1>{clean_title(seo_filter_text_custom(res.get("bubbatitle", "")))}</h1>'
+    
+    if res.get('resfulltext'):
+        wpage += f'<div class="seo-content">{seo_filter_text_custom(res["resfulltext"])}</div>'
+    
+    wpage += '</div>'
+    
+    return wpage
