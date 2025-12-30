@@ -314,6 +314,13 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
                 sorttext = strip_html(seo_filter_text_custom(sorttext))
                 slug = seo_slug(keyword) + '-' + str(pageid) + '/'
                 
+                # Convert datetime to string if needed
+                post_date = page.get('createdDate', '')
+                if post_date and hasattr(post_date, 'strftime'):
+                    post_date = post_date.strftime('%Y-%m-%d %H:%M:%S')
+                elif post_date is None:
+                    post_date = ''
+                
                 pagearray = {
                     'pageid': str(pageid),
                     'post_title': keyword,
@@ -322,7 +329,7 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
                     'post_content': '',
                     'comment_status': 'closed',
                     'ping_status': 'closed',
-                    'post_date': page.get('createdDate', ''),
+                    'post_date': str(post_date),
                     'post_excerpt': sorttext,
                     'post_name': slug,
                     'post_status': 'publish',
@@ -370,6 +377,13 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
             sorttext = strip_html(seo_filter_text_custom(sorttext))
             slug = seo_slug(keyword) + '-' + str(pageid) + '/'
             
+            # Convert datetime to string if needed
+            post_date = page.get('createdDate', '')
+            if post_date and hasattr(post_date, 'strftime'):
+                post_date = post_date.strftime('%Y-%m-%d %H:%M:%S')
+            elif post_date is None:
+                post_date = ''
+            
             pagearray = {
                 'pageid': str(pageid),
                 'canonical': '',
@@ -378,7 +392,7 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
                 'post_content': '',
                 'comment_status': 'closed',
                 'ping_status': 'closed',
-                'post_date': page.get('createdDate', ''),
+                'post_date': str(post_date),
                 'post_excerpt': sorttext,
                 'post_name': slug,
                 'post_status': 'publish',
@@ -423,6 +437,13 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
         if len(domain_data.get('wr_phone', '')) > 9 and domain_settings.get('phoneintitle') == 1:
             metaTitle = domain_data['wr_phone'] + ' - ' + metaTitle
         
+        # Convert datetime to string if needed
+        post_date = bcpage.get('createdDate', '')
+        if post_date and hasattr(post_date, 'strftime'):
+            post_date = post_date.strftime('%Y-%m-%d %H:%M:%S')
+        elif post_date is None:
+            post_date = ''
+        
         bcpagearray = {
             'pageid': str(pageid) + 'bc',
             'post_title': keyword.lower() + ' - Resources',
@@ -430,7 +451,7 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
             'post_content': '',
             'comment_status': 'closed',
             'ping_status': 'closed',
-            'post_date': bcpage.get('createdDate', ''),
+            'post_date': str(post_date),
             'post_excerpt': sorttext,
             'post_name': slug,
             'post_status': 'publish',
