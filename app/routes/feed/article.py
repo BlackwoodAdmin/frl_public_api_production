@@ -39,14 +39,14 @@ async def article_endpoint(
         # Route to WordPress plugin feeds based on kkyy value
         if kkyy == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
             # Route to apifeedwp30 handler
-            # Get feededit from query params directly as workaround
-            feededit_value = request.query_params.get('feedit')
+            # Get feededit from query params directly (workaround for parameter scope issue)
+            feededit_param = request.query_params.get('feedit')
             return await handle_apifeedwp30(
                 domain=domain,
                 apiid=apiid,
                 apikey=apikey,
                 kkyy=kkyy,
-                feededit=feedit_value,
+                feededit=feededit_param,
                 debug=debug
             )
         # Add other kkyy routing as needed
