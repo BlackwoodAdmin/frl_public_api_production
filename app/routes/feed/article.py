@@ -79,7 +79,7 @@ async def article_endpoint(
     
     # Get full domain data for Action handlers
     domain_full_sql = """
-        SELECT d.*, s.servicetype, s.keywords as service_keywords
+        SELECT d.*, s.servicetype, s.keywords as service_keywords, d.script_version, d.wp_plugin
         FROM bwp_domains d
         LEFT JOIN bwp_services s ON d.servicetype = s.id
         WHERE d.id = %s AND d.deleted != 1
@@ -106,7 +106,20 @@ async def article_endpoint(
         )
     
     # Handle WordPress plugin actions (when wp_plugin=1 and script_version >= 5)
-    if domain_category.get('wp_plugin') == 1 and (domain_category.get('script_version', 0) >= 5 or True):  # Assume version 5+ for now
+    # Convert script_version to float for comparison (handles '5.0', '5.0.x', etc.)
+    script_version_str = domain_category.get('script_version', '0') or '0'
+    try:
+        # Extract numeric part (e.g., '5.0.x' -> 5.0, '5' -> 5.0)
+        if isinstance(script_version_str, str):
+            parts = script_version_str.split('.')
+            script_version = float(parts[0] + '.' + parts[1] if len(parts) > 1 else parts[0])
+        else:
+            script_version = float(script_version_str)
+    except (ValueError, IndexError, TypeError):
+        script_version = 0.0
+    
+    wp_plugin = domain_category.get('wp_plugin') or 0
+    if wp_plugin == 1 and script_version >= 5:
         # Extract pageid from slug if needed
         pageid_param = pageid or ''
         keyword_param = k or key or ''
