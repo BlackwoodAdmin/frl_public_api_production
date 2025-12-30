@@ -502,13 +502,18 @@ def build_page_wp(
         return ""
     
     # Build basic page HTML (placeholder - needs full implementation)
-    wpage = f'<div class="seo-automation-main-table">'
+    import html
+    wpage = '<div class="seo-automation-main-table">'
     wpage += f'<h1>{clean_title(seo_filter_text_custom(res.get("restitle", "")))}</h1>'
     
     if res.get('resfulltext'):
-        wpage += f'<div class="seo-content">{seo_filter_text_custom(res["resfulltext"])}</div>'
+        # Unescape HTML entities (convert &quot; to ", &amp; to &, etc.)
+        content = html.unescape(str(res['resfulltext']))
+        wpage += f'<div class="seo-content">{content}</div>'
     elif res.get('resshorttext'):
-        wpage += f'<div class="seo-content">{seo_filter_text_custom(res["resshorttext"])}</div>'
+        # Unescape HTML entities
+        content = html.unescape(str(res['resshorttext']))
+        wpage += f'<div class="seo-content">{content}</div>'
     
     wpage += '</div>'
     
@@ -548,6 +553,7 @@ def build_bcpage_wp(
         return ""
     
     # Build basic page HTML (placeholder - needs full implementation)
+    import html
     bcpage = '<div class="seo-automation-main-table">'
     bcpage += f'<h1>{clean_title(seo_filter_text_custom(res.get("restitle", "")))} - Resources</h1>'
     
@@ -561,7 +567,9 @@ def build_bcpage_wp(
         shorttext = ''
     
     if shorttext:
-        bcpage += f'<div class="seo-content">{seo_filter_text_custom(shorttext)}</div>'
+        # Unescape HTML entities
+        shorttext = html.unescape(str(shorttext))
+        bcpage += f'<div class="seo-content">{shorttext}</div>'
     
     bcpage += '</div>'
     
@@ -611,11 +619,14 @@ def build_bubba_page_wp(
         return ""
     
     # Build basic page HTML (placeholder - needs full implementation)
+    import html
     wpage = '<div class="seo-automation-main-table">'
     wpage += f'<h1>{clean_title(seo_filter_text_custom(res.get("bubbatitle", "")))}</h1>'
     
     if res.get('resfulltext'):
-        wpage += f'<div class="seo-content">{seo_filter_text_custom(res["resfulltext"])}</div>'
+        # Unescape HTML entities
+        content = html.unescape(str(res['resfulltext']))
+        wpage += f'<div class="seo-content">{content}</div>'
     
     wpage += '</div>'
     
