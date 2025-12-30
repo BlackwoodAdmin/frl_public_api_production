@@ -35,12 +35,31 @@ async def article_endpoint(
     Handles both GET and POST requests (PHP $_REQUEST gets both).
     """
     
-    # For POST requests, also check form data (PHP $_REQUEST includes both GET and POST)
+    # For POST requests, also check form data and JSON body (PHP $_REQUEST includes both GET and POST)
+    # Note: POST requests can have parameters in query string OR body
     form_data = None
+    json_data = None
     if request.method == "POST":
+        # First, check query params (POST requests can have params in URL too)
+        # PHP $_REQUEST merges $_GET and $_POST, so we check both
+        query_params = dict(request.query_params)
+        domain = domain or query_params.get("domain")
+        Action = Action or query_params.get("Action")
+        apiid = apiid or query_params.get("apiid")
+        apikey = apikey or query_params.get("apikey")
+        kkyy = kkyy or query_params.get("kkyy")
+        feededit = feededit or query_params.get("feedit")
+        k = k or query_params.get("k")
+        key = key or query_params.get("key")
+        pageid = pageid or query_params.get("pageid")
+        version = version or query_params.get("version", "1.0")
+        debug = debug or query_params.get("debug", "0")
+        agent = agent or query_params.get("agent")
+        
+        # Then try to parse body as form data
         try:
             form_data = await request.form()
-            # Override query params with form data if present (POST takes precedence like PHP)
+            # Override with form data if present (POST body takes precedence)
             domain = domain or form_data.get("domain")
             Action = Action or form_data.get("Action")
             apiid = apiid or form_data.get("apiid")
@@ -50,25 +69,46 @@ async def article_endpoint(
             k = k or form_data.get("k")
             key = key or form_data.get("key")
             pageid = pageid or form_data.get("pageid")
-            version = version or form_data.get("version", "1.0")
-            debug = debug or form_data.get("debug", "0")
+            version = version or form_data.get("version", version)
+            debug = debug or form_data.get("debug", debug)
             agent = agent or form_data.get("agent")
         except Exception:
-            # If form parsing fails, continue with query params only
-            pass
+            # If form parsing fails, try JSON
+            try:
+                json_data = await request.json()
+                domain = domain or json_data.get("domain")
+                Action = Action or json_data.get("Action")
+                apiid = apiid or json_data.get("apiid")
+                apikey = apikey or json_data.get("apikey")
+                kkyy = kkyy or json_data.get("kkyy")
+                feededit = feededit or json_data.get("feedit")
+                k = k or json_data.get("k")
+                key = key or json_data.get("key")
+                pageid = pageid or json_data.get("pageid")
+                version = version or json_data.get("version", version)
+                debug = debug or json_data.get("debug", debug)
+                agent = agent or json_data.get("agent")
+            except Exception:
+                # If both fail, we already have query params above
+                pass
     
     # WordPress plugin feed routing (kkyy-based)
     if apiid and apikey and kkyy:
         # Route to WordPress plugin feeds based on kkyy value
         if kkyy == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
             # Route to apifeedwp30 handler
-            # Get feededit from query params or form data (PHP $_REQUEST gets both)
+            # Get feededit from query params, form data, or JSON (PHP $_REQUEST gets both)
             feededit_param = feededit or request.query_params.get('feedit')
-            if not feededit_param and form_data:
-                feededit_param = form_data.get('feedit')
+            if not feededit_param:
+                if form_data:
+                    feededit_param = form_data.get('feedit')
+                elif json_data:
+                    feededit_param = json_data.get('feedit')
             serveup_param = request.query_params.get('serveup', '0')
             if form_data:
                 serveup_param = form_data.get('serveup', serveup_param)
+            elif json_data:
+                serveup_param = json_data.get('serveup', serveup_param)
             return await handle_apifeedwp30(
                 domain=domain,
                 apiid=apiid,
