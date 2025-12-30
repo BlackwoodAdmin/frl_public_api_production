@@ -464,6 +464,33 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
     return pagesarray
 
 
+def extract_youtube_video_id(video_url: str) -> str:
+    """
+    Extract YouTube video ID from various URL formats.
+    Replicates the PHP video URL cleaning logic from websitereference-wp.php lines 366-383
+    """
+    import re
+    if not video_url or not video_url.strip():
+        return ""
+    
+    # Clean the video URL
+    vid = str(video_url).strip()
+    vid = vid.replace('https://www.', '')
+    vid = vid.replace('http://www.', '')
+    vid = vid.replace('http://', '')
+    vid = vid.replace('//', '')
+    vid = vid.replace('youtu.be/', '')
+    vid = vid.replace('youtube.com/embed/', '')
+    vid = vid.replace('youtube.com/watch?v=', '')
+    vid = vid.replace('www.', '')
+    
+    # Remove &feature=... and similar parameters
+    vid = re.sub(r'&.*feature.*', '', vid)
+    vid = vid.strip()
+    
+    return vid
+
+
 def build_page_wp(
     bubbleid: int,
     domainid: int,
@@ -505,6 +532,22 @@ def build_page_wp(
     import html
     wpage = '<div class="seo-automation-main-table">'
     wpage += f'<h1>{clean_title(seo_filter_text_custom(res.get("restitle", "")))}</h1>'
+    
+    # Handle YouTube video embedding (replicates PHP lines 366-386)
+    # Priority: resvideo -> resvideobubble -> domain_data['wr_video']
+    video_id = ""
+    if res.get('resvideo') and res.get('resvideo').strip():
+        video_id = extract_youtube_video_id(res['resvideo'])
+    elif res.get('resvideobubble') and res.get('resvideobubble').strip():
+        video_id = extract_youtube_video_id(res['resvideobubble'])
+    elif domain_data.get('wr_video') and str(domain_data.get('wr_video', '')).strip():
+        # This replicates lines 372-386: art_category['wr_video'] fallback
+        video_id = extract_youtube_video_id(domain_data['wr_video'])
+    
+    if video_id:
+        title_attr = clean_title(seo_filter_text_custom(res.get("restitle", "")))
+        wpage += f'<div class="vid-container dddd"><iframe title="{title_attr}" style="max-width:100%;margin-bottom:20px;" src="//www.youtube.com/embed/{video_id}" width="900" height="480"></iframe></div>'
+        wpage += '<div class="seo-automation-spacer"></div>'
     
     if res.get('resfulltext'):
         # Unescape HTML entities (convert &quot; to ", &amp; to &, etc.)

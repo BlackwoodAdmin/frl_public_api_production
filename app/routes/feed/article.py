@@ -197,7 +197,8 @@ async def handle_apifeedwp30(
     apikey: str,
     kkyy: str,
     feededit: Optional[str],
-    debug: str
+    debug: str,
+    serveup: Optional[str] = None
 ):
     """
     Handle apifeedwp30.php requests (WordPress 3.0+ plugin feed).
