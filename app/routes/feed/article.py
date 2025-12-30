@@ -1,5 +1,5 @@
 """Article.php endpoint - Main content router."""
-from fastapi import APIRouter, Request, Query, HTTPException
+from fastapi import APIRouter, Request, Query, HTTPException, Form
 from fastapi.responses import JSONResponse, HTMLResponse, Response
 from typing import Optional
 import logging
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/Article.php")
+@router.api_route("/Article.php", methods=["GET", "POST"])
 async def article_endpoint(
     request: Request,
     domain: Optional[str] = Query(None, alias="domain"),
@@ -32,16 +32,43 @@ async def article_endpoint(
     """
     Main Article.php endpoint - routes to different handlers based on parameters.
     Replicates the PHP Article.php functionality.
+    Handles both GET and POST requests (PHP $_REQUEST gets both).
     """
+    
+    # For POST requests, also check form data (PHP $_REQUEST includes both GET and POST)
+    form_data = None
+    if request.method == "POST":
+        try:
+            form_data = await request.form()
+            # Override query params with form data if present (POST takes precedence like PHP)
+            domain = domain or form_data.get("domain")
+            Action = Action or form_data.get("Action")
+            apiid = apiid or form_data.get("apiid")
+            apikey = apikey or form_data.get("apikey")
+            kkyy = kkyy or form_data.get("kkyy")
+            feededit = feededit or form_data.get("feedit")
+            k = k or form_data.get("k")
+            key = key or form_data.get("key")
+            pageid = pageid or form_data.get("pageid")
+            version = version or form_data.get("version", "1.0")
+            debug = debug or form_data.get("debug", "0")
+            agent = agent or form_data.get("agent")
+        except Exception:
+            # If form parsing fails, continue with query params only
+            pass
     
     # WordPress plugin feed routing (kkyy-based)
     if apiid and apikey and kkyy:
         # Route to WordPress plugin feeds based on kkyy value
         if kkyy == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
             # Route to apifeedwp30 handler
-            # Get feededit from query params directly (workaround for parameter scope issue)
-            feededit_param = request.query_params.get('feedit')
+            # Get feededit from query params or form data (PHP $_REQUEST gets both)
+            feededit_param = feededit or request.query_params.get('feedit')
+            if not feededit_param and form_data:
+                feededit_param = form_data.get('feedit')
             serveup_param = request.query_params.get('serveup', '0')
+            if form_data:
+                serveup_param = form_data.get('serveup', serveup_param)
             return await handle_apifeedwp30(
                 domain=domain,
                 apiid=apiid,
