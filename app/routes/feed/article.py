@@ -40,6 +40,8 @@ async def article_endpoint(
     cty: Optional[str] = Query(None),
     state: Optional[str] = Query(None),
     st: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    c: Optional[str] = Query(None),  # Alternative category parameter
 ):
     """
     Main Article.php endpoint - routes to different handlers based on parameters.
@@ -83,6 +85,8 @@ async def article_endpoint(
         cty = cty or query_params.get("cty")
         state = state or query_params.get("state")
         st = st or query_params.get("st")
+        category = category or query_params.get("category")
+        c = c or query_params.get("c")
         
         # Then try to parse body as form data or JSON (PHP $_REQUEST includes both GET and POST)
         content_type = request.headers.get("content-type", "")
@@ -129,6 +133,10 @@ async def article_endpoint(
                         debug = json_data.get("debug")
                     if json_data.get("agent"):
                         agent = json_data.get("agent")
+                    if json_data.get("category"):
+                        category = json_data.get("category")
+                    if json_data.get("c"):
+                        c = json_data.get("c")
                 except Exception as e2:
                     logger.warning(f"JSON parsing failed: {e2}")
             else:
@@ -163,6 +171,10 @@ async def article_endpoint(
                         debug = form_data.get("debug")
                     if form_data.get("agent"):
                         agent = form_data.get("agent")
+                    if form_data.get("category"):
+                        category = form_data.get("category")
+                    if form_data.get("c"):
+                        c = form_data.get("c")
                 except Exception as e:
                     logger.warning(f"Form data parsing failed: {e}")
                     # If form parsing fails, try to parse raw body as URL-encoded string
@@ -198,6 +210,10 @@ async def article_endpoint(
                                 debug = parsed.get("debug")[0]
                             if parsed.get("agent"):
                                 agent = parsed.get("agent")[0]
+                            if parsed.get("category"):
+                                category = parsed.get("category")[0]
+                            if parsed.get("c"):
+                                c = parsed.get("c")[0]
                         except Exception as e3:
                             logger.warning(f"Raw body parsing also failed: {e3}")
         except Exception as e:
@@ -544,15 +560,132 @@ async def article_endpoint(
         return HTMLResponse(content=full_page)
     elif Action == '2':
         # Business Collective (non-WP) - use same function as WP but it handles wp_plugin internally
-        from app.services.content import build_bcpage_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
+        from app.services.content import build_bcpage_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer, get_domain_keywords_from_bubblefeed
+        from fastapi.responses import RedirectResponse
+        
+        # PHP businesscollective.php lines 10-15: Redirect if category is set
+        # Use category or c parameter
+        category_param = category or c
+        if category_param:
+            # Build redirect URL to Action=1
+            if domain_settings.get('usedurl') == 1 and domain_category.get('domain_url'):
+                linkdomain = domain_category['domain_url'].rstrip('/')
+            else:
+                if domain_category.get('ishttps') == 1:
+                    linkdomain = 'https://'
+                else:
+                    linkdomain = 'http://'
+                if domain_category.get('usewww') == 1:
+                    linkdomain += 'www.' + domain_category['domain_name']
+                else:
+                    linkdomain += domain_category['domain_name']
+            
+            keyword_param = k or key or ''
+            pageid_param = pageid or ''
+            redirect_url = f"{linkdomain}/?Action=1&k={keyword_param.replace(' ', '-')}"
+            if pageid_param:
+                redirect_url += f"&PageID={pageid_param}"
+            return HTMLResponse(content=f'<script>document.location=\'{redirect_url}\';</script><noscript><div style="text-align:center;">404 - Page does not exist</div>')
+        
+        # PHP businesscollective.php lines 64-109: Keyword matching logic
         pageid_param = pageid or ''
-        keyword_param = k or key or ''
-        bubbleid = None
-        if pageid_param:
+        keyword_param_orig = k or key or ''
+        keyword_param = keyword_param_orig.lower().strip() if keyword_param_orig else ''
+        
+        # Convert slug format (hyphens) to keyword format (spaces) for matching
+        # The k parameter might be in slug format (hvac-culver-city) but keywords are stored with spaces
+        keyword_param_for_matching = keyword_param.replace('-', ' ') if keyword_param else ''
+        
+        # Get domain keywords from bubblefeed (PHP DomainKeywordsStr)
+        keywords = get_domain_keywords_from_bubblefeed(domainid, displayorder=0)
+        
+        # Get altkeywords from domain
+        altkeywords_str = domain_category.get('altkeywords', '') or ''
+        if altkeywords_str:
+            altkeywords = [k.strip().lower() for k in altkeywords_str.split(',') if k.strip()]
+            keywords = keywords + altkeywords
+        
+        # Remove duplicates and sort (PHP lines 69-72)
+        keywords = list(dict.fromkeys(keywords))  # Preserves order while removing duplicates
+        keywords.sort()
+        
+        # Match keyword (PHP lines 75-83)
+        # Try matching both the original parameter and the converted version
+        key_index = None
+        usefirstkeyword = False
+        if keyword_param_for_matching:
             try:
-                bubbleid = int(pageid_param)
+                # First try the converted version (spaces)
+                key_index = keywords.index(keyword_param_for_matching)
+                keyword_param = keyword_param_for_matching
             except ValueError:
-                bubbleid = None
+                try:
+                    # If that fails, try the original (might be stored as slug)
+                    key_index = keywords.index(keyword_param)
+                except ValueError:
+                    key_index = None
+        
+        if key_index is None:
+            if keywords:
+                keyword_param = keywords[0]
+                key_index = 0
+                usefirstkeyword = True
+            else:
+                # No keywords found - return error or default
+                return HTMLResponse(content="No keywords found for this domain", status_code=404)
+        
+        # Get bubblefeed record for matched keyword (PHP lines 85-109)
+        bubbleid = None
+        res_sql = """
+            SELECT b.id, b.restitle, b.resfulltext, b.resshorttext, b.resfeedtext,
+                   IFNULL(c.id, '') AS categoryid, IFNULL(c.category, '') AS category
+            FROM bwp_bubblefeed b
+            LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
+            WHERE b.domainid = %s AND b.deleted != 1 AND b.restitle = %s
+        """
+        res = db.fetch_row(res_sql, (domainid, keyword_param))
+        
+        # If no record found, get first bubblefeed with links (PHP lines 94-109)
+        if not res:
+            res_sql = """
+                SELECT b.*
+                FROM bwp_bubblefeed b
+                LEFT JOIN bwp_link_placement l ON l.showondomainid = %s AND l.deleted != 1
+                WHERE b.domainid = %s
+                AND b.id = l.showonpgid
+                AND b.deleted != 1
+                ORDER BY b.createdDate
+                LIMIT 1
+            """
+            res = db.fetch_row(res_sql, (domainid, domainid))
+            if res:
+                keyword_param = res.get('restitle', '')
+                key_index = 0
+                usefirstkeyword = True
+        
+        if not res:
+            return HTMLResponse(content="No valid keyword found for this domain", status_code=404)
+        
+        bubbleid = res.get('id')
+        keyword_param = res.get('restitle', keyword_param)
+        
+        # PHP lines 199-203: Redirect if keyword doesn't match and original was provided
+        if (key_index is None or usefirstkeyword) and keyword_param_orig:
+            # Redirect to Action=2 without keyword
+            if domain_settings.get('usedurl') == 1 and domain_category.get('domain_url'):
+                linkdomain = domain_category['domain_url'].rstrip('/')
+            else:
+                if domain_category.get('ishttps') == 1:
+                    linkdomain = 'https://'
+                else:
+                    linkdomain = 'http://'
+                if domain_category.get('usewww') == 1:
+                    linkdomain += 'www.' + domain_category['domain_name']
+                else:
+                    linkdomain += domain_category['domain_name']
+            
+            redirect_url = f"{linkdomain}/?Action=2"
+            return HTMLResponse(content=f'<meta http-equiv="refresh" content="0;URL={redirect_url}">')
         
         wpage = build_bcpage_wp(
             bubbleid=bubbleid,
