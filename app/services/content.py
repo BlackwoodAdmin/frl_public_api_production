@@ -699,7 +699,9 @@ def build_bcpage_wp(
     
     # Additional Resources section (keyword links)
     domain_status = domain_data.get('status')
-    if domain_status in ['1', '2', '8', '10']:
+    # Convert to string for comparison (handles both int and str from DB)
+    domain_status_str = str(domain_status) if domain_status is not None else ''
+    if domain_status_str in ['1', '2', '8', '10']:
         links_sql = """
             SELECT d.*, b.restitle, b.resshorttext, b.resfulltext, b.linkouturl, b.resname, b.resaddress, b.resphone, 
                    l.linkformat, l.deeplink, l.relevant, b.id AS bubblefeedid, b.title, b.categoryid,
