@@ -62,8 +62,11 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                 if is_bron_val:
                     bclink = linkdomain + '/' + str(item['id']) + 'bc/'
                 else:
-                    # Use seo_text_custom for slug (not seo_filter_text_custom)
+                    # Use toAscii(html_entity_decode(seo_text_custom(...))) for slug like PHP
+                    import html
                     slug_text = seo_text_custom(item['restitle'])
+                    slug_text = html.unescape(slug_text)  # html_entity_decode
+                    slug_text = to_ascii(slug_text)  # toAscii
                     slug = seo_slug(slug_text) + '-' + str(item['id']) + 'bc/'
                     bclink = linkdomain + '/' + slug
                 
@@ -80,8 +83,11 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                         # External link
                         foot += '<li><a style="padding-right: 0px !important;" href="' + item['linkouturl'] + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
                     else:
-                        # Internal link - use seo_text_custom for slug
+                        # Internal link - use toAscii(html_entity_decode(seo_text_custom(...))) for slug
+                        import html
                         slug_text = seo_text_custom(item['restitle'])
+                        slug_text = html.unescape(slug_text)  # html_entity_decode
+                        slug_text = to_ascii(slug_text)  # toAscii
                         slug = seo_slug(slug_text) + '-' + str(item['id']) + '/'
                         foot += '<li><a style="padding-right: 0px !important;" href="' + linkdomain + '/' + slug + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
                 else:
@@ -100,6 +106,38 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
     if domain_settings.get('faqUrl') and len(domain_settings['faqUrl']) > 10:
         foot += '<li><a class="url" style="width: 100%;font-size:12px;line-height:13px;" target="_blank" href="' + domain_settings['faqUrl'] + '">FAQ</a></li>\n'
     
+    # Add "Recent Post" section (drip content links) if conditions are met
+    servicetype = domain_data.get('servicetype')
+    dripcontent = domain_data.get('dripcontent', 0)
+    if servicetype not in [10, 356] and dripcontent > 3:
+        bubba_sql = """
+            SELECT ba.* 
+            FROM bwp_bubbafeed ba
+            LEFT JOIN bwp_bubblefeed bb ON bb.id = ba.bubblefeedid
+            WHERE ba.domainid = %s
+            AND ba.deleted != 1
+            AND bb.deleted != 1
+            AND LENGTH(ba.resfulltext) > 300
+            ORDER BY ba.id DESC
+            LIMIT 20
+        """
+        allbubba = db.fetch_all(bubba_sql, (domainid,))
+        
+        if allbubba:
+            foot += '<li>'
+            foot += '<ul class="seo-sub-nav">\n'
+            import html
+            for bubba in allbubba:
+                # Use toAscii(html_entity_decode(seo_text_custom(...))) for slug
+                slug_text = seo_text_custom(bubba.get('bubbatitle', ''))
+                slug_text = html.unescape(slug_text)  # html_entity_decode
+                slug_text = to_ascii(slug_text)  # toAscii
+                slug = seo_slug(slug_text) + '-' + str(bubba['id']) + 'dc'
+                bubba_title = clean_title(html.unescape(seo_filter_text_custom(bubba.get('bubbatitle', ''))))
+                foot += '<li><a style="padding-right: 0px !important;" href="' + linkdomain + '/' + slug + '">' + bubba_title + '</a></li>\n'
+            foot += '</ul>\n'
+            foot += 'Recent Post</li>\n'
+    
     # Build final footer HTML
     if domain_data.get('wr_name'):
         ltest = domain_data['wr_name']
@@ -108,6 +146,7 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
     
     foot += '</ul><a href="' + linkdomain + '/"><div class="seo-button-paid">&copy; ' + str(datetime.now().year) + ' ' + ltest + '</div></a></li></ul>\n'
     
+    # Prepend wrapper divs (matching PHP structure)
     footer_html = '<div class="seo-automation-spacer"></div>\n'
     footer_html += '<div style="display:block !important;" class="seo-footer-section ">\n'
     footer_html += '<ul class="seo-footer-nav num-lite">\n'
