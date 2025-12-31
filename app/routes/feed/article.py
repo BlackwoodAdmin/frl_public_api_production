@@ -63,7 +63,15 @@ async def article_endpoint(
         
         # Then try to parse body as form data or JSON (PHP $_REQUEST includes both GET and POST)
         content_type = request.headers.get("content-type", "")
-        logger.debug(f"POST request - Content-Type: {content_type}")
+        logger.info(f"POST request - Content-Type: {content_type}")
+        
+        # Read raw body first to see what we're getting
+        try:
+            raw_body = await request.body()
+            logger.info(f"POST request - Raw body length: {len(raw_body)}, body: {raw_body.decode('utf-8', errors='ignore')[:500]}")
+        except Exception as e:
+            logger.warning(f"Could not read raw body: {e}")
+            raw_body = b""
         
         # Try to parse body - WordPress uses cURL with CURLOPT_POSTFIELDS (form-encoded)
         # Try form data first (most common for WordPress POST requests)
@@ -73,7 +81,7 @@ async def article_endpoint(
                 # Only try JSON if explicitly JSON content type
                 try:
                     json_data = await request.json()
-                    logger.debug(f"POST request - JSON data: {json_data}")
+                    logger.info(f"POST request - JSON data: {json_data}")
                     if json_data.get("domain"):
                         domain = json_data.get("domain")
                     if json_data.get("Action"):
@@ -99,13 +107,14 @@ async def article_endpoint(
                     if json_data.get("agent"):
                         agent = json_data.get("agent")
                 except Exception as e2:
-                    logger.debug(f"JSON parsing failed: {e2}")
+                    logger.warning(f"JSON parsing failed: {e2}")
             else:
                 # Try form data (default for WordPress cURL POST requests)
                 # This handles: application/x-www-form-urlencoded, multipart/form-data, or no content-type
                 try:
                     form_data = await request.form()
-                    logger.debug(f"POST request - Form data: {dict(form_data)}")
+                    form_dict = dict(form_data)
+                    logger.info(f"POST request - Form data: {form_dict}")
                     # Override with form data if present (POST body takes precedence)
                     if form_data.get("domain"):
                         domain = form_data.get("domain")
@@ -132,9 +141,44 @@ async def article_endpoint(
                     if form_data.get("agent"):
                         agent = form_data.get("agent")
                 except Exception as e:
-                    logger.debug(f"Form data parsing failed: {e}")
+                    logger.warning(f"Form data parsing failed: {e}")
+                    # If form parsing fails, try to parse raw body as URL-encoded string
+                    if raw_body:
+                        try:
+                            from urllib.parse import parse_qs, unquote
+                            body_str = raw_body.decode('utf-8')
+                            # Parse URL-encoded string
+                            parsed = parse_qs(body_str)
+                            logger.info(f"POST request - Parsed from raw body: {parsed}")
+                            # Extract first value from each list (parse_qs returns lists)
+                            if parsed.get("domain"):
+                                domain = parsed.get("domain")[0]
+                            if parsed.get("Action"):
+                                Action = parsed.get("Action")[0]
+                            if parsed.get("apiid"):
+                                apiid = parsed.get("apiid")[0]
+                            if parsed.get("apikey"):
+                                apikey = parsed.get("apikey")[0]
+                            if parsed.get("kkyy"):
+                                kkyy = parsed.get("kkyy")[0]
+                            if parsed.get("feedit"):
+                                feededit = parsed.get("feedit")[0]
+                            if parsed.get("k"):
+                                k = parsed.get("k")[0]
+                            if parsed.get("key"):
+                                key = parsed.get("key")[0]
+                            if parsed.get("pageid"):
+                                pageid = parsed.get("pageid")[0]
+                            if parsed.get("version"):
+                                version = parsed.get("version")[0]
+                            if parsed.get("debug"):
+                                debug = parsed.get("debug")[0]
+                            if parsed.get("agent"):
+                                agent = parsed.get("agent")[0]
+                        except Exception as e3:
+                            logger.warning(f"Raw body parsing also failed: {e3}")
         except Exception as e:
-            logger.debug(f"Body parsing failed: {e}")
+            logger.warning(f"Body parsing failed: {e}")
         
         logger.debug(f"POST request - Final extracted params - domain: {domain}, apiid: {apiid}, apikey: {apikey}, kkyy: {kkyy}, feededit: {feededit}")
     
