@@ -249,6 +249,27 @@ def seo_text_custom(text: str) -> str:
     return text
 
 
+def seo_filter_text_customapi(text: str) -> str:
+    """Clean text similar to PHP seo_filter_text_customapi (for API output)."""
+    import re
+    text = text.strip()
+    text = re.sub(r'&(amp;)+', '&', text)
+    text = text.replace('&amp;amp;', '&amp;')
+    text = text.replace('&amp;mdash;', '&mdash;')
+    text = text.replace('&amp;nbsp;', '&nbsp;')
+    text = text.replace('&amp;#', '&#')
+    # Note: Does NOT decode &#39; and &#124; (commented out in PHP)
+    return text
+
+
+def trim_to_first_n_words(text: str, n: int) -> str:
+    """Trim text to first N words (PHP bwp_shorten_string)."""
+    words = text.split()
+    if len(words) <= n:
+        return text
+    return ' '.join(words[:n]) + ' ...'
+
+
 def to_ascii(text: str) -> str:
     """Convert text to ASCII (simplified version of PHP toAscii).
     Note: PHP toAscii expects text to already be processed by seo_text_custom and html_entity_decode.
@@ -300,6 +321,54 @@ def seo_text_customamp(text: str) -> str:
     return text
 
 
+def seo_automation_add_text_link_new(text: str = '', kword: str = '', iurl: str = '', follow: str = '', title: str = '') -> str:
+    """
+    Add text link to content (PHP seo_automation_add_text_link_new).
+    Replicates PHP function from functions.inc.php line 2273-2307.
+    Skips first 4000 characters before searching for keyword.
+    """
+    import re
+    import html
+    
+    if text and kword and iurl:
+        # Clean keyword and text
+        kword_clean = clean_title(kword)
+        text = seo_text_customamp(text)
+        
+        # Skip the first 4000 characters (PHP line 2278-2280)
+        initial_text = text[:4000]
+        remaining_text = text[4000:]
+        
+        # Pattern to skip existing <a> tags and HTML tags, match keyword
+        # PHP: /<a\b[^>]*>.*?<\/a>(*SKIP)(*FAIL)|<[^>]+>(*SKIP)(*FAIL)|\b{keyword}\b/i
+        escaped_kword = re.escape(kword_clean)
+        pattern = rf'(?:<a\b[^>]*>.*?</a>|<[^>]+>|\b{escaped_kword}\b)'
+        
+        replaced = False
+        
+        def replace_callback(match):
+            nonlocal replaced
+            match_str = match.group(0)
+            # Check if this is the keyword (not an HTML tag)
+            if not match_str.startswith('<') and match_str.lower() == kword_clean.lower():
+                if not replaced:
+                    replaced = True
+                    title_attr = html.escape(title) if title else html.escape(kword_clean)
+                    return f' <a title="{title_attr}" {follow} href="{iurl}">{match_str}</a>'
+            return match_str
+        
+        remaining_text = re.sub(pattern, replace_callback, remaining_text, flags=re.IGNORECASE)
+        
+        # If no replacement was made, append link at end (PHP line 2297-2298)
+        if not replaced:
+            title_attr = html.escape(title) if title else html.escape(kword_clean)
+            remaining_text = remaining_text + f' <a title="{title_attr}" {follow} href="{iurl}">{kword_clean}</a>'
+        
+        return initial_text + remaining_text
+    else:
+        return text
+
+
 def seo_automation_add_text_link_newbc(text: str = '', kword: str = '', iurl: str = '', follow: str = '', title: str = '') -> str:
     """
     Add text link to content (PHP seo_automation_add_text_link_newbc).
@@ -341,6 +410,59 @@ def seo_automation_add_text_link_newbc(text: str = '', kword: str = '', iurl: st
         return text
     else:
         return text
+
+
+def insert_after_first_heading(html_string: str, string_to_insert: str) -> str:
+    """
+    Insert string after the second heading tag (PHP insertAfterFirstHeading).
+    Replicates PHP function from functions.inc.php line 151-178.
+    """
+    import re
+    
+    heading_count = 0
+    replace_count = 0
+    
+    def replace_callback(match):
+        nonlocal heading_count, replace_count
+        heading_count += 1
+        
+        # If this is the second heading tag, append the string to insert
+        if heading_count == 2:
+            replace_count = 1
+            return string_to_insert + match.group(0)
+        
+        # Return the original heading tag for all other cases
+        return match.group(0)
+    
+    # Pattern to match heading tags: <h1> through <h6>
+    pattern = r'<h[1-6][^>]*>.*?</h[1-6]>'
+    result = re.sub(pattern, replace_callback, html_string, flags=re.IGNORECASE | re.DOTALL)
+    
+    # If no replacement was made, prepend the string (PHP line 176)
+    if replace_count == 0:
+        result = string_to_insert + result
+    
+    return result
+
+
+def check_image_src_gpt(string: str) -> int:
+    """
+    Check if string contains specific image src pattern (PHP checkImageSrcGPT).
+    Replicates PHP function from functions.inc.php line 180-192.
+    Returns 1 if pattern NOT found, 0 if found.
+    """
+    import re
+    
+    # Regular expression to find <img> tags with a specific src
+    pattern = r'<img[^>]+src\s*=\s*["\']https://services6\.imagehosting\.space/images/[^"\']+["\'][^>]*>'
+    
+    # Check if the pattern is found in the string
+    if re.search(pattern, string, re.IGNORECASE):
+        # If found, return 0
+        return 0
+    
+    # If not found, return 1
+    return 1
 
 
 def is_bron(servicetype: Optional[int]) -> bool:
@@ -649,51 +771,121 @@ def build_page_wp(
     """
     Build Website Reference page HTML (Action=1).
     Replicates seo_automation_build_page from websitereference-wp.php
-    
-    TODO: Full implementation needed - this is a placeholder
     """
+    import html
+    import re
+    from urllib.parse import quote
+    from datetime import datetime, timedelta
+    import random
+    
     if not bubbleid or not domainid:
         return ""
     
-    # Get bubblefeed data
-    sql = """
-        SELECT b.id, b.restitle, b.title, b.resfulltext, b.resshorttext, b.linkouturl, 
-               b.resphone, b.resvideo, b.resaddress, b.resgooglemaps, b.resname,
-               IFNULL(c.id, '') AS categoryid, IFNULL(c.category, '') AS category
-        FROM bwp_bubblefeed b
-        LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
-        WHERE b.id = %s AND b.domainid = %s AND b.deleted != 1
-    """
-    res = db.fetch_row(sql, (bubbleid, domainid))
+    # Get bubblefeed data - handle multiple scenarios (PHP lines 52-108)
+    res = None
+    if offpageid != 0 and support != 1:
+        sql = """
+            SELECT bo.id, bo.bubblefeedid, b.restitle, bo.title, bo.resfulltext, b.resshorttext, 
+                   b.linkouturl, b.resaddress, b.resgooglemaps, b.resphone, bo.resvideo, 
+                   b.resvideo AS resvideobubble, b.resname,
+                   IFNULL(c.id, '') AS categoryid, IFNULL(c.category, '') AS category
+            FROM bwp_bubblefeedoffsite bo
+            LEFT JOIN bwp_bubblefeed b ON b.id = bo.bubblefeedid
+            LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
+            WHERE bo.id = %s AND bo.domainid = %s
+        """
+        res = db.fetch_row(sql, (offpageid, offdomainid))
+    elif support == 1 and (is_seom(domain_data.get('servicetype')) or is_bron(domain_data.get('servicetype'))):
+        sql = """
+            SELECT b.restitle, b.title, b.resfulltext, b.resshorttext, b.linkouturl, b.resaddress, 
+                   b.resgooglemaps, b.resphone, b.resvideo, b.resname, b.bubblefeedid,
+                   b.resgoogle, b.resfb, b.resx, b.reslinkedin, b.resinstagram, b.restiktok, b.respinterest,
+                   IFNULL(c.id, '') AS categoryid, IFNULL(c.category, '') AS category
+            FROM bwp_bubblefeedsupport b
+            LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
+            WHERE b.id = %s AND b.domainid = %s
+        """
+        res = db.fetch_row(sql, (bubbleid, domainid))
+    elif artpageid != 0:
+        sql = """
+            SELECT b.id, b.restitle, b.title, b.resfulltext, b.resshorttext, b.linkouturl, 
+                   b.resaddress, b.resgooglemaps, b.resphone, b.resvideo, b.resname,
+                   IFNULL(c.id, '') AS categoryid, IFNULL(c.category, '') AS category
+            FROM bwp_bubblefeed b
+            LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
+            WHERE b.id = %s AND b.domainid = %s AND b.deleted != 1
+        """
+        res = db.fetch_row(sql, (artpageid, artdomainid))
+    else:
+        sql = """
+            SELECT b.id, b.restitle, b.title, b.resfulltext, b.resshorttext, b.linkouturl, 
+                   b.categoryid AS bubblecategoryid, b.resphone, b.resvideo, b.resaddress, 
+                   b.resgooglemaps, b.resname, b.resgoogle, b.resfb, b.resx, b.reslinkedin, 
+                   b.resinstagram, b.restiktok, b.respinterest,
+                   IFNULL(c.id, '') AS categoryid, IFNULL(c.category, '') AS category, c.bubblefeedid
+            FROM bwp_bubblefeed b
+            LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
+            WHERE b.id = %s AND b.domainid = %s AND b.deleted != 1
+        """
+        res = db.fetch_row(sql, (bubbleid, domainid))
+    
+    # Fallback: try to find by keyword (PHP lines 97-108)
+    if not res and keyword:
+        sql = """
+            SELECT b.id, b.restitle, b.title, b.resfulltext, b.resshorttext, b.linkouturl, 
+                   b.resphone, b.resvideo, b.resaddress, b.resgooglemaps, b.resname, b.NoContent,
+                   b.resgoogle, b.resfb, b.resx, b.reslinkedin, b.resinstagram, b.restiktok, b.respinterest,
+                   IFNULL(c.id, '') AS categoryid, IFNULL(c.category, '') AS category, c.bubblefeedid
+            FROM bwp_bubblefeed b
+            LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
+            WHERE b.restitle = %s AND b.domainid = %s AND b.deleted != 1
+        """
+        res = db.fetch_row(sql, (keyword, domainid))
     
     if not res:
         return ""
     
-    # Build basic page HTML (placeholder - needs full implementation)
-    # Note: For WordPress plugin (wp_plugin=1), do NOT add H1 - WordPress handles the title
-    # For PHP plugin, H1 is added elsewhere
-    import html
-    wpage = '<div class="seo-automation-main-table">'
-    # WordPress plugin does not add H1 - title is handled by WordPress
-    # wpage += f'<h1>{clean_title(seo_filter_text_custom(res.get("restitle", "")))}</h1>'
+    # Build link domain (PHP lines 208-232)
+    if domain_settings.get('usedurl') == 1 and domain_data.get('domain_url'):
+        linkdomain = domain_data['domain_url'].rstrip('/')
+    else:
+        if domain_data.get('ishttps') == 1:
+            linkdomain = 'https://'
+        else:
+            linkdomain = 'http://'
+        if domain_data.get('usewww') == 1:
+            linkdomain += 'www.' + domain_data['domain_name']
+        else:
+            linkdomain += domain_data['domain_name']
     
-    # Handle YouTube video embedding (replicates PHP lines 366-386)
-    # Priority: resvideo -> resvideobubble -> domain_data['wr_video']
-    video_id = ""
-    if res.get('resvideo') and res.get('resvideo').strip():
-        video_id = extract_youtube_video_id(res['resvideo'])
-    elif res.get('resvideobubble') and res.get('resvideobubble').strip():
-        video_id = extract_youtube_video_id(res['resvideobubble'])
-    elif domain_data.get('wr_video') and str(domain_data.get('wr_video', '')).strip():
-        # This replicates lines 372-386: art_category['wr_video'] fallback
-        video_id = extract_youtube_video_id(domain_data['wr_video'])
+    # Build resurl (PHP lines 243-264)
+    if artpageid != 0 or offpageid != 0:
+        resurl = linkdomain
+    else:
+        if res.get('categoryid'):
+            if res.get('bubblefeedid') == res.get('id'):
+                resurl = '/'
+            else:
+                urltitle = seo_filter_text_custom(res.get('category', ''))
+                slug_text = seo_text_custom(urltitle)
+                slug_text = html.unescape(slug_text)
+                slug_text = to_ascii(slug_text)
+                slug_text = slug_text.lower()
+                slug_text = slug_text.replace(' ', '-')
+                resurl = linkdomain + '/' + slug_text + '-' + str(res.get('bubblefeedid', res.get('id', '')))
+        elif is_seom(domain_data.get('servicetype')) and res.get('linkouturl'):
+            resurl = res['linkouturl']
+        else:
+            resurl = '/'
     
-    if video_id:
-        title_attr = clean_title(seo_filter_text_custom(res.get("restitle", "")))
-        wpage += f'<div class="vid-container dddd"><iframe title="{title_attr}" style="max-width:100%;margin-bottom:20px;" src="//www.youtube.com/embed/{video_id}" width="900" height="480"></iframe></div>'
-        wpage += '<div class="seo-automation-spacer"></div>'
+    # Start building page (PHP line 136)
+    if domain_data.get('resourcesactive') != 1:
+        return '<p>This feature is not available for your current package. Please upgrade your package. [ID-01]</p>'
     
-    # Check if resfulltext contains Bootstrap container classes and add Bootstrap CSS/JS if needed
+    wpage = '<div class="seo-automation-main-table" style="margin-left:auto;margin-right:auto;display:block;">\n'
+    wpage += '<div class="seo-automation-spacer"></div>\n'
+    
+    # Check if resfulltext contains Bootstrap container classes and add Bootstrap CSS/JS if needed (PHP lines 266-275)
     resfulltext = res.get('resfulltext', '')
     if resfulltext and 'container justify-content-center' in resfulltext.lower():
         wpage += '''
@@ -704,16 +896,349 @@ def build_page_wp(
 <style>.wr-fulltext img {height: auto !important;min-width:100%;}@media (min-width: 992px){.wr-fulltext img {min-width:0;}}.container.justify-content-center {max-width:100%;margin-bottom:15px;}.ngodkrbsitr-spacer{clear:both;}.seo-automation-main-table h1:after, .seo-automation-main-table h2:after, .seo-automation-main-table h3:after, .seo-automation-main-table h4:after, .seo-automation-main-table h5:after, .seo-automation-main-table h6:after {display: none !important;clear: none !important;} .seo-automation-main-table h1, .seo-automation-main-table h2, .seo-automation-main-table h3, .seo-automation-main-table h4, .seo-automation-main-table h5, .seo-automation-main-table h6 {clear: none !important;}.seo-automation-main-table .row .col-md-6 {	/* display:list-item; */ } </style>
 '''
     
-    if res.get('resfulltext'):
-        # Unescape HTML entities (convert &quot; to ", &amp; to &, etc.)
-        content = html.unescape(str(res['resfulltext']))
-        wpage += f'<div class="seo-content">{content}</div>'
-    elif res.get('resshorttext'):
-        # Unescape HTML entities
-        content = html.unescape(str(res['resshorttext']))
-        wpage += f'<div class="seo-content">{content}</div>'
+    # Handle YouTube video embedding (PHP lines 282-465)
+    # Priority: resvideo -> resvideobubble -> domain_data['wr_video']
+    video_id = ""
+    if res.get('resvideo') and res.get('resvideo').strip():
+        video_id = extract_youtube_video_id(res['resvideo'])
+    elif res.get('resvideobubble') and res.get('resvideobubble').strip():
+        video_id = extract_youtube_video_id(res['resvideobubble'])
+    elif domain_data.get('wr_video') and str(domain_data.get('wr_video', '')).strip():
+        video_id = extract_youtube_video_id(domain_data['wr_video'])
     
-    wpage += '</div>'
+    if video_id:
+        title_attr = clean_title(seo_filter_text_custom(res.get("restitle", "")))
+        wpage += f'<div class="vid-container dddd"><iframe title="{title_attr}" style="max-width:100%;margin-bottom:20px;" src="//www.youtube.com/embed/{video_id}" width="900" height="480"></iframe></div>'
+        wpage += '<div class="seo-automation-spacer"></div>\n'
+    
+    # Handle snapshot/image insertion (PHP lines 327-463)
+    if domain_data.get('showsnapshot') == 1 and check_image_src_gpt(html.unescape(seo_filter_text_custom(res.get('resfulltext', '')))) == 1:
+        moneynofollow = ''
+        if artpageid != 0 and (artdomainid == 87252 or True):
+            moneynofollow = ''
+        
+        if not res.get('linkouturl'):
+            im = f'<a{moneynofollow} style="display: inline;" href="{resurl}">'
+        else:
+            im = f'<a{moneynofollow} href="{res["linkouturl"].replace("&amp;", "&")}">'
+        
+        im += f'<img src="//imagehosting.space/feed/pageimage.php?domain={domain_data["domain_name"]}" class="align-left" style="width:320px !important;height:260px;" alt="{clean_title(seo_filter_text_custom(res.get("restitle", "")))}">'
+        im += '</a>'
+        
+        # Insert image after first heading (PHP line 337)
+        resfulltext = html.unescape(seo_filter_text_custom(res.get('resfulltext', '')))
+        resfulltext = insert_after_first_heading(resfulltext, im)
+        res['resfulltext'] = html.escape(resfulltext)
+    
+    # Build text content with keyword linking (PHP lines 466-557)
+    textkeywd = clean_title(seo_filter_text_custom(res.get('restitle', '')))
+    
+    if len(res.get('resfulltext', '').strip()) > 50 and domain_data.get('writerlock') != 1:
+        linkedtexted = html.unescape(seo_filter_text_custom(res.get('resfulltext', '')))
+        
+        # Determine URL for linking (PHP lines 472-485)
+        if offpageid != 0:
+            # Build offselfurl (simplified - would need full off_category logic)
+            theurl = linkdomain
+        elif artpageid != 0:
+            # Build artselfurl (simplified - would need full art_category logic)
+            theurl = linkdomain
+        elif len(res.get('linkouturl', '').strip()) <= 0:
+            theurl = resurl
+        else:
+            theurl = res.get('linkouturl', '').replace('&amp;', '&')
+        
+        # Add main keyword link (PHP line 487)
+        moneynofollow = ''
+        linkedtexted = seo_automation_add_text_link_new(linkedtexted, res.get('restitle', ''), theurl, moneynofollow)
+        
+        # Add support keyword links for SEOM/BRON (PHP lines 488-532)
+        if offdomainid != 0:
+            # Support keywords for offsite (PHP lines 488-504)
+            support_sql = """
+                SELECT id, restitle FROM bwp_bubblefeedsupport 
+                WHERE bubblefeedid = %s AND domainid = %s AND deleted != 1 AND LENGTH(resfulltext) > 300
+            """
+            thesupports = db.fetch_all(support_sql, (res.get('bubblefeedid', res.get('id', '')), offdomainid))
+            for thesupport in thesupports:
+                # Build offsupportselfurl (simplified)
+                offsupportselfurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(thesupport['restitle'])) + '-' + str(thesupport['id']) + '/'
+                linkedtexted = seo_automation_add_text_link_new(linkedtexted, thesupport['restitle'], offsupportselfurl, moneynofollow)
+        elif support == 0 and is_seom(domain_data.get('servicetype')):
+            # Support keywords for SEOM (PHP lines 505-512)
+            support_sql = """
+                SELECT id, restitle FROM bwp_bubblefeedsupport 
+                WHERE bubblefeedid = %s AND domainid = %s AND deleted != 1 AND LENGTH(resfulltext) > 300
+            """
+            thesupports = db.fetch_all(support_sql, (bubbleid, domainid))
+            for thesupport in thesupports:
+                thesupporturl = linkdomain + '/' + seo_slug(seo_filter_text_custom(thesupport['restitle'])) + '-' + str(thesupport['id']) + '/'
+                linkedtexted = seo_automation_add_text_link_new(linkedtexted, thesupport['restitle'], thesupporturl, moneynofollow)
+        elif support != 0 and (is_seom(domain_data.get('servicetype')) or is_bron(domain_data.get('servicetype'))):
+            # Support keywords for support page (PHP lines 515-532)
+            mainkw_sql = "SELECT restitle, linkouturl, id FROM bwp_bubblefeed WHERE id = %s"
+            mainkw = db.fetch_row(mainkw_sql, (res.get('bubblefeedid', res.get('id', '')),))
+            if mainkw:
+                if len(mainkw.get('linkouturl', '')) > 5:
+                    mainkwurl = mainkw['linkouturl']
+                else:
+                    mainkwurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(mainkw['restitle'])) + '-' + str(mainkw['id']) + '/'
+                linkedtexted = seo_automation_add_text_link_new(linkedtexted, mainkw['restitle'], mainkwurl.replace('&amp;', '&'), moneynofollow)
+                
+                # Get other support keyword
+                osupkw_sql = """
+                    SELECT restitle, id FROM bwp_bubblefeedsupport 
+                    WHERE bubblefeedid = %s AND restitle != %s
+                """
+                osupkw = db.fetch_row(osupkw_sql, (res.get('bubblefeedid', res.get('id', '')), res.get('restitle', '')))
+                if osupkw:
+                    osupkwurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(osupkw['restitle'])) + '-' + str(osupkw['id']) + '/'
+                    linkedtexted = seo_automation_add_text_link_new(linkedtexted, osupkw['restitle'], osupkwurl.replace('&amp;', '&'), moneynofollow)
+        
+        wpage += linkedtexted
+    elif len(res.get('resshorttext', '').strip()) > 50:
+        # Use shorttext if fulltext not available (PHP lines 535-557)
+        linkedtexted = html.unescape(res.get('resshorttext', ''))
+        
+        # Determine URL for linking
+        if offpageid != 0:
+            theurl = linkdomain
+        elif artpageid != 0:
+            if domain_data.get('writerlock') == 1:
+                linkedtexted = ''
+            theurl = linkdomain
+        elif len(res.get('linkouturl', '').strip()) < 5:
+            theurl = resurl
+        else:
+            theurl = res.get('linkouturl', '').replace('&amp;', '&')
+        
+        linkedtexted = seo_automation_add_text_link_new(linkedtexted, res.get('restitle', ''), theurl, moneynofollow)
+        wpage += linkedtexted
+    
+    wpage += '</div>\n'
+    
+    # Related posts - drip content (bubbafeed) (PHP lines 879-917)
+    if res.get('id'):
+        bubba_sql = """
+            SELECT * FROM bwp_bubbafeed
+            WHERE bubblefeedid = %s AND active = '1' 
+            AND char_length(resfulltext) > 300 AND deleted != '1'
+            ORDER BY createdDate DESC
+        """
+        resbubba = db.fetch_all(bubba_sql, (res['id'],))
+        
+        if resbubba:
+            wpage += '<div class="seo-automation-spacer"></div>\n'
+            wpage += '<div class="seo-automation-container-wr-full">\n'
+            
+            for bubba in resbubba:
+                title = clean_title(seo_filter_text_custom(bubba.get('bubbatitle', '')))
+                titlelink = title.lower().replace(' ', '-')
+                titlelink = to_ascii(html.unescape(titlelink))
+                resurl_bubba = linkdomain + '/' + seo_text_custom(titlelink) + '-' + str(bubba['id']) + 'dc'
+                
+                wpage += '<div class="seo-automation-containerwr moinfomation">\n'
+                wpage += f'<h2 class="h2"><a target="_top" title="{title}" href="{resurl_bubba}">{title}</a></h2>\n'
+                
+                bubbatext = strip_html(html.unescape(seo_filter_text_custom(bubba.get('resfulltext', ''))))
+                bubbatext = trim_to_first_n_words(bubbatext, 75)
+                bubbatext = bubbatext.replace('//gallery.imagehosting.space/gallery/', '//gallery.imagehosting.space/thumbs/')
+                wpage += bubbatext
+                wpage += '</div>\n'
+                wpage += '<div class="seo-automation-spacer"></div>\n'
+            
+            wpage += '</div>\n'
+    
+    # Related posts - related articles (PHP lines 918-1020)
+    if res.get('restitle') and res.get('restitle') == res.get('category'):
+        # Get related articles from same category (PHP lines 918-929)
+        related_sql = """
+            SELECT b.*, c.category
+            FROM bwp_bubblefeed b
+            LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid
+            WHERE b.categoryid = %s AND b.restitle != %s
+            AND b.active = '1' AND b.deleted != '1' AND c.deleted != 1
+            ORDER BY createdDate DESC
+        """
+        resrelated = db.fetch_all(related_sql, (res.get('categoryid', ''), res.get('restitle', '')))
+        
+        if resrelated:
+            wpage += '<h2 class="h1">Related Posts</h2>\n'
+            wpage += '<div class="seo-automation-spacer"></div>\n'
+            wpage += '<div class="seo-automation-container-wr-full">\n'
+            
+            for rel in resrelated:
+                resfulltext_rel = html.unescape(seo_filter_text_custom(rel.get('resfulltext', '')))
+                if len(resfulltext_rel) > 50:
+                    wpage += '<div class="seo-automation-containerwr">\n'
+                    titledecoded = seo_filter_text_custom(rel.get('restitle', ''))
+                    wpage += f'<h2 class="h2"><a target="_top" title="{titledecoded}" href="/">{titledecoded}</a></h2>\n'
+                    wpage += resfulltext_rel
+                    wpage += '<div class="seo-automation-spacer"></div>\n'
+                    
+                    # Get bubbafeed for related article (PHP lines 977-1016)
+                    bubba_rel_sql = """
+                        SELECT * FROM bwp_bubbafeed
+                        WHERE bubblefeedid = %s AND active = '1' 
+                        AND char_length(resfulltext) > 300 AND deleted != '1'
+                        ORDER BY createdDate DESC
+                    """
+                    resbubba_rel = db.fetch_all(bubba_rel_sql, (rel['id'],))
+                    
+                    if resbubba_rel and domain_data.get('servicetype') != 10:
+                        for bubba_rel in resbubba_rel:
+                            title_rel = clean_title(seo_filter_text_custom(bubba_rel.get('bubbatitle', '')))
+                            titlelink_rel = title_rel.lower().replace(' ', '-')
+                            titlelink_rel = to_ascii(html.unescape(titlelink_rel))
+                            resurl_bubba_rel = linkdomain + '/' + seo_text_custom(titlelink_rel) + '-' + str(bubba_rel['id']) + 'dc'
+                            
+                            wpage += '<div class="seo-automation-containerwr moinfomation">\n'
+                            wpage += f'<h2 class="h2"><a target="_top" title="{title_rel}" href="{resurl_bubba_rel}">{title_rel}</a></h2>\n'
+                            
+                            bubbatext_rel = strip_html(html.unescape(seo_filter_text_custom(bubba_rel.get('resfulltext', ''))))
+                            bubbatext_rel = trim_to_first_n_words(bubbatext_rel, 75)
+                            bubbatext_rel = bubbatext_rel.replace('//gallery.imagehosting.space/gallery/', '//gallery.imagehosting.space/thumbs/')
+                            wpage += bubbatext_rel
+                            wpage += '</div>\n'
+                            wpage += '<div class="seo-automation-spacer"></div>\n'
+                    
+                    wpage += '</div>\n'
+            
+            wpage += '</div>\n'
+    
+    # Google Maps section (PHP lines 1022-1487)
+    ssmap = 0
+    if domain_data.get('showmap'):
+        if domain_data.get('wr_address') or res.get('resaddress'):
+            map_val = 0
+            addres = res.get('resaddress') or domain_data.get('wr_address', '')
+            phon = res.get('resphone') or domain_data.get('wr_phone', '')
+            
+            stadd = ''
+            cty = ''
+            state = ''
+            zip_code = ''
+            mapurl = ''
+            
+            if addres:
+                address = seo_filter_text_custom(addres)
+                address = html.unescape(address)
+                addressarray = address.split(',')
+                if len(addressarray) == 3:
+                    stzipstr = addressarray[2]
+                    stziparray = stzipstr.strip().split(' ')
+                    if len(stziparray) == 2:
+                        stadd = addressarray[0].strip()
+                        cty = addressarray[1].strip()
+                        state = stziparray[0].strip()
+                        zip_code = stziparray[1].strip()
+                        map_val = 1
+                    elif len(stziparray) == 3:
+                        stadd = addressarray[0].strip()
+                        cty = addressarray[1].strip()
+                        state = stziparray[0].strip()
+                        zip_code = stziparray[1].strip()
+                        zip_code += ' ' + stziparray[2].strip()
+                        map_val = 1
+            
+            if map_val == 1:
+                wpage += '<div class="seo-automation-spacer"></div>\n'
+                wpage += '<div class="google-map">\n'
+                mpadd = ''
+                
+                if res.get('resname'):
+                    wpage += '<div itemscope itemtype="http://schema.org/LocalBusiness">\n'
+                    wpage += f'<span itemprop="name" style=""><strong>{seo_filter_text_customapi(res["resname"])}</strong></span> '
+                    if res.get('resgooglemaps'):
+                        wpage += f'<a href="{res["resgooglemaps"]}" title="Find us on Google" target="_blank"><img style="padding:0px;max-width:16px;height:auto;" src="https://seopanel.imagehosting.space/images/maps15_bnuw3a_32dp.ico" border="0" width="16" alt="Best Seo Wordpress Plugin"></a>'
+                    mpadd = res['resname']
+                    ssmap = 1
+                elif domain_data.get('wr_name'):
+                    wpage += '<div itemscope itemtype="http://schema.org/LocalBusiness">\n'
+                    wpage += f'<span itemprop="name" style=""><strong>{seo_filter_text_customapi(domain_data["wr_name"])}</strong></span> '
+                    if res.get('resgooglemaps'):
+                        wpage += f'<a href="{res["resgooglemaps"]}" title="Find us on Google" target="_blank"><img style="padding:0px;max-width:16px;height:auto;" src="https://seopanel.imagehosting.space/images/maps15_bnuw3a_32dp.ico" border="0" width="16" alt="Best Seo Wordpress Plugin"></a>'
+                    mpadd = domain_data['wr_name']
+                    ssmap = 1
+                
+                if phon:
+                    wpage += f'<div style="" itemprop="telephone">{phon}</div>\n'
+                
+                cntry = domain_data.get('domain_country', '')
+                wpage += '<div itemprop="address" itemscope itemtype="http://schema.org/PostalAddress">\n'
+                wpage += f'<div style="" itemprop="streetAddress">{stadd}</div>\n'
+                wpage += f'<span style="" itemprop="addressLocality">{cty}</span>\n'
+                wpage += f'<span style="" itemprop="addressRegion">{state}</span>\n'
+                wpage += f'<span style="" itemprop="postalCode">{zip_code}</span>\n'
+                wpage += f'<span style="display:none !important;" itemprop="addressCountry">{cntry}</span>\n'
+                
+                imagesrc = '//imagehosting.space/feed/pageimage.php?domain=' + domain_data['domain_name']
+                wpage += f'<meta itemprop="image" content="{imagesrc}"></meta>\n'
+                wpage += '</div>\n'
+                
+                # Build map URL
+                if mpadd:
+                    mapurl = f'https://www.google.com/maps/embed/v1/place?key=AIzaSyDET-f-9dCENEEt8nU2MLOXluoEtrq2k5o&q={quote(mpadd)}+{quote(addres.replace(",", ""))}'
+                else:
+                    mapurl = f'https://www.google.com/maps/embed/v1/place?key=AIzaSyDET-f-9dCENEEt8nU2MLOXluoEtrq2k5o&q={quote(addres.replace(",", ""))}'
+                
+                wpage += f'<iframe title="{mpadd}" width="280" height="160" style="border:0;overflow:hidden;" src="{mapurl}"></iframe>\n'
+                
+                if mpadd:
+                    wpage += f'<br /><a href="https://maps.google.com/maps?q={quote(mpadd)}+{quote(addres.replace(",", ""))}" style="color:#0000FF;text-align:left">View Larger Map</a>\n'
+                else:
+                    wpage += f'<br /><a href="https://maps.google.com/maps?q={quote(addres.replace(",", ""))}" style="color:#0000FF;text-align:left">View Larger Map</a>\n'
+                
+                # Reviews schema (PHP lines 1137-1150)
+                if domain_settings.get('reviewsch') == 1:
+                    created_date = domain_data.get('createdDate', '')
+                    if created_date:
+                        if isinstance(created_date, str):
+                            try:
+                                past = datetime.strptime(created_date, '%Y-%m-%d %H:%M:%S')
+                            except:
+                                past = datetime.now() - timedelta(days=365)
+                        else:
+                            past = created_date
+                    else:
+                        past = datetime.now() - timedelta(days=365)
+                    
+                    now = datetime.now()
+                    days_old = (now - past).days
+                    rating = round(random.uniform(4.7, 4.9), 1)
+                    
+                    wpage += f'''
+<div itemscope itemtype="https://schema.org/Product">
+    <span class="product_name" itemprop="name">{mpadd}</span>&nbsp; &nbsp;<img src="/wp-content/themes/woodmart-child/4.9stars.png" style="max-width:100px"/>
+    <div itemprop="aggregateRating" itemscope itemtype="https://schema.org/AggregateRating">
+        Rated <span itemprop="ratingValue">{rating}</span>/5 based on <span itemprop="reviewCount">{days_old}</span> customer reviews
+    </div>
+</div>
+'''
+                
+                wpage += '</div>\n'
+    
+    # Social media icons (PHP lines 1493-1508)
+    if (len(res.get('resgoogle', '')) > 10 or len(res.get('resfb', '')) > 10 or 
+        len(res.get('resx', '')) > 10 or len(res.get('reslinkedin', '')) > 10 or
+        len(res.get('resinstagram', '')) > 10 or len(res.get('restiktok', '')) > 10 or
+        len(res.get('respinterest', '')) > 10):
+        if len(res.get('resgoogle', '')) > 10:
+            wpage += f'<a href="{res["resgoogle"]}" title="{res.get("restitle", "")} - Find us on Google" target="_blank"><img style="padding:0px;max-width:16px;height:auto;" src="//seopanel.imagehosting.space/images/maps15_bnuw3a_32dp.ico" border="0" width="16" alt="{res.get("restitle", "")}"></a>'
+        if len(res.get('resfb', '')) > 10:
+            wpage += f'<a href="{res["resfb"]}" title="{res.get("restitle", "")} - Follow us on Facebook" target="_blank"><img style="padding:0px;max-width:16px;height:auto;" src="//imagehosting.space/images/fbfavicon.ico" width="16" alt="{res.get("restitle", "")}"></a>'
+        if len(res.get('resx', '')) > 10:
+            wpage += f'<a href="{res["resx"]}" title="{res.get("restitle", "")} - Follow us on X" target="_blank"><img style="padding:0px;max-width:16px;height:auto;" src="//www.x.com/favicon.ico" width="16" alt="{res.get("restitle", "")}"></a>'
+        if len(res.get('reslinkedin', '')) > 10:
+            wpage += f'<a href="{res["reslinkedin"]}" title="{res.get("restitle", "")} - Follow us on LinkedIn" target="_blank"><img style="padding:0px;max-width:16px;height:auto;" src="//imagehosting.space/images/linkfavicon.ico" border="0" width="16" alt="{res.get("restitle", "")}"></a>'
+        if len(res.get('resinstagram', '')) > 10:
+            wpage += f'<a href="{res["resinstagram"]}" title="{res.get("restitle", "")} - Follow us on Instagram" target="_blank"><img style="padding:0px;max-width:16px;height:auto;" src="//www.instagram.com/favicon.ico" border="0" width="16" alt="{res.get("restitle", "")}"></a>'
+        if len(res.get('restiktok', '')) > 10:
+            wpage += f'<a href="{res["restiktok"]}" title="{res.get("restitle", "")} - Follow us on TikTok" target="_blank"><img style="padding:0px;max-width:16px;height:auto;" src="//www.tiktok.com/favicon.ico" border="0" width="16" alt="{res.get("restitle", "")}"></a>'
+        if len(res.get('respinterest', '')) > 10:
+            wpage += f'<a href="{res["respinterest"]}" title="{res.get("restitle", "")} - Follow us on Penterest" target="_blank"><img style="padding:0px;max-width:16px;height:auto;" src="//www.pinterest.com/favicon.ico" border="0" width="16" alt="{res.get("restitle", "")}"></a>'
+    
+    wpage += '</div>\n'
     
     return wpage
 
