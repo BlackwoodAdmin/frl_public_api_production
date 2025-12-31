@@ -293,6 +293,56 @@ def custom_ucfirst_words(text: str) -> str:
     return ' '.join(word.capitalize() for word in words)
 
 
+def seo_text_customamp(text: str) -> str:
+    """Clean text similar to PHP seo_text_customamp."""
+    text = text.replace("&amp;amp;", "&amp;")
+    text = text.replace("&amp;amp;", "&amp;")
+    return text
+
+
+def seo_automation_add_text_link_newbc(text: str = '', kword: str = '', iurl: str = '', follow: str = '', title: str = '') -> str:
+    """
+    Add text link to content (PHP seo_automation_add_text_link_newbc).
+    Replicates PHP function from functions.inc.php line 2309-2340.
+    """
+    import re
+    import html
+    
+    if text and kword and iurl:
+        # Clean keyword and text
+        kword_clean = clean_title(kword)
+        text = seo_text_customamp(text)
+        
+        # Pattern to skip existing <a> tags and HTML tags, match keyword
+        # PHP: /<a\b[^>]*>.*?<\/a>(*SKIP)(*FAIL)|<[^>]+>(*SKIP)(*FAIL)|\b{keyword}\b/i
+        escaped_kword = re.escape(kword_clean)
+        pattern = rf'(?:<a\b[^>]*>.*?</a>|<[^>]+>|\b{escaped_kword}\b)'
+        
+        replaced = False
+        
+        def replace_callback(match):
+            nonlocal replaced
+            match_str = match.group(0)
+            # Check if this is the keyword (not an HTML tag)
+            if not match_str.startswith('<') and match_str.lower() == kword_clean.lower():
+                if not replaced:
+                    replaced = True
+                    title_attr = html.escape(title) if title else html.escape(kword_clean)
+                    return f' <a title="{title_attr}" {follow} target="_blank" href="{iurl}">{match_str}</a>'
+            return match_str
+        
+        text = re.sub(pattern, replace_callback, text, flags=re.IGNORECASE)
+        
+        # If no replacement was made, append link at end
+        if not replaced:
+            title_attr = html.escape(title) if title else html.escape(kword_clean)
+            text = text + f' <a title="{title_attr}" {follow} target="_blank" href="{iurl}">{kword_clean}</a>'
+        
+        return text
+    else:
+        return text
+
+
 def is_bron(servicetype: Optional[int]) -> bool:
     """Check if service type is BRON."""
     if not servicetype:
@@ -743,7 +793,14 @@ def build_bcpage_wp(
             if supportkwords:
                 supportlks = ''
                 for support in supportkwords:
-                    resurl1 = dl + '/' + seo_slug(seo_filter_text_custom(support['restitle'])) + '-' + str(support['id']) + '/'
+                    # PHP line 144: Use toAscii(html_entity_decode(seo_text_custom(...))) for URL
+                    import html
+                    slug_text = seo_text_custom(support['restitle'])
+                    slug_text = html.unescape(slug_text)
+                    slug_text = to_ascii(slug_text)
+                    slug_text = slug_text.lower()
+                    slug_text = slug_text.replace(' ', '-')
+                    resurl1 = dl + '/' + slug_text + '-' + str(support['id']) + '/'
                     supportlks += f' <strong><a href="{resurl1}" style="">{clean_title(seo_filter_text_custom(support["restitle"]))}</a></strong> -  '
                 supportlks = supportlks.rstrip(' - ')
                 bcpage += supportlks + '<br>\n'
@@ -769,7 +826,14 @@ def build_bcpage_wp(
             if supportkwords:
                 supportlks = ''
                 for support in supportkwords:
-                    resurl1 = dl + '/' + seo_slug(seo_filter_text_custom(support['restitle'])) + '-' + str(support['id']) + '/'
+                    # PHP line 186: Use toAscii(html_entity_decode(seo_text_custom(...))) for URL
+                    import html
+                    slug_text = seo_text_custom(support['restitle'])
+                    slug_text = html.unescape(slug_text)
+                    slug_text = to_ascii(slug_text)
+                    slug_text = slug_text.lower()
+                    slug_text = slug_text.replace(' ', '-')
+                    resurl1 = dl + '/' + slug_text + '-' + str(support['id']) + '/'
                     supportlks += f' <strong><a href="{resurl1}" style="">{clean_title(seo_filter_text_custom(support["restitle"]))}</a></strong> -  '
                 supportlks = supportlks.rstrip(' - ')
                 bcpage += supportlks + '<br>\n'
@@ -884,17 +948,60 @@ def build_bcpage_wp(
                     if not haslinkspg:
                         haslinkspg = {}
                 
-                # Build link URL (simplified - full logic is complex)
-                if len(link.get('linkouturl', '')) > 5 and link.get('status') in ['2', '10']:
+                # Build link URL - match PHP logic exactly
+                # PHP line 322-376: Complex conditional logic for link URL building
+                haslinkspg_count = haslinks if haslinks else 0
+                
+                if haslinkspg_count > 0 and link.get('wp_plugin') != 1 and link.get('servicetype') == 356 and link.get('status') in ['2', '10']:
+                    # PHP line 322-324: CodeURL for non-WP plugin with servicetype 356
+                    # Simplified CodeURL - would need full implementation
+                    linkurl = linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', '')))
+                elif haslinkspg_count > 0 and link.get('wp_plugin') == 1 and link.get('servicetype') == 356 and link.get('status') in ['2', '10']:
+                    # PHP line 326-331: WP plugin with servicetype 356
+                    if is_bron(link.get('servicetype')):
+                        linkurl = linkdomain + '/' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
+                    else:
+                        linkurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', ''))) + '-' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
+                elif len(link.get('linkouturl', '')) > 5 and link.get('status') in ['2', '10'] and (not is_seom(link.get('servicetype')) or is_bron(link.get('servicetype'))):
+                    # PHP line 333: linkouturl if NOT SEOM OR if BRON
                     linkurl = link['linkouturl'].strip()
                 elif link.get('skipfeedchecker') == 1:
+                    # PHP line 337-340
                     linkurl = linkdomainalone
-                elif link.get('wp_plugin') == 1 and (len(link.get('resfulltext', '')) >= 50 or len(link.get('resshorttext', '')) >= 50):
-                    if link.get('bubblecat'):
-                        linkurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(link.get('bubblecat', ''))) + '-' + str(link.get('bubblecatid', '')) + '/'
+                elif not link.get('bubblecat') and link.get('wp_plugin') == 1 and (len(link.get('resfulltext', '')) >= 50 or len(link.get('resshorttext', '')) >= 50) and link.get('status') in ['2', '10']:
+                    # PHP line 342-344: WP plugin without bubblecat
+                    import html
+                    slug_text = seo_text_custom(link.get('restitle', ''))
+                    slug_text = html.unescape(slug_text)
+                    slug_text = to_ascii(slug_text)
+                    slug_text = slug_text.lower()
+                    slug_text = slug_text.replace(' ', '-')
+                    linkurl = linkdomain + '/' + slug_text + '-' + str(link.get('bubblefeedid', '')) + '/'
+                elif link.get('wp_plugin') == 1 and (len(link.get('resfulltext', '')) >= 50 or len(link.get('resshorttext', '')) >= 50) and link.get('status') in ['2', '10']:
+                    # PHP line 346-348: WP plugin with bubblecat
+                    import html
+                    slug_text = seo_text_custom(link.get('bubblecat', ''))
+                    slug_text = html.unescape(slug_text)
+                    slug_text = to_ascii(slug_text)
+                    slug_text = slug_text.lower()
+                    slug_text = slug_text.replace(' ', '-')
+                    linkurl = linkdomain + '/' + slug_text + '-' + str(link.get('bubblecatid', '')) + '/'
+                elif not link.get('bubblecat') and link.get('wp_plugin') != 1 and (len(link.get('resfulltext', '')) >= 50 or len(link.get('resshorttext', '')) >= 50) and link.get('status') in ['2', '10']:
+                    # PHP line 350-355: Non-WP plugin without bubblecat
+                    if link.get('script_version', 0) >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
+                        linkurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '/' + str(link.get('bubblefeedid', '')) + '/'
                     else:
-                        linkurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '-' + str(link.get('bubblefeedid', '')) + '/'
+                        # CodeURL equivalent - simplified
+                        linkurl = linkdomain + '/?Action=1&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '&PageID=' + str(link.get('bubblefeedid', ''))
+                elif link.get('wp_plugin') != 1 and link.get('status') in ['2', '10']:
+                    # PHP line 357-362: Non-WP plugin with bubblecat
+                    if link.get('script_version', 0) >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
+                        linkurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(link.get('bubblecat', ''))) + '/' + str(link.get('bubblecatid', '')) + '/'
+                    else:
+                        # CodeURL equivalent - simplified
+                        linkurl = linkdomain + '/?Action=1&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '&PageID=' + str(link.get('bubblefeedid', ''))
                 else:
+                    # PHP line 372-375: Default fallback
                     linkurl = linkalone
                 
                 follow = ' rel="nofollow"' if link.get('forceinboundnofollow') == 1 else ''
@@ -944,15 +1051,32 @@ def build_bcpage_wp(
                         if tsups:
                             bcpage += tsups + '\n'
                 
-                # Build image URL
+                # Build image URL - match PHP logic exactly
+                # PHP line 386-405: Complex conditional logic for image URL
                 if link.get('skipfeedchecker') == 1 and link.get('linkskipfeedchecker') != 1:
+                    # PHP line 386-388
                     imageurl = linkdomainalone
-                elif haslinkspg and link.get('wp_plugin') == 1 and link.get('status') in ['2', '10', '8']:
+                elif haslinkspg_count > 0 and link.get('wp_plugin') != 1 and link.get('status') in ['2', '10', '8']:
+                    # PHP line 390-395: Non-WP plugin with haslinkspg
+                    if link.get('script_version', 0) >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
+                        imageurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', ''))) + '/' + str(haslinkspg.get('bubblefeedid', '')) + 'bc/'
+                    else:
+                        # CodeURL equivalent - simplified
+                        imageurl = linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', '')))
+                elif (haslinkspg_count > 0 or is_bron(link.get('servicetype'))) and link.get('status') in ['2', '10', '8']:
+                    # PHP line 397-402: haslinkspg > 0 OR isBRON
                     if is_bron(link.get('servicetype')):
                         imageurl = linkdomain + '/' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
                     else:
-                        imageurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', ''))) + '-' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
+                        import html
+                        slug_text = seo_text_custom(haslinkspg.get('restitle', ''))
+                        slug_text = html.unescape(slug_text)
+                        slug_text = to_ascii(slug_text)
+                        slug_text = slug_text.lower()
+                        slug_text = slug_text.replace(' ', '-')
+                        imageurl = linkdomain + '/' + slug_text + '-' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
                 else:
+                    # PHP line 404-405: Default fallback
                     imageurl = linkalone
                 
                 # Build citation container if address/name exists
@@ -1151,27 +1275,51 @@ def build_bcpage_wp(
                 words = restext.split()[:100]
                 restext = ' '.join(words)
                 
-                # Add link to text (simplified version of seo_automation_add_text_link_newbc)
-                # Find first occurrence of keyword and wrap it in a link
-                if restextkw and restextkw in restext:
-                    # Find first occurrence and replace with linked version
-                    idx = restext.find(restextkw)
-                    if idx >= 0:
-                        if map_val == 1:
-                            link_tag = f'<a href="{imageurl}"{follow}>{restextkw}</a>'
-                        elif preml == 1:
-                            link_tag = f'<a href=""{follow}>{restextkw}</a>'
+                # Add link to text - match PHP logic exactly
+                # PHP line 714-741: Complex conditional logic for adding links to text
+                addrndfeed = 0
+                if map_val == 1:
+                    # PHP line 714-715: map == 1
+                    # Use seo_automation_add_text_link_newbc equivalent
+                    restext = seo_automation_add_text_link_newbc(restext, restextkw, imageurl, follow)
+                elif preml == 1:
+                    # PHP line 716-717: preml == 1
+                    restext = seo_automation_add_text_link_newbc(restext, restextkw, '', follow)
+                elif (link.get('status') == '8' and haslinkspg_count > 1) or (addrndfeed == 1 and haslinkspg_count > 1):
+                    # PHP line 718-738: Orphan link handling
+                    orphan_sql = """
+                        SELECT l.id, l.showonpgid, b.restitle, b.id AS bubblefeedid 
+                        FROM bwp_link_placement l 
+                        LEFT JOIN bwp_bubblefeed b ON b.id = l.showonpgid AND b.deleted != 1 
+                        WHERE l.deleted != 1 AND b.restitle <> '' AND b.id != %s AND l.showondomainid = %s 
+                        ORDER BY RAND() LIMIT 1
+                    """
+                    orphanlinkspg = db.fetch_row(orphan_sql, (haslinkspg.get('bubblefeedid', ''), link['id']))
+                    if orphanlinkspg and link.get('wp_plugin') != 1:
+                        # PHP line 721-726: Non-WP plugin orphan link
+                        if link.get('script_version', 0) >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
+                            orphlink = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(orphanlinkspg.get('restitle', ''))) + '/' + str(orphanlinkspg.get('bubblefeedid', '')) + 'bc/'
                         else:
-                            link_tag = f'<a href="{linkalone}"{follow}>{restextkw}</a>'
-                        restext = restext[:idx] + link_tag + restext[idx + len(restextkw):]
-                elif not restextkw:
-                    # If no keyword, just add link at beginning
-                    if map_val == 1:
-                        restext = f'<a href="{imageurl}"{follow}>{restextkw}</a> ' + restext
-                    elif preml == 1:
-                        restext = f'<a href=""{follow}>{restextkw}</a> ' + restext
+                            # CodeURL equivalent - simplified
+                            orphlink = linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(orphanlinkspg.get('restitle', '')))
+                    elif orphanlinkspg and link.get('wp_plugin') == 1:
+                        # PHP line 728-733: WP plugin orphan link
+                        if is_bron(link.get('servicetype')):
+                            orphlink = linkdomain + '/' + str(orphanlinkspg.get('showonpgid', '')) + 'bc/'
+                        else:
+                            import html
+                            slug_text = seo_text_custom(orphanlinkspg.get('restitle', ''))
+                            slug_text = html.unescape(slug_text)
+                            slug_text = to_ascii(slug_text)
+                            slug_text = slug_text.lower()
+                            slug_text = slug_text.replace(' ', '-')
+                            orphlink = linkdomain + '/' + slug_text + '-' + str(orphanlinkspg.get('showonpgid', '')) + 'bc/'
                     else:
-                        restext = f'<a href="{linkalone}"{follow}>{restextkw}</a> ' + restext
+                        orphlink = linkalone
+                    restext = seo_automation_add_text_link_newbc(restext, restextkw, orphlink, follow)
+                else:
+                    # PHP line 740-741: Default fallback
+                    restext = seo_automation_add_text_link_newbc(restext, restextkw, linkalone, follow)
                 
                 bcpage += restext + '\n'
                 
@@ -1289,14 +1437,32 @@ def build_bcpage_wp(
             
             bcpage += '<div class="seo-automation-container">\n'
             
-            # Build link URL
+            # Build link URL - match PHP logic exactly
+            # PHP line 895-927: Complex conditional logic for drip content link URL
             if len(linkdc.get('linkouturl', '')) > 5 and linkdc.get('status') in ['2', '10']:
+                # PHP line 895-897
                 linkurl = linkdc['linkouturl'].strip()
             elif linkdc.get('skipfeedchecker') == 1 and linkdc.get('linkskipfeedchecker') != 1:
+                # PHP line 899-902
                 linkurl = linkdomainalone
             elif linkdc.get('wp_plugin') == 1 and len(linkdc.get('resfulltext', '')) >= 300:
-                linkurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(linkdc.get('bubbatitle', ''))) + '-' + str(linkdc.get('bubbafeedid', '')) + 'dc'
+                # PHP line 904-906: Use toAscii(html_entity_decode(seo_text_custom(...)))
+                import html
+                slug_text = seo_text_custom(linkdc.get('bubbatitle', ''))
+                slug_text = html.unescape(slug_text)
+                slug_text = to_ascii(slug_text)
+                slug_text = slug_text.lower()
+                slug_text = slug_text.replace(' ', '-')
+                linkurl = linkdomain + '/' + slug_text + '-' + str(linkdc.get('bubbafeedid', '')) + 'dc'
+            elif linkdc.get('wp_plugin') != 1 and len(linkdc.get('resfulltext', '')) >= 50 and linkdc.get('status') in ['2', '10']:
+                # PHP line 908-913: Non-WP plugin
+                if linkdc.get('script_version', 0) > 3.2 and linkdc.get('wp_plugin') != 1 and linkdc.get('iswin') != 1 and linkdc.get('usepurl') != 0:
+                    linkurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(linkdc.get('bubbatitle', ''))) + '/' + str(linkdc.get('bubbafeedid', '')) + 'dc'
+                else:
+                    # CodeURL equivalent - simplified
+                    linkurl = linkdomain + '/?Action=3&k=' + seo_slug(seo_filter_text_custom(linkdc.get('bubbatitle', ''))) + '&PageID=' + str(linkdc.get('bubbafeedid', ''))
             else:
+                # PHP line 924-926: Default fallback
                 linkurl = linkdomainalone
             
             follow = ' rel="nofollow"' if linkdc.get('forceinboundnofollow') == 1 else ''
@@ -1304,8 +1470,50 @@ def build_bcpage_wp(
             
             bcpage += f'<h2 class="h2"><a title="{stitle}" href="{linkurl}" style="text-align:left;" target="_blank"{follow}>{stitle}</a></h2>\n'
             
-            # Build image URL
-            imageurl = linkdomainalone
+            # Build image URL - match PHP logic exactly
+            # PHP line 934-950: Complex conditional logic for drip content image URL
+            haslinks_dc_sql = "SELECT count(id) FROM bwp_link_placement WHERE deleted != 1 AND showondomainid = %s AND showonpgid = %s"
+            haslinks_dc = db.fetch_one(haslinks_dc_sql, (linkdc['id'], linkdc.get('bubblefeedid')))
+            haslinks_dc = haslinks_dc or 0
+            
+            if haslinks_dc >= 1:
+                haslinkspg_dc = {'restitle': linkdc.get('restitle'), 'showonpgid': linkdc.get('bubblefeedid'), 'bubblefeedid': linkdc.get('bubblefeedid')}
+            else:
+                haslinkspg_dc_sql = """
+                    SELECT l.id, l.showonpgid, b.restitle, b.id AS bubblefeedid 
+                    FROM bwp_link_placement l 
+                    LEFT JOIN bwp_bubblefeed b ON b.id = l.showonpgid AND b.deleted != 1 
+                    WHERE l.deleted != 1 AND b.restitle <> '' AND l.showondomainid = %s 
+                    ORDER BY RAND() LIMIT 1
+                """
+                haslinkspg_dc = db.fetch_row(haslinkspg_dc_sql, (linkdc['id'],))
+                if not haslinkspg_dc:
+                    haslinkspg_dc = {}
+            
+            haslinkspg_dc_count = haslinks_dc if haslinks_dc else 0
+            
+            if linkdc.get('skipfeedchecker') == 1 and linkdc.get('linkskipfeedchecker') != 1:
+                # PHP line 934-936
+                imageurl = linkdomainalone
+            elif haslinkspg_dc_count > 0 and linkdc.get('wp_plugin') != 1 and linkdc.get('status') in ['2', '10', '8']:
+                # PHP line 938-943: Non-WP plugin with haslinkspg
+                if linkdc.get('script_version', 0) > 3.2 and linkdc.get('wp_plugin') != 1 and linkdc.get('iswin') != 1 and linkdc.get('usepurl') != 0:
+                    imageurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(haslinkspg_dc.get('restitle', ''))) + '/' + str(haslinkspg_dc.get('bubblefeedid', '')) + 'bc/'
+                else:
+                    # CodeURL equivalent - simplified
+                    imageurl = linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(haslinkspg_dc.get('restitle', '')))
+            elif haslinkspg_dc_count > 0 and linkdc.get('wp_plugin') == 1 and linkdc.get('status') in ['2', '10', '8']:
+                # PHP line 945-947: WP plugin with haslinkspg - use toAscii(html_entity_decode(seo_text_custom(...)))
+                import html
+                slug_text = seo_text_custom(haslinkspg_dc.get('restitle', ''))
+                slug_text = html.unescape(slug_text)
+                slug_text = to_ascii(slug_text)
+                slug_text = slug_text.lower()
+                slug_text = slug_text.replace(' ', '-')
+                imageurl = linkdomain + '/' + slug_text + '-' + str(haslinkspg_dc.get('showonpgid', '')) + 'bc/'
+            else:
+                # PHP line 949-950: Default fallback
+                imageurl = linkdomainalone
             
             # Build text content
             wr_name = linkdc.get('wr_name', '')
@@ -1329,14 +1537,9 @@ def build_bcpage_wp(
                 bubbatext = bubbatext.replace('//gallery.imagehosting.space/gallery/', '//gallery.imagehosting.space/thumbs/')
                 # Wrap images in links (PHP: preg_replace pattern)
                 bubbatext = re.sub(r'(?<!<a\s[^>]*>)(<img[^>]+>)(?!</a>)', f'<a href="{imageurl}">\\1</a>', bubbatext)
-                # Add keyword link (simplified version of seo_automation_add_text_link_newbc)
-                if restextkw and restextkw in bubbatext:
-                    idx = bubbatext.find(restextkw)
-                    if idx >= 0:
-                        link_tag = f'<a href="{linkurl}"{follow}>{restextkw}</a>'
-                        bubbatext = bubbatext[:idx] + link_tag + bubbatext[idx + len(restextkw):]
-                elif restextkw:
-                    bubbatext = f'<a href="{linkurl}"{follow}>{restextkw}</a> ' + bubbatext
+                # Add keyword link using seo_automation_add_text_link_newbc
+                # PHP line 1215: Uses seo_automation_add_text_link_newbc
+                bubbatext = seo_automation_add_text_link_newbc(bubbatext, restextkw, linkurl, follow)
             
             bcpage += bubbatext + '\n'
             
