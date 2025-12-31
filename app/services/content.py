@@ -390,6 +390,8 @@ def wrap_content_with_header_footer(
 }
 .ngodkrbsitr-sidebar {   max-width: 29% !important; width: 300px !important; margin: 0 !important; border: 1px solid !important;; padding: 15px 2% !important;;}
 .wr-fulltext { text-align:left!important; padding0px !important; /*max-width:65% !important; */ margin:0!important; float: left !important; }
+.wr-fulltext img {height: auto !important;min-width:100%;}
+@media (min-width: 992px){.wr-fulltext img {min-width:0;}}
 .wr-fulltext-blog { text-align:left!important; padding0px !important; max-width:65% !important; margin:0!important; float: right !important; }
 .ngodkrbsitr-sidebar input, .ngodkrbsitr-sidebar textarea { max-width:85% !important;	 }
 .google-map a { font-size:12px !important;	 }
