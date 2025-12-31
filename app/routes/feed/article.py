@@ -65,10 +65,44 @@ async def article_endpoint(
         content_type = request.headers.get("content-type", "")
         logger.debug(f"POST request - Content-Type: {content_type}")
         
-        # Try to parse body - WordPress might send form-encoded or JSON
+        # Try to parse body - WordPress uses cURL with CURLOPT_POSTFIELDS (form-encoded)
+        # Try form data first (most common for WordPress POST requests)
+        # If no content-type, assume form-encoded (WordPress cURL default)
         try:
-            # Try form data first (most common for WordPress POST requests)
-            if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+            if "application/json" in content_type:
+                # Only try JSON if explicitly JSON content type
+                try:
+                    json_data = await request.json()
+                    logger.debug(f"POST request - JSON data: {json_data}")
+                    if json_data.get("domain"):
+                        domain = json_data.get("domain")
+                    if json_data.get("Action"):
+                        Action = json_data.get("Action")
+                    if json_data.get("apiid"):
+                        apiid = json_data.get("apiid")
+                    if json_data.get("apikey"):
+                        apikey = json_data.get("apikey")
+                    if json_data.get("kkyy"):
+                        kkyy = json_data.get("kkyy")
+                    if json_data.get("feedit"):
+                        feededit = json_data.get("feedit")
+                    if json_data.get("k"):
+                        k = json_data.get("k")
+                    if json_data.get("key"):
+                        key = json_data.get("key")
+                    if json_data.get("pageid"):
+                        pageid = json_data.get("pageid")
+                    if json_data.get("version"):
+                        version = json_data.get("version")
+                    if json_data.get("debug"):
+                        debug = json_data.get("debug")
+                    if json_data.get("agent"):
+                        agent = json_data.get("agent")
+                except Exception as e2:
+                    logger.debug(f"JSON parsing failed: {e2}")
+            else:
+                # Try form data (default for WordPress cURL POST requests)
+                # This handles: application/x-www-form-urlencoded, multipart/form-data, or no content-type
                 try:
                     form_data = await request.form()
                     logger.debug(f"POST request - Form data: {dict(form_data)}")
@@ -99,68 +133,6 @@ async def article_endpoint(
                         agent = form_data.get("agent")
                 except Exception as e:
                     logger.debug(f"Form data parsing failed: {e}")
-            # Try JSON if content type indicates JSON or if no content type specified
-            elif "application/json" in content_type or not content_type:
-                try:
-                    json_data = await request.json()
-                    logger.debug(f"POST request - JSON data: {json_data}")
-                    if json_data.get("domain"):
-                        domain = json_data.get("domain")
-                    if json_data.get("Action"):
-                        Action = json_data.get("Action")
-                    if json_data.get("apiid"):
-                        apiid = json_data.get("apiid")
-                    if json_data.get("apikey"):
-                        apikey = json_data.get("apikey")
-                    if json_data.get("kkyy"):
-                        kkyy = json_data.get("kkyy")
-                    if json_data.get("feedit"):
-                        feededit = json_data.get("feedit")
-                    if json_data.get("k"):
-                        k = json_data.get("k")
-                    if json_data.get("key"):
-                        key = json_data.get("key")
-                    if json_data.get("pageid"):
-                        pageid = json_data.get("pageid")
-                    if json_data.get("version"):
-                        version = json_data.get("version")
-                    if json_data.get("debug"):
-                        debug = json_data.get("debug")
-                    if json_data.get("agent"):
-                        agent = json_data.get("agent")
-                except Exception as e2:
-                    logger.debug(f"JSON parsing failed: {e2}")
-                    # If JSON fails and no content type, try form data as fallback
-                    if not content_type:
-                        try:
-                            form_data = await request.form()
-                            logger.debug(f"POST request - Form data (fallback): {dict(form_data)}")
-                            if form_data.get("domain"):
-                                domain = form_data.get("domain")
-                            if form_data.get("Action"):
-                                Action = form_data.get("Action")
-                            if form_data.get("apiid"):
-                                apiid = form_data.get("apiid")
-                            if form_data.get("apikey"):
-                                apikey = form_data.get("apikey")
-                            if form_data.get("kkyy"):
-                                kkyy = form_data.get("kkyy")
-                            if form_data.get("feedit"):
-                                feededit = form_data.get("feedit")
-                            if form_data.get("k"):
-                                k = form_data.get("k")
-                            if form_data.get("key"):
-                                key = form_data.get("key")
-                            if form_data.get("pageid"):
-                                pageid = form_data.get("pageid")
-                            if form_data.get("version"):
-                                version = form_data.get("version")
-                            if form_data.get("debug"):
-                                debug = form_data.get("debug")
-                            if form_data.get("agent"):
-                                agent = form_data.get("agent")
-                        except Exception as e3:
-                            logger.debug(f"Form data fallback also failed: {e3}")
         except Exception as e:
             logger.debug(f"Body parsing failed: {e}")
         
