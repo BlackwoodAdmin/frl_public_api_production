@@ -58,15 +58,17 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
         for item in silo:
             if item.get('id'):
                 # Build Resources link (PHP has: links_per_page >=1 || 1==1, so always build it)
+                is_bron_val = is_bron(domain_data.get('servicetype'))
+                if is_bron_val:
+                    bclink = linkdomain + '/' + str(item['id']) + 'bc/'
+                else:
+                    # Use seo_text_custom for slug (not seo_filter_text_custom)
+                    slug_text = seo_text_custom(item['restitle'])
+                    slug = seo_slug(slug_text) + '-' + str(item['id']) + 'bc/'
+                    bclink = linkdomain + '/' + slug
+                
+                # Always show Resources link (PHP condition: links_per_page >=1 || 1==1)
                 if item.get('links_per_page', 0) >= 1 or True:  # Always true like PHP
-                    is_bron_val = is_bron(domain_data.get('servicetype'))
-                    if is_bron_val:
-                        bclink = linkdomain + '/' + str(item['id']) + 'bc/'
-                    else:
-                        # Use seo_text_custom for slug (not seo_filter_text_custom)
-                        slug_text = seo_text_custom(item['restitle'])
-                        slug = seo_slug(slug_text) + '-' + str(item['id']) + 'bc/'
-                        bclink = linkdomain + '/' + slug
                     newsf = ' <a style="padding-left: 0px !important;" href="' + bclink + '">Resources</a>'
                 else:
                     newsf = ''
