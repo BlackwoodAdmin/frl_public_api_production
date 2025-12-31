@@ -469,7 +469,8 @@ def is_bron(servicetype: Optional[int]) -> bool:
     """Check if service type is BRON, matching PHP isBRON function."""
     if not servicetype:
         return False
-    sql = "SELECT * FROM bwp_services WHERE servicetype LIKE 'BRON %' AND servicetype != 'SEOM 5' AND id = %s ORDER BY keywords"
+    # Use %% to escape % for PyMySQL (which uses Python % formatting)
+    sql = "SELECT * FROM bwp_services WHERE servicetype LIKE 'BRON %%' AND servicetype != 'SEOM 5' AND id = %s ORDER BY keywords"
     result = db.fetch_all(sql, (servicetype,))
     return bool(result)
 
@@ -478,7 +479,8 @@ def is_seom(servicetype: Optional[int]) -> bool:
     """Check if service type is SEOM, matching PHP isSEOM function."""
     if not servicetype:
         return False
-    sql = "SELECT * FROM bwp_services WHERE servicetype LIKE 'SEOM %' AND servicetype != 'SEOM 5' AND id = %s ORDER BY keywords"
+    # Use %% to escape % for PyMySQL (which uses Python % formatting)
+    sql = "SELECT * FROM bwp_services WHERE servicetype LIKE 'SEOM %%' AND servicetype != 'SEOM 5' AND id = %s ORDER BY keywords"
     result = db.fetch_all(sql, (servicetype,))
     return bool(result)
 
