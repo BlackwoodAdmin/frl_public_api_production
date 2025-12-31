@@ -2081,7 +2081,9 @@ def build_bcpage_wp(
                 bcdomain = link['domain_name'].split('.')
                 bcvardomain = bcdomain[0] if bcdomain else ''
                 
-                bcpage += '<div class="seo-automation-container">\n'
+                bcpage += '<div class="ngodkrbsitr-container">\n'
+                # PHP line 894: Add spacer right after opening container (before H2)
+                bcpage += '<div class="ngodkrbsitr-spacer"></div>\n'
                 
                 # Determine link URL
                 haslinks_sql = "SELECT count(id) FROM bwp_link_placement WHERE deleted != 1 AND showondomainid = %s AND showonpgid = %s"
@@ -2586,7 +2588,8 @@ def build_bcpage_wp(
                         
                         bcpage += '</div>\n'
                 
-                bcpage += '</div><div class="seo-automation-spacer"></div>\n'
+                # PHP line 1336: Close container and add spacer
+                bcpage += '</div><div class="ngodkrbsitr-spacer"></div>\n'
     
     # Drip content links section
     linksdc_sql = """
@@ -2635,7 +2638,9 @@ def build_bcpage_wp(
             bcdomain = linkdc['domain_name'].split('.')
             bcvardomain = bcdomain[0] if bcdomain else ''
             
-            bcpage += '<div class="seo-automation-container">\n'
+            bcpage += '<div class="ngodkrbsitr-container">\n'
+            # PHP line 399: Add spacer right after opening container (before H2)
+            bcpage += '<div class="ngodkrbsitr-spacer"></div>\n'
             
             # Build link URL - match PHP logic exactly
             # PHP line 895-927: Complex conditional logic for drip content link URL
@@ -2807,7 +2812,8 @@ def build_bcpage_wp(
                 
                 bcpage += '</div>\n'
             
-            bcpage += '</div><div class="seo-automation-spacer"></div>\n'
+            # PHP line 775: Close container and add spacer
+            bcpage += '</div><div class="ngodkrbsitr-spacer"></div>\n'
     
     # Add ArticleLinks (PHP line 1680: echo ArticleLinks($res['id']))
     # Get domain_category for ArticleLinks (it's the same as domain_data in this context)
