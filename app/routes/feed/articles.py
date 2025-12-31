@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse
 from typing import Optional
 import logging
 from app.database import db
-from app.services.content import build_footer_wp
+from app.services.content import build_footer_wp, build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
 
 logger = logging.getLogger(__name__)
 
@@ -170,9 +170,9 @@ async def articles_endpoint(
     
     domainid = domain_data['id']
     
-    # Get full domain data
+    # Get full domain data (PHP line 98-103)
     domain_full_sql = """
-        SELECT d.*, s.servicetype, s.keywords as service_keywords, d.script_version, d.wp_plugin, d.iswin, d.usepurl
+        SELECT d.*, s.servicetype, s.keywords as service_keywords, d.script_version, d.wp_plugin, d.iswin, d.usepurl, d.webworkscms
         FROM bwp_domains d
         LEFT JOIN bwp_services s ON d.servicetype = s.id
         WHERE d.id = %s AND d.deleted != 1
@@ -202,6 +202,87 @@ async def articles_endpoint(
             "SELECT * FROM bwp_domain_settings WHERE domainid = %s",
             (domainid,)
         )
+    
+    # PHP Articles.php line 260-294: Check for webworkscms and redirect to CMS homepage
+    webworkscms = domain_category.get('webworkscms') or 0
+    if webworkscms == 1:
+        cms_sql = "SELECT * FROM bwp_cms WHERE domainid = %s"
+        cms = db.fetch_row(cms_sql, (domainid,))
+        
+        if cms and cms.get('cmsactive') == 1:
+            cmspagetype = cms.get('cmspagetype')
+            cmspage = cms.get('cmspage')
+            
+            if cmspagetype == 1 and cmspage:
+                # Get article from bwp_bubblefeed
+                article_sql = "SELECT * FROM bwp_bubblefeed WHERE id = %s"
+                article = db.fetch_row(article_sql, (cmspage,))
+                
+                if article:
+                    # Redirect to Article.php with Action=1 and the article's restitle and PageID
+                    # PHP uses curl_get_file_contents, but we'll call the handler directly
+                    # Build the article page content
+                    keyword_slug = article.get('restitle', '').replace(' ', '-').lower()
+                    bubbleid = article.get('id', 0)
+                    
+                    # Build the page using build_page_wp
+                    page_content = build_page_wp(
+                        bubbleid=bubbleid,
+                        domainid=domainid,
+                        debug=(debug == '1'),
+                        agent=agent or '',
+                        keyword=article.get('restitle', ''),
+                        domain_data=domain_category,
+                        domain_settings=domain_settings,
+                        artpageid=cmspage,
+                        artdomainid=domainid
+                    )
+                    
+                    # Get header and footer
+                    header_data = get_header_footer(domainid, domain_category, domain_settings, debug == '1')
+                    header = header_data['header']
+                    footer = header_data['footer']
+                    
+                    # Build metaheader
+                    metaheader = build_metaheader(
+                        domainid=domainid,
+                        domain_data=domain_category,
+                        domain_settings=domain_settings,
+                        action='1',
+                        keyword=article.get('restitle', ''),
+                        pageid=cmspage,
+                        city=city or cty or '',
+                        state=state or st or ''
+                    )
+                    
+                    # Build canonical URL
+                    if domain_category.get('ishttps') == 1:
+                        canonical_url = 'https://'
+                    else:
+                        canonical_url = 'http://'
+                    if domain_category.get('usewww') == 1:
+                        canonical_url += 'www.' + domain_category.get('domain_name', '')
+                    else:
+                        canonical_url += domain_category.get('domain_name', '')
+                    canonical_url += '/'
+                    
+                    # Wrap content with header and footer
+                    full_page_html = wrap_content_with_header_footer(
+                        content=page_content,
+                        header=header,
+                        footer=footer,
+                        metaheader=metaheader,
+                        canonical_url=canonical_url,
+                        websitereferencesimple=False,
+                        wp_plugin=domain_category.get('wp_plugin', 0)
+                    )
+                    
+                    return HTMLResponse(content=full_page_html)
+            
+            elif cmspagetype == 5 and cmspage:
+                # Get article from bwp_blog_post (Action=5 - not yet implemented)
+                # For now, return a placeholder
+                return HTMLResponse(content="<!-- CMS Blog Post (Action=5) not yet implemented -->")
     
     # PHP Articles.php: if script_version >= 3 and wp_plugin != 1 and iswin != 1 and usepurl != 0
     # then call seo_automation_build_footer30 (similar to build_footer_wp)
