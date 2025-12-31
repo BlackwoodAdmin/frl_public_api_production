@@ -7,9 +7,9 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
     # Database settings
-    db_host: str = "10.248.48.202"
-    db_name: str = "freerele_blackwoodproductions"
-    db_user: str = "freerele_bwp"
+    db_host: str = ""
+    db_name: str = ""
+    db_user: str = ""
     db_password: str = ""
     db_port: int = 3306
     db_charset: str = "utf8mb4"

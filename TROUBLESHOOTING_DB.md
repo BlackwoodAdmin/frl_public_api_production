@@ -1,6 +1,6 @@
 # Database Connection Troubleshooting
 
-## Issue: "Can't connect to MySQL server on '10.248.48.202' (timed out)"
+## Issue: "Can't connect to MySQL server (timed out)"
 
 ### Possible Causes:
 
@@ -15,13 +15,15 @@
 
 ```bash
 # Test if you can reach the database server
-ping 10.248.48.202
+ping YOUR_DB_HOST
 
 # Test if port 3306 is accessible
-telnet 10.248.48.202 3306
+telnet YOUR_DB_HOST 3306
 # OR
-nc -zv 10.248.48.202 3306
+nc -zv YOUR_DB_HOST 3306
 ```
+
+Replace `YOUR_DB_HOST` with your actual database host from your `.env` file.
 
 #### 2. Check Database Credentials
 
@@ -32,10 +34,11 @@ cat /var/www/frl-python-api/.env
 ```
 
 Make sure:
-- `DB_HOST=10.248.48.202`
-- `DB_USER=freerele_bwp`
-- `DB_PASSWORD` is correct (with quotes if it contains special characters)
-- `DB_NAME=freerele_blackwoodproductions`
+- `DB_HOST` is set to your database host
+- `DB_USER` is set to your database username
+- `DB_PASSWORD` is correct (with quotes if it contains special characters like `#`)
+- `DB_NAME` is set to your database name
+- `DB_PORT` is set correctly (usually 3306)
 
 #### 3. Test Database Connection Manually
 
@@ -43,13 +46,13 @@ Make sure:
 # Install MySQL client if not already installed
 dnf install mysql -y
 
-# Test connection
-mysql -h 10.248.48.202 -u freerele_bwp -p freerele_blackwoodproductions
+# Test connection (replace with your actual credentials)
+mysql -h YOUR_DB_HOST -u YOUR_DB_USER -p YOUR_DB_NAME
 ```
 
 #### 4. Check Firewall Rules
 
-On the database server (10.248.48.202), make sure:
+On the database server, make sure:
 - MySQL is listening on the correct interface
 - Firewall allows connections from your VPS IP
 - MySQL user has permission to connect from your VPS IP

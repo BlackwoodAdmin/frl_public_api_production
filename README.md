@@ -12,7 +12,7 @@ Python implementation of the Free Relevant Links feed endpoints, replicating the
 
 - Python 3.9+
 - AlmaLinux 9 (or compatible)
-- MySQL database access to `freerele_blackwoodproductions` at `10.248.48.202`
+- MySQL/MariaDB database access
 
 ## Installation
 
@@ -27,14 +27,11 @@ pip install -r requirements.txt
 
 ## Configuration
 
-Copy `.env.example` to `.env` and configure:
+Copy `.env.example` to `.env` and configure with your database credentials:
 
 ```bash
-DB_HOST=10.248.48.202
-DB_NAME=freerele_blackwoodproductions
-DB_USER=freerele_bwp
-DB_PASSWORD=your_password
-DB_PORT=3306
+cp .env.example .env
+# Edit .env with your actual database credentials
 ```
 
 ## Running

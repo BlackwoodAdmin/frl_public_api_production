@@ -55,10 +55,17 @@ cp .env.example .env
 nano .env
 ```
 
-Update the `.env` file with your actual database password:
+Update the `.env` file with your actual database credentials:
 ```
-DB_PASSWORD=Silver#33#Streak
+DB_HOST=your_database_host
+DB_PORT=3306
+DB_NAME=your_database_name
+DB_USER=your_database_user
+DB_PASSWORD=your_database_password
+DB_CHARSET=utf8mb4
 ```
+
+**Note:** The `.env` file is in `.gitignore` and will not be committed to GitHub. Make sure to configure it with your actual database credentials on the VPS.
 
 ## Step 6: Test Database Connection
 
