@@ -363,11 +363,50 @@ async def article_endpoint(
     
     # Handle other actions (non-WP plugin)
     if Action == '1':
-        # Website Reference (non-WP)
-        return {"message": "Action=1 (non-WP) not yet implemented", "domain": domain, "action": Action}
+        # Website Reference (non-WP) - use same function as WP but it handles wp_plugin internally
+        from app.services.content import build_page_wp
+        # Extract pageid and keyword
+        pageid_param = pageid or ''
+        keyword_param = k or key or ''
+        
+        # Parse pageid
+        bubbleid = None
+        if pageid_param:
+            try:
+                bubbleid = int(pageid_param)
+            except ValueError:
+                bubbleid = None
+        
+        wpage = build_page_wp(
+            bubbleid=bubbleid,
+            domainid=domainid,
+            debug=debug == '1',
+            agent=agent or '',
+            keyword=keyword_param,
+            domain_data=domain_category,
+            domain_settings=domain_settings
+        )
+        return HTMLResponse(content=wpage)
     elif Action == '2':
-        # Business Collective (non-WP)
-        return {"message": "Action=2 (non-WP) not yet implemented", "domain": domain, "action": Action}
+        # Business Collective (non-WP) - use same function as WP but it handles wp_plugin internally
+        from app.services.content import build_bcpage_wp
+        pageid_param = pageid or ''
+        bubbleid = None
+        if pageid_param:
+            try:
+                bubbleid = int(pageid_param)
+            except ValueError:
+                bubbleid = None
+        
+        wpage = build_bcpage_wp(
+            bubbleid=bubbleid,
+            domainid=domainid,
+            debug=debug == '1',
+            agent=agent or '',
+            domain_data=domain_category,
+            domain_settings=domain_settings
+        )
+        return HTMLResponse(content=wpage)
     # ... other actions
     
     return {"message": "Endpoint not yet implemented", "domain": domain, "action": Action}
