@@ -1543,7 +1543,7 @@ def build_bcpage_wp(
                 if (is_seom(link.get('servicetype')) or is_bron(link.get('servicetype'))) and link.get('bubblefeedid'):
                     support_sql = """
                         SELECT id, restitle FROM bwp_bubblefeedsupport 
-                        WHERE bubblefeedid = %s AND LENGTH(resfulltext) > 300
+                        WHERE bubblefeedid = %s AND deleted != 1 AND LENGTH(resfulltext) > 300
                     """
                     supps = db.fetch_all(support_sql, (link['bubblefeedid'],))
                     if supps:
