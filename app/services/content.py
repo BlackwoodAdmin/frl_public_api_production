@@ -1553,7 +1553,10 @@ def build_page_wp(
                     osupkwurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(osupkw['restitle'])) + '-' + str(osupkw['id']) + '/'
                     linkedtexted = seo_automation_add_text_link_new(linkedtexted, osupkw['restitle'], osupkwurl.replace('&amp;', '&'), moneynofollow)
         
+        # Wrap content in wr-fulltext div to allow text wrapping around images
+        wpage += '<div class="wr-fulltext">\n'
         wpage += linkedtexted
+        wpage += '</div>\n'
     elif len(res.get('resshorttext', '').strip()) > 50:
         # Use shorttext if fulltext not available (PHP lines 535-557)
         linkedtexted = html.unescape(res.get('resshorttext', ''))
@@ -1571,7 +1574,10 @@ def build_page_wp(
             theurl = res.get('linkouturl', '').replace('&amp;', '&')
         
         linkedtexted = seo_automation_add_text_link_new(linkedtexted, res.get('restitle', ''), theurl, moneynofollow)
+        # Wrap content in wr-fulltext div to allow text wrapping around images
+        wpage += '<div class="wr-fulltext">\n'
         wpage += linkedtexted
+        wpage += '</div>\n'
     
     wpage += '</div>\n'
     
