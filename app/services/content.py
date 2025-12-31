@@ -56,10 +56,11 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
         foot += '<ul class="seo-sub-nav">\n'
         
         for item in silo:
+            import html
+            is_bron_val = is_bron(domain_data.get('servicetype'))
+            
+            # Match PHP logic: elseif($silo[$i]['id'])
             if item.get('id'):
-                import html
-                is_bron_val = is_bron(domain_data.get('servicetype'))
-                
                 # Build Resources link (Business Collective page - resfeedtext)
                 # PHP condition: links_per_page >=1 || 1==1 (always true)
                 if item.get('links_per_page', 0) >= 1 or True:  # Always true like PHP
@@ -76,10 +77,12 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                     newsf = ' <a style="padding-left: 0px !important;" href="' + bclink + '">Resources</a>'
                 else:
                     newsf = ''
-                    bclink = ''  # Will be set if needed
+                    bclink = ''
                 
                 # Main link logic (for resfulltext pages)
-                if domain_data.get('resourcesactive') == '1':
+                # Check resourcesactive as string '1' or integer 1
+                resourcesactive = str(domain_data.get('resourcesactive', ''))
+                if resourcesactive == '1' or resourcesactive == 1:
                     # Resources active - show main article link (resfulltext) + Resources link (resfeedtext)
                     if (item.get('NoContent') == 0 or is_bron_val) and len(item.get('linkouturl', '').strip()) > 5:
                         # External link
@@ -108,6 +111,22 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                             bclink = linkdomain + '/' + slug_text + '-' + str(item['id']) + 'bc/'
                     foot += '<li><a style="padding-right: 0px !important;" href="' + bclink + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a></li>\n'
                 
+                num_lnks += 1
+            # Match PHP logic: elseif(strlen(trim($silo[$i]['linkouturl'])) > 5)
+            elif len(item.get('linkouturl', '').strip()) > 5:
+                # External link case - build Resources link if links_per_page >= 1
+                if item.get('links_per_page', 0) >= 1:
+                    # Use seo_filter_text_custom for this case (line 235 in PHP)
+                    slug_text = seo_filter_text_custom(item['restitle'])
+                    slug_text = html.unescape(slug_text)
+                    slug_text = to_ascii(slug_text)
+                    slug_text = slug_text.lower()
+                    slug_text = slug_text.replace(' ', '-')
+                    bclink = linkdomain + '/' + slug_text + '-' + str(item.get('id', '')) + 'bc/'
+                    newsf = ' <a style="padding-left: 0px !important;" href="' + bclink + '">Resources</a>'
+                else:
+                    newsf = ''
+                foot += '<li><a style="padding-right: 0px !important;" href="' + item['linkouturl'] + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
                 num_lnks += 1
         
         foot += '</ul>\n'
