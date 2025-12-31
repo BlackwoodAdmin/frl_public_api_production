@@ -963,6 +963,7 @@ def build_bcpage_wp(
                 state = ''
                 zip_code = ''
                 mapurl = ''
+                address = ''
                 
                 if (link.get('wr_address') or link.get('resaddress')) and (link.get('wr_name') or link.get('resname')):
                     preml = 1
@@ -971,6 +972,23 @@ def build_bcpage_wp(
                     if link_settings.get('gmbframe') and len(link_settings['gmbframe']) > 10:
                         mapurl = link_settings['gmbframe']
                         map_val = 1
+                        # Parse address even when gmbframe exists
+                        if address:
+                            addressarray = address.split(',')
+                            if len(addressarray) >= 3:
+                                stzipstr = addressarray[2]
+                                stziparray = stzipstr.strip().split(' ')
+                                if len(stziparray) == 2:
+                                    stadd = addressarray[0]
+                                    cty = addressarray[1]
+                                    state = stziparray[0]
+                                    zip_code = stziparray[1]
+                                elif len(stziparray) == 3:
+                                    stadd = addressarray[0].strip()
+                                    cty = addressarray[1].strip()
+                                    state = stziparray[0].strip()
+                                    zip_code = stziparray[1].strip()
+                                    zip_code += ' ' + stziparray[2].strip()
                     elif address:
                         addressarray = address.split(',')
                         if len(addressarray) == 3:
@@ -993,113 +1011,111 @@ def build_bcpage_wp(
                             if map_val == 1:
                                 wr_name = link.get('resname') or link.get('wr_name', '')
                                 mapurl = f'https://www.google.com/maps/embed/v1/place?key=AIzaSyDET-f-9dCENEEt8nU2MLOXluoEtrq2k5o&q={quote(wr_name)}+{quote(address.replace(",", ""))}'
+                
+                # Citation container is ALWAYS created when preml == 1 (PHP line 531)
+                if preml == 1:
+                    bcpage += '<div class="bwp_citation_conatainer">\n'
+                    bcpage += '<div itemscope itemtype="http://schema.org/LocalBusiness">\n'
+                    bcpage += '<div class="citation_map_container">\n'
                     
                     if map_val == 1:
-                        bcpage += '<div class="bwp_citation_conatainer">\n'
-                        bcpage += '<div itemscope itemtype="http://schema.org/LocalBusiness">\n'
-                        bcpage += '<div class="citation_map_container">\n'
                         bcpage += f'<iframe width="130" height="110" style="width:130px;height:110px;border:0;overflow:hidden;" src="{mapurl}"></iframe>\n'
                         bcpage += f'<img itemprop="image" src="//imagehosting.space/feed/pageimage.php?domain={link["domain_name"]}" alt="{link["domain_name"]}" style="display:none !important;">\n'
-                        bcpage += '</div>\n'
-                        
-                        wr_name = link.get('resname') or link.get('wr_name', '')
-                        bcpage += f'<span itemprop="name" style="font-size:12px;line-height:13px;"><strong>{wr_name}</strong></span><br>\n'
-                        
-                        if address and map_val == 1 and stadd:
-                            bcpage += '<div itemprop="address" itemscope itemtype="http://schema.org/PostalAddress">\n'
-                            bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="streetAddress">{stadd}</span><br>\n'
-                            bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="addressLocality">{cty}</span> '
-                            bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="addressRegion">{state}</span> '
-                            bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="postalCode">{zip_code}</span>\n'
-                            bcpage += f'<span style="font-size:12px;line-height:13px;display:none;" itemprop="addressCountry">{link.get("domain_country", "")}</span><br>\n'
-                        
-                        if link.get('wr_phone') or link.get('resphone'):
-                            phon = link.get('resphone') or link.get('wr_phone', '')
-                            bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="telephone">{phon}<br>\n'
-                        
-                        bcpage += f'<a style="font-size:12px;line-height:13px;" itemprop="url" href="{linkalone}">{link["domain_name"]}</a></span><br>\n'
-                        
-                        if address and map_val == 1:
-                            bcpage += '</div>\n'
-                        
-                        # Social media icons
-                        if (link.get('wr_googleplus') or link.get('wr_facebook') or link.get('wr_twitter') or 
-                            link.get('wr_linkedin') or link.get('wr_yelp') or link.get('wr_bing') or link.get('wr_yahoo')):
-                            bcpage += '<div class="seo-automation-space"></div>\n'
-                            alttxt = seo_filter_text_custom(link.get('restitle', ''))
-                            bcpage += '<div class="related-art-social">\n'
-                            
-                            # Add all social icons
-                            if link.get('wr_facebook'):
-                                urlf = link['wr_facebook']
-                                if 'http' in urlf:
-                                    urlf = urlf.replace('http:', 'https:')
-                                elif urlf.startswith('/'):
-                                    urlf = 'https://www.facebook.com' + urlf
-                                else:
-                                    urlf = 'https://www.facebook.com/' + urlf
-                                bcpage += f'<a href="{urlf}" title="{alttxt} - Follow us on Facebook" target="_blank"><img src="//imagehosting.space/images/fbfavicon.ico" width="16" alt="{alttxt}"></a>'
-                            
-                            if link.get('wr_twitter'):
-                                urlt = link['wr_twitter']
-                                if 'http' in urlt:
-                                    urlt = urlt.replace('http:', 'https:')
-                                elif urlt.startswith('/'):
-                                    urlt = 'https://twitter.com' + urlt
-                                else:
-                                    urlt = 'https://twitter.com/' + urlt
-                                bcpage += f'<a href="{urlt}" title="{alttxt} - Follow us on Twitter" target="_blank"><img src="//imagehosting.space/images/twitfavicon.ico" width="16" alt="{alttxt}"></a>'
-                            
-                            if link.get('wr_linkedin'):
-                                urll = link['wr_linkedin']
-                                if 'http' in urll:
-                                    urll = urll.replace('http:', 'https:')
-                                elif urll.startswith('/'):
-                                    urll = 'https://www.linkedin.com/pub' + urll
-                                else:
-                                    urll = 'https://www.linkedin.com/pub/' + urll
-                                bcpage += f'<a href="{urll}" title="{alttxt} - Follow us on LinkedIn" target="_blank"><img src="//imagehosting.space/images/linkfavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
-                            
-                            if link.get('wr_googleplus'):
-                                urlg = link['wr_googleplus']
-                                if 'http' in urlg:
-                                    urlg = urlg.replace('http:', 'https:')
-                                elif urlg.startswith('/'):
-                                    urlg = 'https://plus.google.com' + urlg
-                                else:
-                                    urlg = 'https://plus.google.com/' + urlg
-                                bcpage += f'<a href="{urlg}" title="{alttxt} - Find us on Google" target="_blank"><img src="//imagehosting.space/images/maps15_bnuw3a_32dp.ico" border="0" width="16" alt="{alttxt}"></a>'
-                            
-                            if link.get('wr_yelp'):
-                                urly = link['wr_yelp']
-                                bcpage += f'<a href="{urly}" title="{alttxt} - Follow us on Yelp" target="_blank"><img src="//imagehosting.space/images/yelpfavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
-                            
-                            if link.get('wr_bing'):
-                                urly = link['wr_bing']
-                                bcpage += f'<a href="{urly}" title="{alttxt} - Find us on Bing" target="_blank"><img src="//imagehosting.space/images/bingfavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
-                            
-                            if link.get('wr_yahoo'):
-                                urly = link['wr_yahoo']
-                                bcpage += f'<a href="{urly}" title="{alttxt} - Find us on Yahoo" target="_blank"><img src="//imagehosting.space/images/yahoofavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
-                            
-                            bcpage += '</div>\n'
-                        
-                        if link_settings.get('blogUrl') and len(link_settings['blogUrl']) > 10:
-                            bcpage += f' <a target="_blank" href="{link_settings["blogUrl"]}">Blog</a>  '
-                        if link_settings.get('faqUrl') and len(link_settings['faqUrl']) > 10:
-                            bcpage += f' <a target="_blank" href="{link_settings["faqUrl"]}">FAQ</a> '
-                        
-                        bcpage += '</div>\n'
-                        bcpage += '</div>\n'
                     else:
-                        # No map - just image
-                        bcpage += '<div class="snapshot-container" style="margin-left:20px !important;">\n'
-                        bcpage += f'<a href="{imageurl}" target="_blank"{follow}><img src="//imagehosting.space/feed/pageimage.php?domain={link["domain_name"]}" alt="{link["domain_name"]}" style="width:130px !important;height:110px;"></a>\n'
-                        if link_settings.get('blogUrl') and len(link_settings['blogUrl']) > 10:
-                            bcpage += f' <a target="_blank" href="{link_settings["blogUrl"]}">Blog</a>  '
-                        if link_settings.get('faqUrl') and len(link_settings['faqUrl']) > 10:
-                            bcpage += f' <a target="_blank" href="{link_settings["faqUrl"]}">FAQ</a> '
+                        bcpage += f'<a href="{imageurl}" target="_blank"{follow}><img itemprop="image" src="//imagehosting.space/feed/pageimage.php?domain={link["domain_name"]}" alt="{link["domain_name"]}" style="width:130px !important;height:110px;"></a>\n'
+                    
+                    bcpage += '</div>\n'
+                    
+                    wr_name = link.get('resname') or link.get('wr_name', '')
+                    bcpage += f'<span itemprop="name" style="font-size:12px;line-height:13px;"><strong>{wr_name}</strong></span><br>\n'
+                    
+                    # Address is only shown when address exists and map == 1 (PHP line 559)
+                    if address and map_val == 1 and stadd:
+                        bcpage += '<div itemprop="address" itemscope itemtype="http://schema.org/PostalAddress">\n'
+                        bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="streetAddress">{stadd}</span><br>\n'
+                        bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="addressLocality">{cty}</span> '
+                        bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="addressRegion">{state}</span> '
+                        bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="postalCode">{zip_code}</span>\n'
+                        bcpage += f'<span style="font-size:12px;line-height:13px;display:none;" itemprop="addressCountry">{link.get("domain_country", "")}</span><br>\n'
+                    
+                    if link.get('wr_phone') or link.get('resphone'):
+                        phon = link.get('resphone') or link.get('wr_phone', '')
+                        bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="telephone">{phon}<br>\n'
+                    
+                    bcpage += f'<a style="font-size:12px;line-height:13px;" itemprop="url" href="{linkalone}">{link["domain_name"]}</a></span><br>\n'
+                    
+                    if address and map_val == 1:
                         bcpage += '</div>\n'
+                    
+                    # Social media icons
+                    if (link.get('wr_googleplus') or link.get('wr_facebook') or link.get('wr_twitter') or 
+                        link.get('wr_linkedin') or link.get('wr_yelp') or link.get('wr_bing') or link.get('wr_yahoo')):
+                        bcpage += '<div class="seo-automation-space"></div>\n'
+                        alttxt = seo_filter_text_custom(link.get('restitle', ''))
+                        bcpage += '<div class="related-art-social">\n'
+                        
+                        # Add all social icons
+                        if link.get('wr_facebook'):
+                            urlf = link['wr_facebook']
+                            if 'http' in urlf:
+                                urlf = urlf.replace('http:', 'https:')
+                            elif urlf.startswith('/'):
+                                urlf = 'https://www.facebook.com' + urlf
+                            else:
+                                urlf = 'https://www.facebook.com/' + urlf
+                            bcpage += f'<a href="{urlf}" title="{alttxt} - Follow us on Facebook" target="_blank"><img src="//imagehosting.space/images/fbfavicon.ico" width="16" alt="{alttxt}"></a>'
+                        
+                        if link.get('wr_twitter'):
+                            urlt = link['wr_twitter']
+                            if 'http' in urlt:
+                                urlt = urlt.replace('http:', 'https:')
+                            elif urlt.startswith('/'):
+                                urlt = 'https://twitter.com' + urlt
+                            else:
+                                urlt = 'https://twitter.com/' + urlt
+                            bcpage += f'<a href="{urlt}" title="{alttxt} - Follow us on Twitter" target="_blank"><img src="//imagehosting.space/images/twitfavicon.ico" width="16" alt="{alttxt}"></a>'
+                        
+                        if link.get('wr_linkedin'):
+                            urll = link['wr_linkedin']
+                            if 'http' in urll:
+                                urll = urll.replace('http:', 'https:')
+                            elif urll.startswith('/'):
+                                urll = 'https://www.linkedin.com/pub' + urll
+                            else:
+                                urll = 'https://www.linkedin.com/pub/' + urll
+                            bcpage += f'<a href="{urll}" title="{alttxt} - Follow us on LinkedIn" target="_blank"><img src="//imagehosting.space/images/linkfavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                        
+                        if link.get('wr_googleplus'):
+                            urlg = link['wr_googleplus']
+                            if 'http' in urlg:
+                                urlg = urlg.replace('http:', 'https:')
+                            elif urlg.startswith('/'):
+                                urlg = 'https://plus.google.com' + urlg
+                            else:
+                                urlg = 'https://plus.google.com/' + urlg
+                            bcpage += f'<a href="{urlg}" title="{alttxt} - Find us on Google" target="_blank"><img src="//imagehosting.space/images/maps15_bnuw3a_32dp.ico" border="0" width="16" alt="{alttxt}"></a>'
+                        
+                        if link.get('wr_yelp'):
+                            urly = link['wr_yelp']
+                            bcpage += f'<a href="{urly}" title="{alttxt} - Follow us on Yelp" target="_blank"><img src="//imagehosting.space/images/yelpfavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                        
+                        if link.get('wr_bing'):
+                            urly = link['wr_bing']
+                            bcpage += f'<a href="{urly}" title="{alttxt} - Find us on Bing" target="_blank"><img src="//imagehosting.space/images/bingfavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                        
+                        if link.get('wr_yahoo'):
+                            urly = link['wr_yahoo']
+                            bcpage += f'<a href="{urly}" title="{alttxt} - Find us on Yahoo" target="_blank"><img src="//imagehosting.space/images/yahoofavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                        
+                        bcpage += '</div>\n'
+                    
+                    if link_settings.get('blogUrl') and len(link_settings['blogUrl']) > 10:
+                        bcpage += f' <a target="_blank" href="{link_settings["blogUrl"]}">Blog</a>  '
+                    if link_settings.get('faqUrl') and len(link_settings['faqUrl']) > 10:
+                        bcpage += f' <a target="_blank" href="{link_settings["faqUrl"]}">FAQ</a> '
+                    
+                    bcpage += '</div>\n'
+                    bcpage += '</div>\n'
                 else:
                     # No address - just image
                     bcpage += '<div class="snapshot-container" style="margin-left:20px !important;">\n'
