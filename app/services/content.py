@@ -24,7 +24,346 @@ def get_script_version_num(script_version) -> float:
         return 0.0
 
 
-def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings: Dict[str, Any]) -> Dict[str, str]:
+def get_header_footer(domainid: int, domain_status: Any, keyword: str = '', category: str = '', alttemplate: Optional[int] = None) -> Dict[str, Any]:
+    """
+    Get header and footer HTML from database templates.
+    Replicates PHP Article.php lines 868-981.
+    
+    Returns dict with:
+    - header: HTML header string
+    - footer: HTML footer string
+    - header_footer: Full template data dict
+    - doctype: Document type string
+    - style_vars: Dictionary of style variables
+    """
+    import html
+    
+    # Get default template (feedstyle_id = 1)
+    default_template = db.fetch_row(
+        "SELECT * FROM bwp_domain_feedstyle WHERE feedstyle_id = '1'"
+    )
+    
+    defhead = ''
+    deffoot = ''
+    if default_template:
+        defhead = html.unescape(default_template.get('domain_header', ''))
+        defhead = defhead.replace('<old', '<')
+        defhead = defhead.replace('</old', '<')
+        deffoot = html.unescape(default_template.get('domain_footer', ''))
+        deffoot = deffoot.replace('<old', '<')
+        deffoot = deffoot.replace('</old', '<')
+    
+    # Check for alternative template (keyword-specific or primary)
+    # PHP lines 884-921: Template selection logic
+    cmstemplate = '0'
+    primaryid = None
+    
+    if not alttemplate:
+        # Get custom primary template
+        primary_template = db.fetch_row(
+            "SELECT feedstyle_id FROM bwp_domain_feedstyle_alt WHERE domain_id = %s AND deleted != 1 AND `primary` = 1",
+            (domainid,)
+        )
+        if primary_template:
+            primaryid = primary_template.get('feedstyle_id')
+            alttemplate = primaryid
+    
+    # Get template data
+    if alttemplate:
+        # Get alternative template
+        header_footer = db.fetch_row(
+            "SELECT * FROM bwp_domain_feedstyle_alt WHERE feedstyle_id = %s",
+            (alttemplate,)
+        )
+        # Fallback to domain default if alt template missing
+        if not header_footer or not header_footer.get('domain_header'):
+            header_footer = db.fetch_row(
+                "SELECT * FROM bwp_domain_feedstyle WHERE domain_id = %s",
+                (domainid,)
+            )
+    else:
+        # Get domain default template
+        header_footer = db.fetch_row(
+            "SELECT * FROM bwp_domain_feedstyle WHERE domain_id = %s",
+            (domainid,)
+        )
+    
+    # Fallback to system default (feedstyle_id = 2) if domain template missing
+    if not header_footer or not header_footer.get('domain_header'):
+        header_footer = db.fetch_row(
+            "SELECT * FROM bwp_domain_feedstyle WHERE feedstyle_id = '2'"
+        )
+    
+    # Decode header and footer
+    header = html.unescape(header_footer.get('domain_header', '')) if header_footer else ''
+    footer = html.unescape(header_footer.get('domain_footer', '')) if header_footer else ''
+    
+    # Add style tag if domain_smalltextcolor is set (PHP line 971-975)
+    if header_footer and header_footer.get('domain_smalltextcolor'):
+        font_color = header_footer['domain_smalltextcolor']
+        header += f'\n<style>.ngodkrbsitr-main-table{{color:{font_color};}}</style>\n'
+    
+    # Use default if domain status is 0 or 1 or header is empty (PHP line 977-981)
+    if domain_status in [0, 1] or not header:
+        header = defhead
+        footer = deffoot
+    
+    # Get doctype
+    doctype = html.unescape(header_footer.get('domain_doctype', '')) if header_footer else ''
+    
+    # Set default style values (PHP lines 984-1012)
+    style_vars = {}
+    if header_footer:
+        style_vars['blogtitlecolor'] = header_footer.get('blogtitlecolor') or 'black'
+        style_vars['blogdatecolor'] = header_footer.get('blogdatecolor') or 'black'
+        style_vars['blogcontentcolor'] = header_footer.get('blogcontentcolor') or 'black'
+        style_vars['domain_fontcolor'] = header_footer.get('domain_fontcolor') or 'black'
+        style_vars['domain_smalltextcolor'] = header_footer.get('domain_smalltextcolor') or 'black'
+        style_vars['domain_headercolor'] = header_footer.get('domain_headercolor') or 'black'
+        style_vars['domain_linkcolor'] = header_footer.get('domain_linkcolor') or 'blue'
+        style_vars['domain_linkhover'] = header_footer.get('domain_linkhover') or 'black'
+        style_vars['domain_linkvisited'] = header_footer.get('domain_linkvisited') or 'blue'
+        style_vars['domain_notescolor'] = header_footer.get('domain_notescolor') or 'black'
+        style_vars['domain_linksmallcolor'] = header_footer.get('domain_linksmallcolor') or 'blue'
+        style_vars['domain_linksmallhover'] = header_footer.get('domain_linksmallhover') or 'black'
+        style_vars['domain_linksmallvisited'] = header_footer.get('domain_linksmallvisited') or 'blue'
+        
+        # Build style strings (PHP lines 997-1009)
+        style_vars['blogtitle'] = f"color:{style_vars['blogtitlecolor']};font-family:{header_footer.get('blogtitlefont', '')};text-decoration:none;font-size:{header_footer.get('blogtitlesize', '')}pt;font-weight:{header_footer.get('blogtitlewight', '')}"
+        style_vars['blogdate'] = f"color:{style_vars['blogdatecolor']};font-family:{header_footer.get('blogdatefont', '')};text-decoration:none;font-size:{header_footer.get('blogdatesize', '')}pt;font-weight:{header_footer.get('blogdateweight', '')}"
+        style_vars['blogcontent'] = f"color:{style_vars['blogcontentcolor']};font-family:{header_footer.get('blogcontentfont', '')};text-decoration:none;font-size:{header_footer.get('blogcontentsize', '')}pt;font-weight:{header_footer.get('blogcontentweight', '')}"
+        style_vars['main_page_style'] = f"color:{style_vars['domain_fontcolor']}; font-family:{header_footer.get('domain_fontface', '')}; font-size:{header_footer.get('domain_fontsize', '')}pt; font-weight:{header_footer.get('domain_fontweight', '')};"
+        style_vars['main_page_style_small'] = f"color:{style_vars['domain_smalltextcolor']}; font-family:{header_footer.get('domain_smalltextfont', '')}; font-size:{header_footer.get('domain_smalltextsize', '')}pt; font-weight:{header_footer.get('domain_smalltextweight', '')};"
+        style_vars['main_page_style_header'] = f"color:{style_vars['domain_headercolor']}; font-family:{header_footer.get('domain_headerfont', '')}; font-size:{header_footer.get('domain_headersize', '')}pt; font-weight:{header_footer.get('domain_headerweight', '')};"
+        style_vars['main_page_links'] = f" color:{style_vars['domain_linkcolor']}; font-family:{header_footer.get('domain_linkfont', '')}; font-size:{header_footer.get('domain_linkfontsize', '')}pt; font-weight:{header_footer.get('domain_linkweight', '')}; text-decoration:{header_footer.get('domain_linkdecoration', '')};\""
+        style_vars['main_page_links'] += f" onMouseOver=\"this.style.color='{style_vars['domain_linkhover']}';\" onMouseOut=\"this.style.color='{style_vars['domain_linkvisited']}';"
+        style_vars['misc_notes'] = f"color:{style_vars['domain_notescolor']}; font-family:{header_footer.get('domain_notesfont', '')}; font-size:{header_footer.get('domain_notessize', '')}pt; font-weight:{header_footer.get('domain_notesweight', '')};"
+        style_vars['main_page_links_small'] = f' color:{style_vars["domain_linksmallcolor"]}; font-family:{header_footer.get("domain_linksmallfont", "")}; font-size:{header_footer.get("domain_linksmallfontsize", "")}pt; font-weight:{header_footer.get("domain_linksmallweight", "")}; text-decoration:{header_footer.get("domain_linksmalldecoration", "")};"'
+        style_vars['main_page_links_small'] += f" onMouseOver=\"this.style.color='{style_vars['domain_linksmallhover']}';\" onMouseOut=\"this.style.color='{style_vars['domain_linksmallvisited']}';"
+        style_vars['wr_style_small'] = f'color:{style_vars["domain_fontcolor"]}; font-family:{header_footer.get("domain_fontface", "")}; font-size:{header_footer.get("domain_fontsize", "")}pt; font-weight:bold;'
+        style_vars['wr_style_large'] = f'color:{style_vars["domain_fontcolor"]}; font-family:{header_footer.get("domain_headerfont", "")}; font-size:{header_footer.get("domain_headersize", "")}pt; font-weight:bold;'
+    
+    return {
+        'header': header,
+        'footer': footer,
+        'header_footer': header_footer or {},
+        'doctype': doctype,
+        'style_vars': style_vars
+    }
+
+
+def build_metaheader(
+    domainid: int,
+    domain_data: Dict[str, Any],
+    domain_settings: Dict[str, Any],
+    action: str,
+    keyword: str = '',
+    pageid: int = 0,
+    category: str = '',
+    city: str = '',
+    state: str = '',
+    st: str = '',
+    bubble: Optional[Dict[str, Any]] = None
+) -> str:
+    """
+    Build meta header HTML (title, description, keywords, og tags).
+    Replicates PHP Article.php lines 1016-1289.
+    """
+    import html
+    import re
+    
+    # Get domain category
+    domain_category_sql = """
+        SELECT dom.*, cat.category 
+        FROM bwp_domains dom 
+        INNER JOIN bwp_domain_category cat ON domain_category = cat.id 
+        WHERE dom.id = %s
+    """
+    metadomain = db.fetch_row(domain_category_sql, (domainid,))
+    
+    if not metadomain:
+        metadomain = domain_data
+    
+    # Get keywords
+    metakeywords = get_domain_keywords(domainid)
+    if not metakeywords:
+        metakeywords = [domain_data.get('domain_name', '')]
+    
+    # Find matching keyword
+    import random
+    metakey = None
+    if keyword:
+        try:
+            metakey = metakeywords.index(keyword.lower())
+        except ValueError:
+            metakey = None
+    
+    if metakey is None:
+        metakey = random.randint(0, len(metakeywords) - 1) if metakeywords else 0
+    
+    metaKeywords = metakeywords[metakey] if metakeywords else keyword
+    
+    # Build meta title and description based on action
+    metaTitle = ''
+    metaDesc = ''
+    
+    if action == '1':
+        # Website Reference
+        if bubble:
+            if bubble.get('metatitle') and bubble['metatitle'].strip():
+                metaTitle = clean_title(seo_filter_text_custom(bubble['metatitle']))
+                metaKeywords = seo_filter_text_custom(bubble.get('restitle', ''))
+            else:
+                metaTitle = clean_title(seo_filter_text_custom(bubble.get('restitle', '')))
+                metaKeywords = seo_filter_text_custom(bubble.get('restitle', ''))
+            
+            if bubble.get('metadescription') and bubble['metadescription'].strip():
+                metaDesc = re.sub(r'\r|\n', ' ', seo_filter_text_custom(bubble['metadescription']))
+            else:
+                # Extract first 20 words from resfulltext
+                resfulltext = html.unescape(seo_filter_text_custom(bubble.get('resfulltext', '')))
+                resfulltext = re.sub(r'<[^>]+>', '', resfulltext)  # strip tags
+                words = resfulltext.split()[:20]
+                content = ' '.join(words)
+                metaDesc = content.replace('Table of Contents', '').strip() + '... ' + metaTitle
+            
+            # Add phone to title if configured
+            if len(metadomain.get('wr_phone', '')) > 9 and domain_settings.get('phoneintitle') == 1:
+                metaTitle = metadomain['wr_phone'] + ' - ' + metaTitle
+        else:
+            metaTitle = keyword or metaKeywords
+            metaDesc = metadomain.get('desc2', '') or metaTitle
+    elif action == '2':
+        # Business Collective
+        if bubble:
+            metaTitle = seo_filter_text_custom(bubble.get('restitle', '')) + ' - Resources'
+            metaDesc = seo_filter_text_custom(bubble.get('restitle', '')) + ' - Resources'
+            metaKeywords = seo_filter_text_custom(bubble.get('restitle', ''))
+            
+            if len(metadomain.get('wr_phone', '')) > 9 and domain_settings.get('phoneintitle') == 1:
+                metaTitle = metadomain['wr_phone'] + ' - ' + metaTitle
+        else:
+            metaTitle = keyword or metaKeywords
+            metaDesc = metadomain.get('desc2', '') or metaTitle
+    
+    # Add city/state to meta if provided
+    if city:
+        metaDesc = (city + ': ' + metaDesc).strip()
+        metaTitle = clean_title(city + ' - ' + metaTitle) + ' - ' + domain_data.get('domain_name', '')
+        metaKeywords = (metaKeywords + ' ' + city).strip()
+    elif state:
+        metaDesc = (state + ' - ' + st + ': ' + metaDesc).strip()
+        metaTitle = (state + ' - ' + metaTitle).strip().title() + ' - ' + domain_data.get('domain_name', '')
+        metaKeywords = (metaKeywords + ' ' + state + ', ' + metaKeywords + ' ' + st).strip()
+    
+    # Build metaheader HTML (PHP lines 1269-1288)
+    metaheader = ''
+    metaheader += f'<title>{seo_filter_text_custom(metaTitle)}</title>\n'
+    metaheader += f'<meta name="description" content="{seo_filter_text_custom(metaDesc)}"/>\n'
+    metaheader += f'<meta name="keywords" content="{seo_filter_text_custom(metaKeywords)}"/>\n'
+    metaheader += f'<meta property="og:title" content="{seo_filter_text_custom(metaTitle)}">\n'
+    metaheader += f'<meta property="og:description" content="{seo_filter_text_custom(metaDesc)}"/>\n'
+    
+    if domain_data.get('domain_country') == 'US':
+        metaheader += '<meta property="og:locale" content="en_US" />\n'
+    
+    # Add Umami analytics if configured
+    if domain_settings.get('umamiid') and domain_settings['umamiid'].strip():
+        metaheader += f'<script async src="https://analytics.umami.is/script.js" data-website-id="{domain_settings["umamiid"]}"></script>\n'
+    
+    return metaheader
+
+
+def wrap_content_with_header_footer(
+    content: str,
+    header: str,
+    footer: str,
+    metaheader: str,
+    canonical_url: str = '',
+    websitereferencesimple: bool = False,
+    wp_plugin: int = 0
+) -> str:
+    """
+    Wrap content with header and footer HTML.
+    Replicates PHP websitereference.php lines 263-294 (header) and 1761-1785 (footer).
+    
+    Args:
+        content: Main content HTML
+        header: Header HTML from template
+        footer: Footer HTML from template
+        metaheader: Meta tags HTML
+        canonical_url: Canonical link URL
+        websitereferencesimple: If True, skip header/footer (for simple mode)
+        wp_plugin: If 1, skip header/footer (WordPress handles it)
+    """
+    # WordPress plugin doesn't use header/footer (WordPress handles it)
+    if wp_plugin == 1:
+        return content
+    
+    # Simple mode doesn't use header/footer
+    if websitereferencesimple:
+        return content
+    
+    full_page = ''
+    
+    # Build header section (PHP lines 263-294)
+    ishead = '</head>' in header.lower() if header else False
+    
+    if not ishead:
+        # Header doesn't contain </head> - output full HTML structure
+        full_page += '<html>\n'
+        full_page += '<head>\n'
+        # Note: feed.js.php and feed.css.php would be included here in PHP
+        # For now, we'll just include the metaheader
+        full_page += metaheader
+        if canonical_url:
+            full_page += f'<link href="{canonical_url}" rel="canonical" />\n'
+        full_page += '</head>\n'
+        full_page += '<body>\n'
+        # Note: feed.bodytop.php would be included here in PHP
+        full_page += header if header else ''
+    else:
+        # Header contains </head> - split and insert metaheader
+        header_lower = header.lower()
+        head_pos = header_lower.find('</head>')
+        if head_pos >= 0:
+            full_page += header[:head_pos]  # Everything before </head>
+            full_page += metaheader
+            # Note: feed.js.php and feed.css.php would be included here in PHP
+            if canonical_url:
+                full_page += f'<link href="{canonical_url}" rel="canonical" />\n'
+            full_page += header[head_pos:]  # </head> and everything after
+        else:
+            full_page += header
+        # Note: feed.bodytop.php would be included here in PHP
+    
+    # Add main content
+    full_page += content
+    
+    # Build footer section (PHP lines 1761-1785)
+    isfoothtml = '</html>' in footer.lower() if footer else False
+    isfootbody = '</body>' in footer.lower() if footer else False
+    
+    if not isfoothtml and not isfootbody:
+        # Footer doesn't contain </html> or </body>
+        full_page += footer if footer else ''
+        # Note: webtabs.inc.php and feed.footer.php would be included here in PHP
+        full_page += '</body>\n'
+        full_page += '</html>\n'
+    elif not isfootbody:
+        # Footer contains </html> but not </body>
+        full_page += footer if footer else ''
+        # Note: webtabs.inc.php and feed.footer.php would be included here in PHP
+        full_page += '</body>\n'
+    else:
+        # Footer contains </body> (and possibly </html>)
+        # Note: webtabs.inc.php and feed.footer.php would be included here in PHP
+        full_page += footer if footer else ''
+    
+    return full_page
+
+
+def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings: Dict[str, Any]) -> str:
     """
     Build footer HTML for WordPress plugin (feedit=2).
     Replicates seo_automation_build_footerWP function from ArticlesWP5.php

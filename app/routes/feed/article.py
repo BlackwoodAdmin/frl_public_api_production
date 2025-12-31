@@ -322,7 +322,7 @@ async def article_endpoint(
         
         if Action == '1':
             # Website Reference page
-            from app.services.content import build_page_wp
+            from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
             wpage = build_page_wp(
                 bubbleid=bubbleid,
                 domainid=domainid,
@@ -332,11 +332,64 @@ async def article_endpoint(
                 domain_data=domain_category,
                 domain_settings=domain_settings
             )
-            return HTMLResponse(content=wpage)
+            
+            # For WordPress plugin, don't add header/footer (WordPress handles it)
+            if wp_plugin == 1:
+                return HTMLResponse(content=wpage)
+            
+            # For non-WP, get header/footer and wrap content
+            header_footer_data = get_header_footer(domainid, domain_category.get('status'), keyword_param)
+            
+            # Get bubble data for metaheader
+            bubble_sql = """
+                SELECT b.*, c.category AS bubblecat, c.bubblefeedid AS bubblecatid, c.id AS bubblecatsid 
+                FROM bwp_bubblefeed b 
+                LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid 
+                WHERE b.domainid = %s AND b.id = %s
+            """
+            bubble = db.fetch_row(bubble_sql, (domainid, bubbleid)) if bubbleid else None
+            
+            # Build canonical URL
+            if domain_settings.get('usedurl') == 1 and domain_category.get('domain_url'):
+                linkdomain = domain_category['domain_url'].rstrip('/')
+            else:
+                if domain_category.get('ishttps') == 1:
+                    linkdomain = 'https://'
+                else:
+                    linkdomain = 'http://'
+                if domain_category.get('usewww') == 1:
+                    linkdomain += 'www.' + domain_category['domain_name']
+                else:
+                    linkdomain += domain_category['domain_name']
+            
+            canonical_url = linkdomain + '/' + keyword_param.lower().replace(' ', '-') + '-' + str(bubbleid) + '/' if bubbleid else linkdomain
+            
+            # Build metaheader
+            metaheader = build_metaheader(
+                domainid=domainid,
+                domain_data=domain_category,
+                domain_settings=domain_settings,
+                action='1',
+                keyword=keyword_param,
+                pageid=bubbleid or 0,
+                bubble=bubble
+            )
+            
+            # Wrap content with header/footer
+            full_page = wrap_content_with_header_footer(
+                content=wpage,
+                header=header_footer_data['header'],
+                footer=header_footer_data['footer'],
+                metaheader=metaheader,
+                canonical_url=canonical_url,
+                wp_plugin=wp_plugin
+            )
+            
+            return HTMLResponse(content=full_page)
         
         elif Action == '2':
             # Business Collective page
-            from app.services.content import build_bcpage_wp
+            from app.services.content import build_bcpage_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
             wpage = build_bcpage_wp(
                 bubbleid=bubbleid,
                 domainid=domainid,
@@ -345,7 +398,60 @@ async def article_endpoint(
                 domain_data=domain_category,
                 domain_settings=domain_settings
             )
-            return HTMLResponse(content=wpage)
+            
+            # For WordPress plugin, don't add header/footer (WordPress handles it)
+            if wp_plugin == 1:
+                return HTMLResponse(content=wpage)
+            
+            # For non-WP, get header/footer and wrap content
+            header_footer_data = get_header_footer(domainid, domain_category.get('status'))
+            
+            # Get bubble data for metaheader
+            bubble_sql = """
+                SELECT b.*, c.category AS bubblecat, c.bubblefeedid AS bubblecatid, c.id AS bubblecatsid 
+                FROM bwp_bubblefeed b 
+                LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid 
+                WHERE b.domainid = %s AND b.id = %s
+            """
+            bubble = db.fetch_row(bubble_sql, (domainid, bubbleid)) if bubbleid else None
+            
+            # Build canonical URL
+            if domain_settings.get('usedurl') == 1 and domain_category.get('domain_url'):
+                linkdomain = domain_category['domain_url'].rstrip('/')
+            else:
+                if domain_category.get('ishttps') == 1:
+                    linkdomain = 'https://'
+                else:
+                    linkdomain = 'http://'
+                if domain_category.get('usewww') == 1:
+                    linkdomain += 'www.' + domain_category['domain_name']
+                else:
+                    linkdomain += domain_category['domain_name']
+            
+            canonical_url = linkdomain + '/?Action=2&k=' + (keyword_param or '').lower().replace(' ', '-') if keyword_param else linkdomain
+            
+            # Build metaheader
+            metaheader = build_metaheader(
+                domainid=domainid,
+                domain_data=domain_category,
+                domain_settings=domain_settings,
+                action='2',
+                keyword=keyword_param or '',
+                pageid=bubbleid or 0,
+                bubble=bubble
+            )
+            
+            # Wrap content with header/footer
+            full_page = wrap_content_with_header_footer(
+                content=wpage,
+                header=header_footer_data['header'],
+                footer=header_footer_data['footer'],
+                metaheader=metaheader,
+                canonical_url=canonical_url,
+                wp_plugin=wp_plugin
+            )
+            
+            return HTMLResponse(content=full_page)
         
         elif Action == '3':
             # Bubba page
@@ -364,7 +470,7 @@ async def article_endpoint(
     # Handle other actions (non-WP plugin)
     if Action == '1':
         # Website Reference (non-WP) - use same function as WP but it handles wp_plugin internally
-        from app.services.content import build_page_wp
+        from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
         # Extract pageid and keyword
         pageid_param = pageid or ''
         keyword_param = k or key or ''
@@ -386,11 +492,61 @@ async def article_endpoint(
             domain_data=domain_category,
             domain_settings=domain_settings
         )
-        return HTMLResponse(content=wpage)
+        
+        # Get header/footer and wrap content (non-WP always uses header/footer)
+        header_footer_data = get_header_footer(domainid, domain_category.get('status'), keyword_param)
+        
+        # Get bubble data for metaheader
+        bubble_sql = """
+            SELECT b.*, c.category AS bubblecat, c.bubblefeedid AS bubblecatid, c.id AS bubblecatsid 
+            FROM bwp_bubblefeed b 
+            LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid 
+            WHERE b.domainid = %s AND b.id = %s
+        """
+        bubble = db.fetch_row(bubble_sql, (domainid, bubbleid)) if bubbleid else None
+        
+        # Build canonical URL
+        if domain_settings.get('usedurl') == 1 and domain_category.get('domain_url'):
+            linkdomain = domain_category['domain_url'].rstrip('/')
+        else:
+            if domain_category.get('ishttps') == 1:
+                linkdomain = 'https://'
+            else:
+                linkdomain = 'http://'
+            if domain_category.get('usewww') == 1:
+                linkdomain += 'www.' + domain_category['domain_name']
+            else:
+                linkdomain += domain_category['domain_name']
+        
+        canonical_url = linkdomain + '/?Action=1&k=' + keyword_param.lower().replace(' ', '-') + ('&PageID=' + str(bubbleid) if bubbleid else '') if keyword_param else linkdomain
+        
+        # Build metaheader
+        metaheader = build_metaheader(
+            domainid=domainid,
+            domain_data=domain_category,
+            domain_settings=domain_settings,
+            action='1',
+            keyword=keyword_param,
+            pageid=bubbleid or 0,
+            bubble=bubble
+        )
+        
+        # Wrap content with header/footer
+        full_page = wrap_content_with_header_footer(
+            content=wpage,
+            header=header_footer_data['header'],
+            footer=header_footer_data['footer'],
+            metaheader=metaheader,
+            canonical_url=canonical_url,
+            wp_plugin=wp_plugin
+        )
+        
+        return HTMLResponse(content=full_page)
     elif Action == '2':
         # Business Collective (non-WP) - use same function as WP but it handles wp_plugin internally
-        from app.services.content import build_bcpage_wp
+        from app.services.content import build_bcpage_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
         pageid_param = pageid or ''
+        keyword_param = k or key or ''
         bubbleid = None
         if pageid_param:
             try:
@@ -406,7 +562,56 @@ async def article_endpoint(
             domain_data=domain_category,
             domain_settings=domain_settings
         )
-        return HTMLResponse(content=wpage)
+        
+        # Get header/footer and wrap content (non-WP always uses header/footer)
+        header_footer_data = get_header_footer(domainid, domain_category.get('status'), keyword_param)
+        
+        # Get bubble data for metaheader
+        bubble_sql = """
+            SELECT b.*, c.category AS bubblecat, c.bubblefeedid AS bubblecatid, c.id AS bubblecatsid 
+            FROM bwp_bubblefeed b 
+            LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid 
+            WHERE b.domainid = %s AND b.id = %s
+        """
+        bubble = db.fetch_row(bubble_sql, (domainid, bubbleid)) if bubbleid else None
+        
+        # Build canonical URL
+        if domain_settings.get('usedurl') == 1 and domain_category.get('domain_url'):
+            linkdomain = domain_category['domain_url'].rstrip('/')
+        else:
+            if domain_category.get('ishttps') == 1:
+                linkdomain = 'https://'
+            else:
+                linkdomain = 'http://'
+            if domain_category.get('usewww') == 1:
+                linkdomain += 'www.' + domain_category['domain_name']
+            else:
+                linkdomain += domain_category['domain_name']
+        
+        canonical_url = linkdomain + '/?Action=2&k=' + keyword_param.lower().replace(' ', '-') if keyword_param else linkdomain
+        
+        # Build metaheader
+        metaheader = build_metaheader(
+            domainid=domainid,
+            domain_data=domain_category,
+            domain_settings=domain_settings,
+            action='2',
+            keyword=keyword_param or '',
+            pageid=bubbleid or 0,
+            bubble=bubble
+        )
+        
+        # Wrap content with header/footer
+        full_page = wrap_content_with_header_footer(
+            content=wpage,
+            header=header_footer_data['header'],
+            footer=header_footer_data['footer'],
+            metaheader=metaheader,
+            canonical_url=canonical_url,
+            wp_plugin=wp_plugin
+        )
+        
+        return HTMLResponse(content=full_page)
     # ... other actions
     
     return {"message": "Endpoint not yet implemented", "domain": domain, "action": Action}
