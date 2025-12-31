@@ -1587,7 +1587,9 @@ def build_bcpage_wp(
                                 supp_title = custom_ucfirst_words(seo_text_custom(supp['restitle']))
                                 tsups += '- <span style="font-size:12px;line-height:13px;"><strong> <a ' + moneynofollow + ' title="' + supp_title + '" href="' + suppurl + '" target="_blank"' + follow + '> ' + supp_title + ' </a> </strong></span> '
                         
-                        tsups = tsups.lstrip('- ').strip()
+                        # PHP line 443: ltrim($tsups, '-') - only remove leading dashes
+                        tsups = tsups.lstrip('-')
+                        # PHP line 444-447: if($tsups != '') output it
                         if tsups:
                             bcpage += tsups + '\n'
                 
