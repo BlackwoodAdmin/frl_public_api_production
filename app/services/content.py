@@ -64,10 +64,12 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                 else:
                     # Use toAscii(html_entity_decode(seo_text_custom(...))) for slug like PHP
                     import html
-                    slug_text = seo_text_custom(item['restitle'])
+                    slug_text = seo_text_custom(item['restitle'])  # seo_text_custom
                     slug_text = html.unescape(slug_text)  # html_entity_decode
                     slug_text = to_ascii(slug_text)  # toAscii
-                    slug = seo_slug(slug_text) + '-' + str(item['id']) + 'bc/'
+                    slug_text = slug_text.lower()  # strtolower
+                    slug_text = slug_text.replace(' ', '-')  # str_replace(' ', '-', ...)
+                    slug = slug_text + '-' + str(item['id']) + 'bc/'
                     bclink = linkdomain + '/' + slug
                 
                 # Always show Resources link (PHP condition: links_per_page >=1 || 1==1)
@@ -85,10 +87,12 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                     else:
                         # Internal link - use toAscii(html_entity_decode(seo_text_custom(...))) for slug
                         import html
-                        slug_text = seo_text_custom(item['restitle'])
+                        slug_text = seo_text_custom(item['restitle'])  # seo_text_custom
                         slug_text = html.unescape(slug_text)  # html_entity_decode
                         slug_text = to_ascii(slug_text)  # toAscii
-                        slug = seo_slug(slug_text) + '-' + str(item['id']) + '/'
+                        slug_text = slug_text.lower()  # strtolower
+                        slug_text = slug_text.replace(' ', '-')  # str_replace(' ', '-', ...)
+                        slug = slug_text + '-' + str(item['id']) + '/'
                         foot += '<li><a style="padding-right: 0px !important;" href="' + linkdomain + '/' + slug + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
                 else:
                     # Resources not active - show only Business Collective link
@@ -129,10 +133,12 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
             import html
             for bubba in allbubba:
                 # Use toAscii(html_entity_decode(seo_text_custom(...))) for slug
-                slug_text = seo_text_custom(bubba.get('bubbatitle', ''))
+                slug_text = seo_text_custom(bubba.get('bubbatitle', ''))  # seo_text_custom
                 slug_text = html.unescape(slug_text)  # html_entity_decode
                 slug_text = to_ascii(slug_text)  # toAscii
-                slug = seo_slug(slug_text) + '-' + str(bubba['id']) + 'dc'
+                slug_text = slug_text.lower()  # strtolower
+                slug_text = slug_text.replace(' ', '-')  # str_replace(' ', '-', ...)
+                slug = slug_text + '-' + str(bubba['id']) + 'dc'
                 bubba_title = clean_title(html.unescape(seo_filter_text_custom(bubba.get('bubbatitle', ''))))
                 foot += '<li><a style="padding-right: 0px !important;" href="' + linkdomain + '/' + slug + '">' + bubba_title + '</a></li>\n'
             foot += '</ul>\n'
@@ -215,12 +221,12 @@ def seo_text_custom(text: str) -> str:
 
 
 def to_ascii(text: str) -> str:
-    """Convert text to ASCII (simplified version of PHP toAscii)."""
-    import html
+    """Convert text to ASCII (simplified version of PHP toAscii).
+    Note: PHP toAscii expects text to already be processed by seo_text_custom and html_entity_decode.
+    """
     import re
-    text = seo_filter_text_custom(text)
+    # Text should already be processed by seo_text_custom and html_entity_decode before calling this
     text = text.replace(' &#x26;', '')
-    text = html.unescape(text)
     # Basic transliteration (simplified - full version has extensive table)
     text = text.replace("'", "")
     text = text.replace('#039;', '')
