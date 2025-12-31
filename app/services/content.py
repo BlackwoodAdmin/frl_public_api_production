@@ -1861,6 +1861,11 @@ def build_page_wp(
     wpage += f'<div class="{css_prefix}-spacer"></div>\n'
     wpage += '</div>\n'
     wpage += '''<style>
+.wr-fulltext img {height: auto !important;min-width:100%;}
+@media (min-width: 992px){.wr-fulltext img {min-width:0;}}
+img {padding:10px;}
+h1:after, h2:after, h3:after, h4:after, h5:after, h6:after {display: none !important;clear: none !important;}
+h1, h2, h3, h4, h5, h6 {clear: none !important;}
 .ngodkrbsitr-spacer{clear:both;}
 .citation_map_container iframe {
 	width:130px !important;
@@ -2854,6 +2859,11 @@ def build_bcpage_wp(
     bcpage += f'<div class="{css_prefix}-spacer"></div>\n'
     bcpage += '</div>\n'
     bcpage += '''<style>
+.wr-fulltext img {height: auto !important;min-width:100%;}
+@media (min-width: 992px){.wr-fulltext img {min-width:0;}}
+img {padding:10px;}
+h1:after, h2:after, h3:after, h4:after, h5:after, h6:after {display: none !important;clear: none !important;}
+h1, h2, h3, h4, h5, h6 {clear: none !important;}
 .ngodkrbsitr-spacer{clear:both;}
 .citation_map_container iframe {
 	width:130px !important;
