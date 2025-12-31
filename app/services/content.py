@@ -57,27 +57,34 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
         
         for item in silo:
             if item.get('id'):
-                # Build link
-                if item.get('links_per_page', 0) >= 1:
-                    # Build Resources link
-                    slug = seo_slug(item['restitle']) + '-' + str(item['id']) + 'bc/'
-                    bclink = linkdomain + '/' + slug
+                # Build Resources link (PHP has: links_per_page >=1 || 1==1, so always build it)
+                if item.get('links_per_page', 0) >= 1 or True:  # Always true like PHP
+                    is_bron_val = is_bron(domain_data.get('servicetype'))
+                    if is_bron_val:
+                        bclink = linkdomain + '/' + str(item['id']) + 'bc/'
+                    else:
+                        # Use seo_text_custom for slug (not seo_filter_text_custom)
+                        slug_text = seo_text_custom(item['restitle'])
+                        slug = seo_slug(slug_text) + '-' + str(item['id']) + 'bc/'
+                        bclink = linkdomain + '/' + slug
                     newsf = ' <a style="padding-left: 0px !important;" href="' + bclink + '">Resources</a>'
                 else:
                     newsf = ''
                 
-                    if domain_data.get('resourcesactive') == '1':
-                        if (item.get('NoContent') == 0 or is_bron(domain_data.get('servicetype'))) and len(item.get('linkouturl', '').strip()) > 5:
-                            # External link
-                            foot += '<li><a style="padding-right: 0px !important;" href="' + item['linkouturl'] + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
-                        else:
-                            # Internal link
-                            slug = seo_slug(item['restitle']) + '-' + str(item['id']) + '/'
-                            foot += '<li><a style="padding-right: 0px !important;" href="' + linkdomain + '/' + slug + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
+                # Main link logic
+                if domain_data.get('resourcesactive') == '1':
+                    # Resources active - show main article link + Resources link
+                    if (item.get('NoContent') == 0 or is_bron(domain_data.get('servicetype'))) and len(item.get('linkouturl', '').strip()) > 5:
+                        # External link
+                        foot += '<li><a style="padding-right: 0px !important;" href="' + item['linkouturl'] + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
                     else:
-                        # Business Collective link only
-                        slug = seo_slug(item['restitle']) + '-' + str(item['id']) + 'bc/'
-                        foot += '<li><a style="padding-right: 0px !important;" href="' + linkdomain + '/' + slug + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a></li>\n'
+                        # Internal link - use seo_text_custom for slug
+                        slug_text = seo_text_custom(item['restitle'])
+                        slug = seo_slug(slug_text) + '-' + str(item['id']) + '/'
+                        foot += '<li><a style="padding-right: 0px !important;" href="' + linkdomain + '/' + slug + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
+                else:
+                    # Resources not active - show only Business Collective link
+                    foot += '<li><a style="padding-right: 0px !important;" href="' + bclink + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a></li>\n'
                 
                 num_lnks += 1
         
