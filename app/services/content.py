@@ -2980,6 +2980,10 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                 if not bubblefeedid or len(str(bubblefeedid)) == 0:
                     links_per_page = item.get('links_per_page', 0) or 0
                     
+                    # Always build Resources link regardless of links_per_page
+                    bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
+                    newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
+                    
                     if links_per_page >= 1:
                         # Get related links (PHP lines 1651-1690)
                         links_sql = """
@@ -3044,36 +3048,29 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                                 linkurl = ''
                             slug = seo_slug(seo_filter_text_custom(link.get('restitle', '')))
                             sssnav += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;k={slug}&amp;PageID={link.get("bubblefeedid", "")}"> {clean_title(seo_filter_text_custom(link.get("restitle", "")))} </a></li>\n'
-                        
-                        # Build Resources link (PHP line 1693)
-                        bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                        newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
-                    else:
-                        newsf = ''
                     
                     # Build main link (PHP lines 1700-1716)
                     if domain_category.get('resourcesactive') == '1':
                         if item.get('NoContent') == 0 and len(item.get('linkouturl', '').strip()) > 5:
-                            if links_per_page >= 1:
-                                bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                                newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
-                            else:
-                                newsf = ''
                             feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
                         else:
                             linkurl = code_url(domainid, domain_data, domain_settings)
                             slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
                             feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;k={slug}&amp;PageID={item_id}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
-                    elif links_per_page >= 1:
+                    else:
                         linkurl = code_url(domainid, domain_data, domain_settings)
                         slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=2&amp;k={slug}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a></li>\n'
+                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=2&amp;k={slug}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
                     
                     num_lnks += 1
                 
                 # PHP line 1723: elseif($silo[$i]['bubblefeedid'] == $silo[$i]['id'])
                 elif bubblefeedid == item_id:
                     links_per_page = item.get('links_per_page', 0) or 0
+                    
+                    # Always build Resources link regardless of links_per_page
+                    bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
+                    newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
                     
                     if links_per_page >= 1:
                         # Get related links (similar to above)
@@ -3107,32 +3104,24 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                                 linkurl = ''
                             slug = seo_slug(seo_filter_text_custom(link.get('restitle', '')))
                             sssnav += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;k={slug}&amp;PageID={link.get("bubblefeedid", "")}"> {clean_title(seo_filter_text_custom(link.get("restitle", "")))} </a></li>\n'
-                        
-                        bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                        newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
-                    else:
-                        newsf = ''
                     
                     # Build category link (PHP lines 1758-1764)
                     if domain_category.get('resourcesactive') == '1':
                         linkurl = code_url(domainid, domain_data, domain_settings)
                         category_slug = seo_slug(seo_filter_text_custom(item.get('category', '')))
                         feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;category={category_slug}&amp;c={item.get("categoryid", "")}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
-                    elif links_per_page >= 1:
+                    else:
                         linkurl = code_url(domainid, domain_data, domain_settings)
                         slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=2&amp;k={slug}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a></li>\n'
+                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=2&amp;k={slug}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
                     
                     num_lnks += 1
                 
                 # PHP line 1767: elseif(strlen(trim($silo[$i]['linkouturl'])) > 5)
                 elif len(item.get('linkouturl', '').strip()) > 5:
-                    links_per_page = item.get('links_per_page', 0) or 0
-                    if links_per_page >= 1:
-                        bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                        newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
-                    else:
-                        newsf = ''
+                    # Always build Resources link regardless of links_per_page
+                    bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
+                    newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
                     feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
             
             feedlinks += '</ul>\n'
