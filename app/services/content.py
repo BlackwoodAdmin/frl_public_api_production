@@ -2723,7 +2723,12 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
             'pubsharing': 'Related Articles'
         }
     
-    price = labels.get('price', 0)
+    # Convert price to number (database may return string)
+    price_raw = labels.get('price', 0)
+    try:
+        price = float(price_raw) if price_raw else 0
+    except (ValueError, TypeError):
+        price = 0
     feedlinks = ''
     
     # Build link domain (PHP lines 1561-1568)
