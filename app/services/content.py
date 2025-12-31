@@ -590,11 +590,13 @@ def build_bcpage_wp(
     """
     Build Business Collective page HTML (Action=2).
     Replicates seo_automation_build_bcpage from businesscollective-wp.php
-    
-    TODO: Full implementation needed - this is a placeholder
     """
     if not bubbleid or not domainid:
         return ""
+    
+    import html
+    import re
+    from urllib.parse import quote
     
     # Get bubblefeed data
     sql = """
@@ -609,26 +611,691 @@ def build_bcpage_wp(
     if not res:
         return ""
     
-    # Build basic page HTML (placeholder - needs full implementation)
-    import html
-    bcpage = '<div class="seo-automation-main-table">'
-    bcpage += f'<h1>{clean_title(seo_filter_text_custom(res.get("restitle", "")))} - Resources</h1>'
+    # Build domain link
+    if domain_settings.get('usedurl') == 1 and domain_data.get('domain_url'):
+        dl = domain_data['domain_url'].rstrip('/')
+    else:
+        if domain_data.get('ishttps') == 1:
+            dl = 'https://'
+        else:
+            dl = 'http://'
+        if domain_data.get('usewww') == 1:
+            dl += 'www.' + domain_data['domain_name']
+        else:
+            dl += domain_data['domain_name']
     
-    if res.get('resfeedtext'):
+    # Build resurl
+    if len(res.get('linkouturl', '')) > 5:
+        resurl = res['linkouturl'].strip()
+    else:
+        resurl = dl + '/' + seo_slug(seo_filter_text_custom(res['restitle'])) + '-' + str(res['id']) + '/'
+    
+    # Start building page
+    bcpage = '<div class="seo-automation-main-table" style="margin-left:auto;margin-right:auto;display:block;">\n'
+    bcpage += '<div class="seo-automation-spacer"></div>\n'
+    
+    # Handle video or image
+    servicetype = domain_data.get('servicetype')
+    isSEOM_val = is_seom(servicetype)
+    isBRON_val = is_bron(servicetype)
+    
+    if not domain_data.get('wr_video'):
+        bcpage += f'<h2 style="text-align:center;margin:0 0 15px 0;"><a href="{resurl}" target="_blank">{clean_title(seo_filter_text_custom(res.get("restitle", "")))}</a></h2>\n'
+        
+        # Support links for SEOM/BRON
+        if isSEOM_val or isBRON_val:
+            support_sql = """
+                SELECT restitle, id FROM bwp_bubblefeedsupport 
+                WHERE domainid = %s AND bubblefeedid = %s AND deleted != 1 AND LENGTH(resfulltext) > 300
+            """
+            supportkwords = db.fetch_all(support_sql, (domainid, res['id']))
+            if supportkwords:
+                supportlks = ''
+                for support in supportkwords:
+                    resurl1 = dl + '/' + seo_slug(seo_filter_text_custom(support['restitle'])) + '-' + str(support['id']) + '/'
+                    supportlks += f' <strong><a href="{resurl1}" style="">{clean_title(seo_filter_text_custom(support["restitle"]))}</a></strong> -  '
+                supportlks = supportlks.rstrip(' - ')
+                bcpage += supportlks + '<br>\n'
+        
+        if domain_data.get('showsnapshot') == 1:
+            bcpage += f'<a href="{resurl}" target="_blank"><img src="//imagehosting.space/feed/pageimage.php?domain={domain_data["domain_name"]}" alt="{clean_title(seo_filter_text_custom(res.get("restitle", "")))}" style="width:160px !important;height:130px;" class="align-left"></a>\n'
+    else:
+        # Video
+        vid = extract_youtube_video_id(domain_data['wr_video'])
+        if vid:
+            bcpage += f'<div class="vid-container"><iframe style="max-width:100% !important;margin-bottom:20px;" src="//www.youtube.com/embed/{vid}" width="900" height="480"></iframe></div>\n'
+            bcpage += '<div class="seo-automation-spacer"></div>\n'
+        
+        bcpage += f'<h2 style="text-align:center;margin:0 0 15px 0;"><a href="{resurl}" target="_blank">{clean_title(seo_filter_text_custom(res.get("restitle", "")))}</a></h2>\n'
+        
+        # Support links for SEOM/BRON
+        if isSEOM_val or isBRON_val:
+            support_sql = """
+                SELECT restitle, id FROM bwp_bubblefeedsupport 
+                WHERE domainid = %s AND bubblefeedid = %s AND deleted != 1 AND LENGTH(resfulltext) > 300
+            """
+            supportkwords = db.fetch_all(support_sql, (domainid, res['id']))
+            if supportkwords:
+                supportlks = ''
+                for support in supportkwords:
+                    resurl1 = dl + '/' + seo_slug(seo_filter_text_custom(support['restitle'])) + '-' + str(support['id']) + '/'
+                    supportlks += f' <strong><a href="{resurl1}" style="">{clean_title(seo_filter_text_custom(support["restitle"]))}</a></strong> -  '
+                supportlks = supportlks.rstrip(' - ')
+                bcpage += supportlks + '<br>\n'
+    
+    # Get resfeedtext or resshorttext
+    if res.get('resfeedtext') and res['resfeedtext'].strip():
         shorttext = res['resfeedtext']
         shorttext = shorttext.replace('Table of Contents', '').strip()
-    elif res.get('resshorttext'):
+    elif res.get('resshorttext') and res['resshorttext'].strip():
         shorttext = res['resshorttext']
         shorttext = shorttext.replace('Table of Contents', '').strip()
     else:
         shorttext = ''
     
     if shorttext:
-        # Unescape HTML entities
         shorttext = html.unescape(str(shorttext))
-        bcpage += f'<div class="seo-content">{shorttext}</div>'
+        bcpage += shorttext + '\n'
     
-    bcpage += '</div>'
+    # Additional Resources section (keyword links)
+    domain_status = domain_data.get('status')
+    if domain_status in ['1', '2', '8', '10']:
+        links_sql = """
+            SELECT d.*, b.restitle, b.resshorttext, b.resfulltext, b.linkouturl, b.resname, b.resaddress, b.resphone, 
+                   l.linkformat, l.deeplink, l.relevant, b.id AS bubblefeedid, b.title, b.categoryid,
+                   s.servicetype AS servicename, s.price,
+                   bc.category AS bubblecat, bc.bubblefeedid AS bubblecatid,
+                   c.category AS subcat,
+                   mc.maincategories_name AS maincat,
+                   d.showtagsonbusinesscollective, d.usewebsitereferencetitles
+            FROM bwp_link_placement l
+            LEFT JOIN bwp_domains d ON d.id = l.domainid
+            LEFT JOIN bwp_services s ON d.servicetype = s.id
+            LEFT JOIN bwp_bubblefeed b ON b.id = l.bubblefeedid
+            LEFT JOIN bwp_bubblefeedcategory bc ON bc.id = b.categoryid
+            LEFT JOIN bwp_domain_category c ON c.id = d.domain_category
+            LEFT JOIN bwp_maincategories mc ON mc.maincategories_id = c.parent_catid
+            WHERE l.showondomainid = %s
+            AND l.showonpgid = %s
+            AND l.deleted != 1
+            AND l.linkformat = 'keyword'
+            AND d.deleted != 1
+            AND l.showondomainid NOT IN (SELECT domain_id FROM bwp_domains_disabled WHERE disabled_domain_id = d.id)
+            AND d.domainip != %s
+            ORDER BY l.relevant DESC
+        """
+        links = db.fetch_all(links_sql, (domainid, res['id'], domain_data.get('domainip', '')))
+        
+        if links:
+            bcpage += '<div class="seo-automation-spacer"></div>\n'
+            bcpage += '<h3 style="text-align:left;font-size:22px;font-weight:bold;">Additional Resources:</h3>\n'
+            bcpage += '<div class="seo-automation-tag-container" style="border-bottom:0px solid black; border-top:0px solid black;;height:10px;"></div>\n'
+            bcpage += '<div class="seo-automation-spacer"></div>\n'
+            
+            # Process each link
+            for link in links:
+                # Get link settings
+                link_settings_sql = "SELECT * FROM bwp_domain_settings WHERE domainid = %s"
+                link_settings = db.fetch_row(link_settings_sql, (link['id'],))
+                if not link_settings:
+                    db.execute("INSERT INTO bwp_domain_settings SET domainid = %s", (link['id'],))
+                    link_settings = db.fetch_row(link_settings_sql, (link['id'],))
+                
+                # Build link domain URLs
+                if link_settings.get('usedurl') == 1 and link.get('domain_url'):
+                    linkdomain = link['domain_url'].rstrip('/')
+                else:
+                    if link.get('ishttps') == 1:
+                        lprfx = 'https://'
+                    else:
+                        lprfx = 'http://'
+                    if link.get('usewww') == 1:
+                        linkdomain = lprfx + 'www.' + link['domain_name']
+                    else:
+                        linkdomain = lprfx + link['domain_name']
+                
+                linkdomainalone = linkdomain
+                if link.get('ishttps') == 1:
+                    lprfx = 'https://'
+                else:
+                    lprfx = 'http://'
+                if link.get('usewww') == 1:
+                    linkalone = lprfx + 'www.' + link['domain_name'] + '/'
+                else:
+                    linkalone = lprfx + link['domain_name'] + '/'
+                
+                if link.get('servicetype') == 370:
+                    linkdomainalone = linkdomain + '/'
+                
+                bcdomain = link['domain_name'].split('.')
+                bcvardomain = bcdomain[0] if bcdomain else ''
+                
+                bcpage += '<div class="seo-automation-container">\n'
+                
+                # Determine link URL
+                haslinks_sql = "SELECT count(id) FROM bwp_link_placement WHERE deleted != 1 AND showondomainid = %s AND showonpgid = %s"
+                haslinks = db.fetch_one(haslinks_sql, (link['id'], link.get('bubblefeedid')))
+                haslinks = haslinks or 0
+                
+                if haslinks >= 1:
+                    haslinkspg = {'restitle': link.get('restitle'), 'showonpgid': link.get('bubblefeedid'), 'bubblefeedid': link.get('bubblefeedid')}
+                else:
+                    haslinkspg_sql = """
+                        SELECT l.id, l.showonpgid, b.restitle, b.id AS bubblefeedid 
+                        FROM bwp_link_placement l 
+                        LEFT JOIN bwp_bubblefeed b ON b.id = l.showonpgid AND b.deleted != 1 
+                        WHERE l.deleted != 1 AND b.restitle <> '' AND l.showondomainid = %s 
+                        ORDER BY RAND() LIMIT 1
+                    """
+                    haslinkspg = db.fetch_row(haslinkspg_sql, (link['id'],))
+                    if not haslinkspg:
+                        haslinkspg = {}
+                
+                # Build link URL (simplified - full logic is complex)
+                if len(link.get('linkouturl', '')) > 5 and link.get('status') in ['2', '10']:
+                    linkurl = link['linkouturl'].strip()
+                elif link.get('skipfeedchecker') == 1:
+                    linkurl = linkdomainalone
+                elif link.get('wp_plugin') == 1 and (len(link.get('resfulltext', '')) >= 50 or len(link.get('resshorttext', '')) >= 50):
+                    if link.get('bubblecat'):
+                        linkurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(link.get('bubblecat', ''))) + '-' + str(link.get('bubblecatid', '')) + '/'
+                    else:
+                        linkurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '-' + str(link.get('bubblefeedid', '')) + '/'
+                else:
+                    linkurl = linkalone
+                
+                follow = ' rel="nofollow"' if link.get('forceinboundnofollow') == 1 else ''
+                
+                # Build title
+                if link.get('title'):
+                    stitle = clean_title(seo_filter_text_custom(link['title']))
+                else:
+                    stitle = clean_title(seo_filter_text_custom(link.get('restitle', '')))
+                
+                bcpage += f'<h2 class="h2"><a title="{stitle}" href="{linkurl}" style="text-align:left;" target="_blank"{follow}>{stitle}</a></h2>\n'
+                
+                # Support links for SEOM/BRON services
+                if (is_seom(link.get('servicetype')) or is_bron(link.get('servicetype'))) and link.get('bubblefeedid'):
+                    support_sql = """
+                        SELECT id, restitle FROM bwp_bubblefeedsupport 
+                        WHERE bubblefeedid = %s AND LENGTH(resfulltext) > 300
+                    """
+                    supps = db.fetch_all(support_sql, (link['bubblefeedid'],))
+                    if supps:
+                        tsups = ''
+                        for supp in supps:
+                            suppurl = ''
+                            if link.get('wp_plugin') != 1 and link.get('status') in ['2', '10', '8']:
+                                # Build suppurl for non-WP plugin
+                                if link.get('script_version', 0) >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
+                                    suppurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(supp['restitle'])) + '/' + str(supp['id']) + '/'
+                                else:
+                                    # CodeURL equivalent - simplified
+                                    suppurl = linkdomain + '/?Action=1&k=' + seo_slug(seo_filter_text_custom(supp['restitle'])) + '&PageID=' + str(supp['id'])
+                            elif link.get('wp_plugin') == 1 and link.get('status') in ['2', '10']:
+                                suppurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(supp['restitle'])) + '-' + str(supp['id']) + '/'
+                            
+                            if suppurl:
+                                tsups += f'- <span style="font-size:12px;line-height:13px;"><strong><a title="{clean_title(seo_filter_text_custom(supp["restitle"]))}" href="{suppurl}" target="_blank"{follow}>{clean_title(seo_filter_text_custom(supp["restitle"]))}</a></strong></span> '
+                        
+                        tsups = tsups.lstrip('- ')
+                        if tsups:
+                            bcpage += tsups + '\n'
+                
+                # Build image URL
+                if link.get('skipfeedchecker') == 1 and link.get('linkskipfeedchecker') != 1:
+                    imageurl = linkdomainalone
+                elif haslinkspg and link.get('wp_plugin') == 1 and link.get('status') in ['2', '10', '8']:
+                    if is_bron(link.get('servicetype')):
+                        imageurl = linkdomain + '/' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
+                    else:
+                        imageurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', ''))) + '-' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
+                else:
+                    imageurl = linkalone
+                
+                # Build citation container if address/name exists
+                preml = 0
+                map_val = 0
+                if (link.get('wr_address') or link.get('resaddress')) and (link.get('wr_name') or link.get('resname')):
+                    preml = 1
+                    address = link.get('resaddress') or link.get('wr_address', '')
+                    
+                    if link_settings.get('gmbframe') and len(link_settings['gmbframe']) > 10:
+                        mapurl = link_settings['gmbframe']
+                        map_val = 1
+                    elif address:
+                        addressarray = address.split(',')
+                        if len(addressarray) == 3:
+                            stzipstr = addressarray[2]
+                            stziparray = stzipstr.strip().split(' ')
+                            if len(stziparray) == 2:
+                                stadd = addressarray[0]
+                                cty = addressarray[1]
+                                state = stziparray[0]
+                                zip_code = stziparray[1]
+                                map_val = 1
+                            elif len(stziparray) == 3:
+                                stadd = addressarray[0].strip()
+                                cty = addressarray[1].strip()
+                                state = stziparray[0].strip()
+                                zip_code = stziparray[1].strip()
+                                zip_code += ' ' + stziparray[2].strip()
+                                map_val = 1
+                            
+                            if map_val == 1:
+                                wr_name = link.get('resname') or link.get('wr_name', '')
+                                mapurl = f'https://www.google.com/maps/embed/v1/place?key=AIzaSyDET-f-9dCENEEt8nU2MLOXluoEtrq2k5o&q={quote(wr_name)}+{quote(address.replace(",", ""))}'
+                    
+                    if map_val == 1:
+                        bcpage += '<div class="bwp_citation_conatainer">\n'
+                        bcpage += '<div itemscope itemtype="http://schema.org/LocalBusiness">\n'
+                        bcpage += '<div class="citation_map_container">\n'
+                        bcpage += f'<iframe width="130" height="110" style="width:130px;height:110px;border:0;overflow:hidden;" src="{mapurl}"></iframe>\n'
+                        bcpage += f'<img itemprop="image" src="//imagehosting.space/feed/pageimage.php?domain={link["domain_name"]}" alt="{link["domain_name"]}" style="display:none !important;">\n'
+                        bcpage += '</div>\n'
+                        
+                        wr_name = link.get('resname') or link.get('wr_name', '')
+                        bcpage += f'<span itemprop="name" style="font-size:12px;line-height:13px;"><strong>{wr_name}</strong></span><br>\n'
+                        
+                        if address and map_val == 1:
+                            bcpage += '<div itemprop="address" itemscope itemtype="http://schema.org/PostalAddress">\n'
+                            bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="streetAddress">{stadd}</span><br>\n'
+                            bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="addressLocality">{cty}</span> '
+                            bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="addressRegion">{state}</span> '
+                            bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="postalCode">{zip_code}</span>\n'
+                            bcpage += f'<span style="font-size:12px;line-height:13px;display:none;" itemprop="addressCountry">{link.get("domain_country", "")}</span><br>\n'
+                        
+                        if link.get('wr_phone') or link.get('resphone'):
+                            phon = link.get('resphone') or link.get('wr_phone', '')
+                            bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="telephone">{phon}<br>\n'
+                        
+                        bcpage += f'<a style="font-size:12px;line-height:13px;" itemprop="url" href="{linkalone}">{link["domain_name"]}</a></span><br>\n'
+                        
+                        if address and map_val == 1:
+                            bcpage += '</div>\n'
+                        
+                        # Social media icons
+                        if (link.get('wr_googleplus') or link.get('wr_facebook') or link.get('wr_twitter') or 
+                            link.get('wr_linkedin') or link.get('wr_yelp') or link.get('wr_bing') or link.get('wr_yahoo')):
+                            bcpage += '<div class="seo-automation-space"></div>\n'
+                            alttxt = seo_filter_text_custom(link.get('restitle', ''))
+                            bcpage += '<div class="related-art-social">\n'
+                            
+                            # Add all social icons
+                            if link.get('wr_facebook'):
+                                urlf = link['wr_facebook']
+                                if 'http' in urlf:
+                                    urlf = urlf.replace('http:', 'https:')
+                                elif urlf.startswith('/'):
+                                    urlf = 'https://www.facebook.com' + urlf
+                                else:
+                                    urlf = 'https://www.facebook.com/' + urlf
+                                bcpage += f'<a href="{urlf}" title="{alttxt} - Follow us on Facebook" target="_blank"><img src="//imagehosting.space/images/fbfavicon.ico" width="16" alt="{alttxt}"></a>'
+                            
+                            if link.get('wr_twitter'):
+                                urlt = link['wr_twitter']
+                                if 'http' in urlt:
+                                    urlt = urlt.replace('http:', 'https:')
+                                elif urlt.startswith('/'):
+                                    urlt = 'https://twitter.com' + urlt
+                                else:
+                                    urlt = 'https://twitter.com/' + urlt
+                                bcpage += f'<a href="{urlt}" title="{alttxt} - Follow us on Twitter" target="_blank"><img src="//imagehosting.space/images/twitfavicon.ico" width="16" alt="{alttxt}"></a>'
+                            
+                            if link.get('wr_linkedin'):
+                                urll = link['wr_linkedin']
+                                if 'http' in urll:
+                                    urll = urll.replace('http:', 'https:')
+                                elif urll.startswith('/'):
+                                    urll = 'https://www.linkedin.com/pub' + urll
+                                else:
+                                    urll = 'https://www.linkedin.com/pub/' + urll
+                                bcpage += f'<a href="{urll}" title="{alttxt} - Follow us on LinkedIn" target="_blank"><img src="//imagehosting.space/images/linkfavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                            
+                            if link.get('wr_googleplus'):
+                                urlg = link['wr_googleplus']
+                                if 'http' in urlg:
+                                    urlg = urlg.replace('http:', 'https:')
+                                elif urlg.startswith('/'):
+                                    urlg = 'https://plus.google.com' + urlg
+                                else:
+                                    urlg = 'https://plus.google.com/' + urlg
+                                bcpage += f'<a href="{urlg}" title="{alttxt} - Find us on Google" target="_blank"><img src="//imagehosting.space/images/maps15_bnuw3a_32dp.ico" border="0" width="16" alt="{alttxt}"></a>'
+                            
+                            if link.get('wr_yelp'):
+                                urly = link['wr_yelp']
+                                bcpage += f'<a href="{urly}" title="{alttxt} - Follow us on Yelp" target="_blank"><img src="//imagehosting.space/images/yelpfavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                            
+                            if link.get('wr_bing'):
+                                urly = link['wr_bing']
+                                bcpage += f'<a href="{urly}" title="{alttxt} - Find us on Bing" target="_blank"><img src="//imagehosting.space/images/bingfavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                            
+                            if link.get('wr_yahoo'):
+                                urly = link['wr_yahoo']
+                                bcpage += f'<a href="{urly}" title="{alttxt} - Find us on Yahoo" target="_blank"><img src="//imagehosting.space/images/yahoofavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                            
+                            bcpage += '</div>\n'
+                        
+                        if link_settings.get('blogUrl') and len(link_settings['blogUrl']) > 10:
+                            bcpage += f' <a target="_blank" href="{link_settings["blogUrl"]}">Blog</a>  '
+                        if link_settings.get('faqUrl') and len(link_settings['faqUrl']) > 10:
+                            bcpage += f' <a target="_blank" href="{link_settings["faqUrl"]}">FAQ</a> '
+                        
+                        bcpage += '</div>\n'
+                        bcpage += '</div>\n'
+                    else:
+                        # No map - just image
+                        bcpage += '<div class="snapshot-container" style="margin-left:20px !important;">\n'
+                        bcpage += f'<a href="{imageurl}" target="_blank"{follow}><img src="//imagehosting.space/feed/pageimage.php?domain={link["domain_name"]}" alt="{link["domain_name"]}" style="width:130px !important;height:110px;"></a>\n'
+                        if link_settings.get('blogUrl') and len(link_settings['blogUrl']) > 10:
+                            bcpage += f' <a target="_blank" href="{link_settings["blogUrl"]}">Blog</a>  '
+                        if link_settings.get('faqUrl') and len(link_settings['faqUrl']) > 10:
+                            bcpage += f' <a target="_blank" href="{link_settings["faqUrl"]}">FAQ</a> '
+                        bcpage += '</div>\n'
+                else:
+                    # No address - just image
+                    bcpage += '<div class="snapshot-container" style="margin-left:20px !important;">\n'
+                    bcpage += f'<a href="{imageurl}" target="_blank"{follow}><img src="//imagehosting.space/feed/pageimage.php?domain={link["domain_name"]}" alt="{link["domain_name"]}" style="width:130px !important;height:110px;"></a>\n'
+                    if link_settings.get('blogUrl') and len(link_settings['blogUrl']) > 10:
+                        bcpage += f' <a target="_blank" href="{link_settings["blogUrl"]}">Blog</a>  '
+                    if link_settings.get('faqUrl') and len(link_settings['faqUrl']) > 10:
+                        bcpage += f' <a target="_blank" href="{link_settings["faqUrl"]}">FAQ</a> '
+                    bcpage += '</div>\n'
+                
+                # Build text content
+                if link.get('resname'):
+                    wr_name = link['resname']
+                else:
+                    wr_name = link.get('wr_name', '')
+                
+                if link.get('restitle') and not is_bron(link.get('servicetype')):
+                    restextkw = seo_filter_text_custom(link['restitle'])
+                elif wr_name:
+                    restextkw = seo_filter_text_custom(wr_name)
+                else:
+                    restextkw = seo_filter_text_custom(link.get('domain_name', ''))
+                
+                if link.get('desc2') and not link.get('resshorttext'):
+                    restext = seo_filter_text_custom(link['desc2'])
+                else:
+                    restext = seo_filter_text_custom(link.get('resshorttext', ''))
+                
+                if len(restext) < 20:
+                    restext = restextkw
+                
+                # Trim to first 100 words (PHP trimToFirst100Words)
+                words = restext.split()[:100]
+                restext = ' '.join(words)
+                
+                # Add link to text (simplified version of seo_automation_add_text_link_newbc)
+                # Find first occurrence of keyword and wrap it in a link
+                if restextkw and restextkw in restext:
+                    # Find first occurrence and replace with linked version
+                    idx = restext.find(restextkw)
+                    if idx >= 0:
+                        if map_val == 1:
+                            link_tag = f'<a href="{imageurl}"{follow}>{restextkw}</a>'
+                        elif preml == 1:
+                            link_tag = f'<a href=""{follow}>{restextkw}</a>'
+                        else:
+                            link_tag = f'<a href="{linkalone}"{follow}>{restextkw}</a>'
+                        restext = restext[:idx] + link_tag + restext[idx + len(restextkw):]
+                elif not restextkw:
+                    # If no keyword, just add link at beginning
+                    if map_val == 1:
+                        restext = f'<a href="{imageurl}"{follow}>{restextkw}</a> ' + restext
+                    elif preml == 1:
+                        restext = f'<a href=""{follow}>{restextkw}</a> ' + restext
+                    else:
+                        restext = f'<a href="{linkalone}"{follow}>{restextkw}</a> ' + restext
+                
+                bcpage += restext + '\n'
+                
+                # Social media if no address
+                if preml == 0:
+                    if (link.get('wr_googleplus') or link.get('wr_facebook') or link.get('wr_twitter') or 
+                        link.get('wr_linkedin') or link.get('wr_yelp') or link.get('wr_bing') or link.get('wr_yahoo')):
+                        bcpage += '<div style="height:1px;"></div>\n'
+                        alttxt = seo_filter_text_custom(link.get('restitle', ''))
+                        bcpage += '<div class="related-art-social" style="float:left;">\n'
+                        
+                        # Add all social icons
+                        if link.get('wr_facebook'):
+                            urlf = link['wr_facebook']
+                            if 'http' in urlf:
+                                urlf = urlf.replace('http:', 'https:')
+                            elif urlf.startswith('/'):
+                                urlf = 'https://www.facebook.com' + urlf
+                            else:
+                                urlf = 'https://www.facebook.com/' + urlf
+                            bcpage += f'<a href="{urlf}" title="{alttxt} - Follow us on Facebook" target="_blank"><img src="//imagehosting.space/images/fbfavicon.ico" width="16" alt="{alttxt}"></a>'
+                        
+                        if link.get('wr_twitter'):
+                            urlt = link['wr_twitter']
+                            if 'http' in urlt:
+                                urlt = urlt.replace('http:', 'https:')
+                            elif urlt.startswith('/'):
+                                urlt = 'https://twitter.com' + urlt
+                            else:
+                                urlt = 'https://twitter.com/' + urlt
+                            bcpage += f'<a href="{urlt}" title="{alttxt} - Follow us on Twitter" target="_blank"><img src="//imagehosting.space/images/twitfavicon.ico" width="16" alt="{alttxt}"></a>'
+                        
+                        if link.get('wr_linkedin'):
+                            urll = link['wr_linkedin']
+                            if 'http' in urll:
+                                urll = urll.replace('http:', 'https:')
+                            elif urll.startswith('/'):
+                                urll = 'https://www.linkedin.com/pub' + urll
+                            else:
+                                urll = 'https://www.linkedin.com/pub/' + urll
+                            bcpage += f'<a href="{urll}" title="{alttxt} - Follow us on LinkedIn" target="_blank"><img src="//imagehosting.space/images/linkfavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                        
+                        if link.get('wr_googleplus'):
+                            urlg = link['wr_googleplus']
+                            if 'http' in urlg:
+                                urlg = urlg.replace('http:', 'https:')
+                            elif urlg.startswith('/'):
+                                urlg = 'https://plus.google.com' + urlg
+                            else:
+                                urlg = 'https://plus.google.com/' + urlg
+                            bcpage += f'<a href="{urlg}" title="{alttxt} - Find us on Google" target="_blank"><img src="//imagehosting.space/images/maps15_bnuw3a_32dp.ico" border="0" width="16" alt="{alttxt}"></a>'
+                        
+                        if link.get('wr_yelp'):
+                            urly = link['wr_yelp']
+                            bcpage += f'<a href="{urly}" title="{alttxt} - Follow us on Yelp" target="_blank"><img src="//imagehosting.space/images/yelpfavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                        
+                        if link.get('wr_bing'):
+                            urly = link['wr_bing']
+                            bcpage += f'<a href="{urly}" title="{alttxt} - Find us on Bing" target="_blank"><img src="//imagehosting.space/images/bingfavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                        
+                        if link.get('wr_yahoo'):
+                            urly = link['wr_yahoo']
+                            bcpage += f'<a href="{urly}" title="{alttxt} - Find us on Yahoo" target="_blank"><img src="//imagehosting.space/images/yahoofavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                        
+                        bcpage += '</div>\n'
+                
+                bcpage += '</div><div class="seo-automation-spacer"></div>\n'
+    
+    # Drip content links section
+    linksdc_sql = """
+        SELECT d.*, b.id AS bubbafeedid, b.bubblefeedid, b.restitle, b.bubbatitle, b.resshorttext, b.resfulltext, 
+               b.linkouturl, b.resaddress, b.resphone, l.linkformat, l.deeplink, l.relevant,
+               s.servicetype AS servicename, s.price,
+               c.category AS subcat,
+               mc.maincategories_name AS maincat,
+               d.showtagsonbusinesscollective, d.usewebsitereferencetitles
+        FROM bwp_link_placement l
+        LEFT JOIN bwp_domains d ON d.id = l.domainid
+        LEFT JOIN bwp_services s ON d.servicetype = s.id
+        LEFT JOIN bwp_bubbafeed b ON b.id = l.bubblefeedid
+        LEFT JOIN bwp_bubblefeed bl ON bl.id = b.bubblefeedid
+        LEFT JOIN bwp_domain_category c ON c.id = d.domain_category
+        LEFT JOIN bwp_maincategories mc ON mc.maincategories_id = c.parent_catid
+        WHERE l.showondomainid = %s
+        AND l.showonpgid = %s
+        AND l.deleted != 1
+        AND d.deleted != 1
+        AND b.deleted != 1
+        AND bl.deleted != 1
+        AND l.linkformat = 'dripcontent'
+        AND l.showondomainid NOT IN (SELECT domain_id FROM bwp_domains_disabled WHERE disabled_domain_id = d.id)
+        AND d.domainip != %s
+        ORDER BY l.relevant DESC
+    """
+    linksdc = db.fetch_all(linksdc_sql, (domainid, res['id'], domain_data.get('domainip', '')))
+    
+    if linksdc:
+        for linkdc in linksdc:
+            # Build link domain
+            if linkdc.get('ishttps') == 1:
+                lprfx = 'https://'
+            else:
+                lprfx = 'http://'
+            if linkdc.get('usewww') == 1:
+                linkdomain = lprfx + 'www.' + linkdc['domain_name']
+            else:
+                linkdomain = lprfx + linkdc['domain_name']
+            
+            linkdomainalone = linkdomain
+            if linkdc.get('servicetype') == 370:
+                linkdomainalone = linkdomain + '/'
+            
+            bcdomain = linkdc['domain_name'].split('.')
+            bcvardomain = bcdomain[0] if bcdomain else ''
+            
+            bcpage += '<div class="seo-automation-container">\n'
+            
+            # Build link URL
+            if len(linkdc.get('linkouturl', '')) > 5 and linkdc.get('status') in ['2', '10']:
+                linkurl = linkdc['linkouturl'].strip()
+            elif linkdc.get('skipfeedchecker') == 1 and linkdc.get('linkskipfeedchecker') != 1:
+                linkurl = linkdomainalone
+            elif linkdc.get('wp_plugin') == 1 and len(linkdc.get('resfulltext', '')) >= 300:
+                linkurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(linkdc.get('bubbatitle', ''))) + '-' + str(linkdc.get('bubbafeedid', '')) + 'dc'
+            else:
+                linkurl = linkdomainalone
+            
+            follow = ' rel="nofollow"' if linkdc.get('forceinboundnofollow') == 1 else ''
+            stitle = clean_title(seo_filter_text_custom(linkdc.get('bubbatitle', '')))
+            
+            bcpage += f'<h2 class="h2"><a title="{stitle}" href="{linkurl}" style="text-align:left;" target="_blank"{follow}>{stitle}</a></h2>\n'
+            
+            # Build image URL
+            imageurl = linkdomainalone
+            
+            # Build text content
+            wr_name = linkdc.get('wr_name', '')
+            if linkdc.get('restitle'):
+                restextkw = seo_filter_text_custom(linkdc['restitle'])
+            elif wr_name:
+                restextkw = seo_filter_text_custom(wr_name)
+            else:
+                restextkw = seo_filter_text_custom(linkdc.get('domain_name', ''))
+            
+            # Get bubbatext
+            bubbatext = linkdc.get('resfulltext', '')
+            if bubbatext:
+                bubbatext = html.unescape(bubbatext)
+                # Strip tags except img (PHP: strip_tags with '<img>' allowed)
+                bubbatext = re.sub(r'<(?!img\b)[^>]+>', '', bubbatext)
+                # Shorten to 75 characters (PHP: bwp_shorten_string($bubbatext,75))
+                if len(bubbatext) > 75:
+                    bubbatext = bubbatext[:75].rsplit(' ', 1)[0] + '...'
+                # Replace gallery URLs
+                bubbatext = bubbatext.replace('//gallery.imagehosting.space/gallery/', '//gallery.imagehosting.space/thumbs/')
+                # Wrap images in links (PHP: preg_replace pattern)
+                bubbatext = re.sub(r'(?<!<a\s[^>]*>)(<img[^>]+>)(?!</a>)', f'<a href="{imageurl}">\\1</a>', bubbatext)
+                # Add keyword link (simplified version of seo_automation_add_text_link_newbc)
+                if restextkw and restextkw in bubbatext:
+                    idx = bubbatext.find(restextkw)
+                    if idx >= 0:
+                        link_tag = f'<a href="{linkurl}"{follow}>{restextkw}</a>'
+                        bubbatext = bubbatext[:idx] + link_tag + bubbatext[idx + len(restextkw):]
+                elif restextkw:
+                    bubbatext = f'<a href="{linkurl}"{follow}>{restextkw}</a> ' + bubbatext
+            
+            bcpage += bubbatext + '\n'
+            
+            # Social media if no address
+            if (linkdc.get('wr_googleplus') or linkdc.get('wr_facebook') or linkdc.get('wr_twitter') or 
+                linkdc.get('wr_linkedin') or linkdc.get('wr_yelp') or linkdc.get('wr_bing') or linkdc.get('wr_yahoo')):
+                bcpage += '<div style="height:1px;"></div>\n'
+                alttxt = seo_filter_text_custom(linkdc.get('restitle', ''))
+                bcpage += '<div class="related-art-social" style="float:left;">\n'
+                
+                # Add all social icons
+                if linkdc.get('wr_facebook'):
+                    urlf = linkdc['wr_facebook']
+                    if 'http' in urlf:
+                        urlf = urlf.replace('http:', 'https:')
+                    elif urlf.startswith('/'):
+                        urlf = 'https://www.facebook.com' + urlf
+                    else:
+                        urlf = 'https://www.facebook.com/' + urlf
+                    bcpage += f'<a href="{urlf}" title="{alttxt} - Follow us on Facebook" target="_blank"><img src="//imagehosting.space/images/fbfavicon.ico" width="16" alt="{alttxt}"></a>'
+                
+                if linkdc.get('wr_twitter'):
+                    urlt = linkdc['wr_twitter']
+                    if 'http' in urlt:
+                        urlt = urlt.replace('http:', 'https:')
+                    elif urlt.startswith('/'):
+                        urlt = 'https://twitter.com' + urlt
+                    else:
+                        urlt = 'https://twitter.com/' + urlt
+                    bcpage += f'<a href="{urlt}" title="{alttxt} - Follow us on Twitter" target="_blank"><img src="//imagehosting.space/images/twitfavicon.ico" width="16" alt="{alttxt}"></a>'
+                
+                if linkdc.get('wr_linkedin'):
+                    urll = linkdc['wr_linkedin']
+                    if 'http' in urll:
+                        urll = urll.replace('http:', 'https:')
+                    elif urll.startswith('/'):
+                        urll = 'https://www.linkedin.com/pub' + urll
+                    else:
+                        urll = 'https://www.linkedin.com/pub/' + urll
+                    bcpage += f'<a href="{urll}" title="{alttxt} - Follow us on LinkedIn" target="_blank"><img src="//imagehosting.space/images/linkfavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                
+                if linkdc.get('wr_googleplus'):
+                    urlg = linkdc['wr_googleplus']
+                    if 'http' in urlg:
+                        urlg = urlg.replace('http:', 'https:')
+                    elif urlg.startswith('/'):
+                        urlg = 'https://plus.google.com' + urlg
+                    else:
+                        urlg = 'https://plus.google.com/' + urlg
+                    bcpage += f'<a href="{urlg}" title="{alttxt} - Find us on Google" target="_blank"><img src="//imagehosting.space/images/maps15_bnuw3a_32dp.ico" border="0" width="16" alt="{alttxt}"></a>'
+                
+                if linkdc.get('wr_yelp'):
+                    urly = linkdc['wr_yelp']
+                    bcpage += f'<a href="{urly}" title="{alttxt} - Follow us on Yelp" target="_blank"><img src="//imagehosting.space/images/yelpfavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                
+                if linkdc.get('wr_bing'):
+                    urly = linkdc['wr_bing']
+                    bcpage += f'<a href="{urly}" title="{alttxt} - Find us on Bing" target="_blank"><img src="//imagehosting.space/images/bingfavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                
+                if linkdc.get('wr_yahoo'):
+                    urly = linkdc['wr_yahoo']
+                    bcpage += f'<a href="{urly}" title="{alttxt} - Find us on Yahoo" target="_blank"><img src="//imagehosting.space/images/yahoofavicon.ico" border="0" width="16" alt="{alttxt}"></a>'
+                
+                bcpage += '</div>\n'
+            
+            bcpage += '</div><div class="seo-automation-spacer"></div>\n'
+    
+    # Closing HTML
+    bcpage += '<div class="seo-automation-spacer"></div>\n'
+    bcpage += '<div class="seo-automation-tag-container" style="border-bottom:1px solid black; border-top:1px solid black;"></div>\n'
+    bcpage += '<link rel="stylesheet" id="SEO_Automation_premium_0_X-css" href="https://public.imagehosting.space/external_files/premiumstyles.css" type="text/css" media="all" />\n'
+    bcpage += '<div class="seo-automation-spacer"></div>\n'
+    bcpage += '</div>\n'
+    bcpage += '''<style>
+.ngodkrbsitr-spacer{clear:both;}
+.citation_map_container iframe {
+	width:130px !important;
+}
+.vid-container iframe {
+	width:100% !important;
+}
+</style>
+'''
     
     return bcpage
 
