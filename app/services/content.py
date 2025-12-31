@@ -1570,8 +1570,16 @@ def build_bcpage_wp(
                 # PHP isset() returns true if key exists AND value is not NULL
                 has_bubblefeedid = 'bubblefeedid' in link and bubblefeedid_val is not None
                 
+                # Debug: Log values to diagnose issue
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"Support keywords check - restitle: {link.get('restitle')}, servicetype: {servicetype_val}, bubblefeedid: {bubblefeedid_val}, has_bubblefeedid: {has_bubblefeedid}")
+                is_seom_result = is_seom(servicetype_val)
+                is_bron_result = is_bron(servicetype_val)
+                logger.info(f"is_seom({servicetype_val}): {is_seom_result}, is_bron({servicetype_val}): {is_bron_result}")
+                
                 # Check if the linked domain is SEOM or BRON
-                if (is_seom(servicetype_val) or is_bron(servicetype_val)) and has_bubblefeedid:
+                if (is_seom_result or is_bron_result) and has_bubblefeedid:
                     # PHP line 417: Query doesn't filter by deleted != 1
                     support_sql = """
                         SELECT id, restitle FROM bwp_bubblefeedsupport 
@@ -1579,6 +1587,7 @@ def build_bcpage_wp(
                     """
                     # Query bwp_bubblefeedsupport where bubblefeedid matches the bwp_bubblefeed.id
                     supps = db.fetch_all(support_sql, (bubblefeedid_val,))
+                    logger.info(f"Found {len(supps) if supps else 0} supporting keywords for bubblefeedid {bubblefeedid_val}")
                     if supps:
                         tsups = ''
                         for supp in supps:
