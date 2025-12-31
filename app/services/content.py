@@ -57,45 +57,55 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
         
         for item in silo:
             if item.get('id'):
-                # Build Resources link (PHP has: links_per_page >=1 || 1==1, so always build it)
+                import html
                 is_bron_val = is_bron(domain_data.get('servicetype'))
-                if is_bron_val:
-                    bclink = linkdomain + '/' + str(item['id']) + 'bc/'
-                else:
-                    # Use toAscii(html_entity_decode(seo_text_custom(...))) for slug like PHP
-                    import html
-                    slug_text = seo_text_custom(item['restitle'])  # seo_text_custom
-                    slug_text = html.unescape(slug_text)  # html_entity_decode
-                    slug_text = to_ascii(slug_text)  # toAscii
-                    slug_text = slug_text.lower()  # strtolower
-                    slug_text = slug_text.replace(' ', '-')  # str_replace(' ', '-', ...)
-                    slug = slug_text + '-' + str(item['id']) + 'bc/'
-                    bclink = linkdomain + '/' + slug
                 
-                # Always show Resources link (PHP condition: links_per_page >=1 || 1==1)
+                # Build Resources link (Business Collective page - resfeedtext)
+                # PHP condition: links_per_page >=1 || 1==1 (always true)
                 if item.get('links_per_page', 0) >= 1 or True:  # Always true like PHP
-                    newsf = ' <a style="padding-left: 0px !important;" href="' + bclink + '">Resources</a>'
-                else:
-                    newsf = ''
-                
-                # Main link logic
-                if domain_data.get('resourcesactive') == '1':
-                    # Resources active - show main article link + Resources link
-                    if (item.get('NoContent') == 0 or is_bron(domain_data.get('servicetype'))) and len(item.get('linkouturl', '').strip()) > 5:
-                        # External link
-                        foot += '<li><a style="padding-right: 0px !important;" href="' + item['linkouturl'] + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
+                    if is_bron_val:
+                        bclink = linkdomain + '/' + str(item['id']) + 'bc/'
                     else:
-                        # Internal link - use toAscii(html_entity_decode(seo_text_custom(...))) for slug
-                        import html
+                        # Use toAscii(html_entity_decode(seo_text_custom(...))) for slug
                         slug_text = seo_text_custom(item['restitle'])  # seo_text_custom
                         slug_text = html.unescape(slug_text)  # html_entity_decode
                         slug_text = to_ascii(slug_text)  # toAscii
                         slug_text = slug_text.lower()  # strtolower
                         slug_text = slug_text.replace(' ', '-')  # str_replace(' ', '-', ...)
-                        slug = slug_text + '-' + str(item['id']) + '/'
-                        foot += '<li><a style="padding-right: 0px !important;" href="' + linkdomain + '/' + slug + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
+                        bclink = linkdomain + '/' + slug_text + '-' + str(item['id']) + 'bc/'
+                    newsf = ' <a style="padding-left: 0px !important;" href="' + bclink + '">Resources</a>'
                 else:
-                    # Resources not active - show only Business Collective link
+                    newsf = ''
+                    bclink = ''  # Will be set if needed
+                
+                # Main link logic (for resfulltext pages)
+                if domain_data.get('resourcesactive') == '1':
+                    # Resources active - show main article link (resfulltext) + Resources link (resfeedtext)
+                    if (item.get('NoContent') == 0 or is_bron_val) and len(item.get('linkouturl', '').strip()) > 5:
+                        # External link
+                        foot += '<li><a style="padding-right: 0px !important;" href="' + item['linkouturl'] + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
+                    else:
+                        # Internal link to main content page (resfulltext) - use toAscii(html_entity_decode(seo_text_custom(...))) for slug
+                        slug_text = seo_text_custom(item['restitle'])  # seo_text_custom
+                        slug_text = html.unescape(slug_text)  # html_entity_decode
+                        slug_text = to_ascii(slug_text)  # toAscii
+                        slug_text = slug_text.lower()  # strtolower
+                        slug_text = slug_text.replace(' ', '-')  # str_replace(' ', '-', ...)
+                        main_link = linkdomain + '/' + slug_text + '-' + str(item['id']) + '/'
+                        foot += '<li><a style="padding-right: 0px !important;" href="' + main_link + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
+                else:
+                    # Resources not active - show only Business Collective link (resfeedtext)
+                    if not bclink:
+                        # Build bclink if not already built
+                        if is_bron_val:
+                            bclink = linkdomain + '/' + str(item['id']) + 'bc/'
+                        else:
+                            slug_text = seo_text_custom(item['restitle'])
+                            slug_text = html.unescape(slug_text)
+                            slug_text = to_ascii(slug_text)
+                            slug_text = slug_text.lower()
+                            slug_text = slug_text.replace(' ', '-')
+                            bclink = linkdomain + '/' + slug_text + '-' + str(item['id']) + 'bc/'
                     foot += '<li><a style="padding-right: 0px !important;" href="' + bclink + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a></li>\n'
                 
                 num_lnks += 1
