@@ -28,7 +28,18 @@ async def article_endpoint(
     version: Optional[str] = Query("1.0"),
     debug: Optional[str] = Query("0"),
     agent: Optional[str] = Query(None),
-    # Add other common parameters as needed
+    # PHP plugin 0308.php parameters
+    referer: Optional[str] = Query(None),
+    address: Optional[str] = Query(None),
+    query: Optional[str] = Query(None),
+    uri: Optional[str] = Query(None),
+    cScript: Optional[str] = Query(None),
+    blnComplete: Optional[str] = Query(None),
+    page: Optional[str] = Query("1"),
+    city: Optional[str] = Query(None),
+    cty: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    st: Optional[str] = Query(None),
 ):
     """
     Main Article.php endpoint - routes to different handlers based on parameters.
@@ -60,6 +71,18 @@ async def article_endpoint(
         version = version or query_params.get("version", "1.0")
         debug = debug or query_params.get("debug", "0")
         agent = agent or query_params.get("agent")
+        # PHP plugin 0308.php parameters
+        referer = referer or query_params.get("referer")
+        address = address or query_params.get("address")
+        query = query or query_params.get("query")
+        uri = uri or query_params.get("uri")
+        cScript = cScript or query_params.get("cScript")
+        blnComplete = blnComplete or query_params.get("blnComplete")
+        page = page or query_params.get("page", "1")
+        city = city or query_params.get("city")
+        cty = cty or query_params.get("cty")
+        state = state or query_params.get("state")
+        st = st or query_params.get("st")
         
         # Then try to parse body as form data or JSON (PHP $_REQUEST includes both GET and POST)
         content_type = request.headers.get("content-type", "")
