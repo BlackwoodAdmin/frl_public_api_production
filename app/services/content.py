@@ -941,6 +941,12 @@ def build_bcpage_wp(
                 # Build citation container if address/name exists
                 preml = 0
                 map_val = 0
+                stadd = ''
+                cty = ''
+                state = ''
+                zip_code = ''
+                mapurl = ''
+                
                 if (link.get('wr_address') or link.get('resaddress')) and (link.get('wr_name') or link.get('resname')):
                     preml = 1
                     address = link.get('resaddress') or link.get('wr_address', '')
@@ -982,7 +988,7 @@ def build_bcpage_wp(
                         wr_name = link.get('resname') or link.get('wr_name', '')
                         bcpage += f'<span itemprop="name" style="font-size:12px;line-height:13px;"><strong>{wr_name}</strong></span><br>\n'
                         
-                        if address and map_val == 1:
+                        if address and map_val == 1 and stadd:
                             bcpage += '<div itemprop="address" itemscope itemtype="http://schema.org/PostalAddress">\n'
                             bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="streetAddress">{stadd}</span><br>\n'
                             bcpage += f'<span style="font-size:12px;line-height:13px;" itemprop="addressLocality">{cty}</span> '
