@@ -285,6 +285,14 @@ def clean_title(text: str) -> str:
         return text.strip()
 
 
+def custom_ucfirst_words(text: str) -> str:
+    """Capitalize first letter of each word (PHP customUcfirstWords)."""
+    if not text:
+        return ''
+    words = text.split()
+    return ' '.join(word.capitalize() for word in words)
+
+
 def is_bron(servicetype: Optional[int]) -> bool:
     """Check if service type is BRON."""
     if not servicetype:
@@ -918,12 +926,21 @@ def build_bcpage_wp(
                                     # CodeURL equivalent - simplified
                                     suppurl = linkdomain + '/?Action=1&k=' + seo_slug(seo_filter_text_custom(supp['restitle'])) + '&PageID=' + str(supp['id'])
                             elif link.get('wp_plugin') == 1 and link.get('status') in ['2', '10']:
-                                suppurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(supp['restitle'])) + '-' + str(supp['id']) + '/'
+                                # Use toAscii(html_entity_decode(seo_text_custom(...))) for WP plugin
+                                import html
+                                supp_slug_text = seo_text_custom(supp['restitle'])
+                                supp_slug_text = html.unescape(supp_slug_text)
+                                supp_slug_text = to_ascii(supp_slug_text)
+                                supp_slug_text = supp_slug_text.lower()
+                                supp_slug_text = supp_slug_text.replace(' ', '-')
+                                suppurl = linkdomain + '/' + supp_slug_text + '-' + str(supp['id']) + '/'
                             
                             if suppurl:
-                                tsups += f'- <span style="font-size:12px;line-height:13px;"><strong><a title="{clean_title(seo_filter_text_custom(supp["restitle"]))}" href="{suppurl}" target="_blank"{follow}>{clean_title(seo_filter_text_custom(supp["restitle"]))}</a></strong></span> '
+                                # Use custom_ucfirst_words(seo_text_custom(...)) for display
+                                supp_title = custom_ucfirst_words(seo_text_custom(supp['restitle']))
+                                tsups += '- <span style="font-size:12px;line-height:13px;"><strong> <a title="' + supp_title + '" href="' + suppurl + '" target="_blank"' + follow + '> ' + supp_title + ' </a> </strong></span> '
                         
-                        tsups = tsups.lstrip('- ')
+                        tsups = tsups.lstrip('-')
                         if tsups:
                             bcpage += tsups + '\n'
                 
