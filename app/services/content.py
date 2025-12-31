@@ -1533,21 +1533,34 @@ def build_bcpage_wp(
                 
                 follow = ' rel="nofollow"' if link.get('forceinboundnofollow') == 1 else ''
                 
+                # PHP line 410-411: moneynofollow (empty string in this case)
+                moneynofollow = ''
+                
                 # Build title
                 if link.get('title'):
                     stitle = clean_title(seo_filter_text_custom(link['title']))
                 else:
                     stitle = clean_title(seo_filter_text_custom(link.get('restitle', '')))
                 
-                bcpage += f'<h2 class="h2"><a title="{stitle}" href="{linkurl}" style="text-align:left;" target="_blank"{follow}>{stitle}</a></h2>\n'
+                bcpage += f'<h2 class="h2"><a{moneynofollow} title="{stitle}" href="{linkurl}" style="text-align:left;" target="_blank"{follow}>{stitle}</a></h2>\n'
                 
                 # Support links for SEOM/BRON services
-                if (is_seom(link.get('servicetype')) or is_bron(link.get('servicetype'))) and link.get('bubblefeedid'):
+                # PHP line 415-447: Check if SEOM/BRON and bubblefeedid exists
+                servicetype_val = link.get('servicetype')
+                # Convert to int if it's a string or None
+                if servicetype_val is not None:
+                    try:
+                        servicetype_val = int(servicetype_val)
+                    except (ValueError, TypeError):
+                        servicetype_val = None
+                bubblefeedid_val = link.get('bubblefeedid')
+                if (is_seom(servicetype_val) or is_bron(servicetype_val)) and bubblefeedid_val:
+                    # PHP line 417: Query doesn't filter by deleted != 1
                     support_sql = """
                         SELECT id, restitle FROM bwp_bubblefeedsupport 
-                        WHERE bubblefeedid = %s AND deleted != 1 AND LENGTH(resfulltext) > 300
+                        WHERE bubblefeedid = %s AND LENGTH(resfulltext) > 300
                     """
-                    supps = db.fetch_all(support_sql, (link['bubblefeedid'],))
+                    supps = db.fetch_all(support_sql, (bubblefeedid_val,))
                     if supps:
                         tsups = ''
                         for supp in supps:
@@ -1570,9 +1583,9 @@ def build_bcpage_wp(
                                 suppurl = linkdomain + '/' + supp_slug_text + '-' + str(supp['id']) + '/'
                             
                             if suppurl:
-                                # Use custom_ucfirst_words(seo_text_custom(...)) for display
+                                # PHP line 438: Use moneynofollow and custom_ucfirst_words(seo_text_custom(...)) for display
                                 supp_title = custom_ucfirst_words(seo_text_custom(supp['restitle']))
-                                tsups += '- <span style="font-size:12px;line-height:13px;"><strong> <a title="' + supp_title + '" href="' + suppurl + '" target="_blank"' + follow + '> ' + supp_title + ' </a> </strong></span> '
+                                tsups += '- <span style="font-size:12px;line-height:13px;"><strong> <a ' + moneynofollow + ' title="' + supp_title + '" href="' + suppurl + '" target="_blank"' + follow + '> ' + supp_title + ' </a> </strong></span> '
                         
                         tsups = tsups.lstrip('- ').strip()
                         if tsups:
