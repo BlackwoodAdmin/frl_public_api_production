@@ -1610,6 +1610,8 @@ def build_bcpage_wp(
                                 supp_slug_text = supp_slug_text.replace(' ', '-')
                                 suppurl = linkdomain + '/' + supp_slug_text + '-' + str(supp['id']) + '/'
                             
+                            logger.info(f"Support keyword: {supp.get('restitle')}, wp_plugin: {link.get('wp_plugin')}, status: {link.get('status')}, suppurl: {suppurl}")
+                            
                             if suppurl:
                                 # PHP line 438: Use moneynofollow and custom_ucfirst_words(seo_text_custom(...)) for display
                                 supp_title = custom_ucfirst_words(seo_text_custom(supp['restitle']))
@@ -1617,9 +1619,13 @@ def build_bcpage_wp(
                         
                         # PHP line 443: ltrim($tsups, '-') - only remove leading dashes
                         tsups = tsups.lstrip('-')
+                        logger.info(f"After lstrip, tsups length: {len(tsups)}, tsups: {tsups[:100] if tsups else 'EMPTY'}")
                         # PHP line 444-447: if($tsups != '') output it
                         if tsups:
+                            logger.info(f"Outputting tsups to bcpage")
                             bcpage += tsups + '\n'
+                        else:
+                            logger.info(f"tsups is empty, not outputting")
                 
                 # Build image URL - match PHP logic exactly
                 # PHP line 386-405: Complex conditional logic for image URL
