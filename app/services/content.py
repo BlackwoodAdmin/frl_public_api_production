@@ -1545,7 +1545,8 @@ def build_bcpage_wp(
                 bcpage += f'<h2 class="h2"><a{moneynofollow} title="{stitle}" href="{linkurl}" style="text-align:left;" target="_blank"{follow}>{stitle}</a></h2>\n'
                 
                 # Support links for SEOM/BRON services
-                # PHP line 415-447: Check if SEOM/BRON and bubblefeedid exists
+                # PHP line 415: if((isSEOM($links[$i]['servicetype']) || isBRON($links[$i]['servicetype'])) && isset($links[$i]['bubblefeedid']))
+                # isset() checks if key exists, not if value is truthy
                 servicetype_val = link.get('servicetype')
                 # Convert to int if it's a string or None
                 if servicetype_val is not None:
@@ -1553,13 +1554,15 @@ def build_bcpage_wp(
                         servicetype_val = int(servicetype_val)
                     except (ValueError, TypeError):
                         servicetype_val = None
-                bubblefeedid_val = link.get('bubblefeedid')
-                if (is_seom(servicetype_val) or is_bron(servicetype_val)) and bubblefeedid_val:
+                # Check if bubblefeedid key exists (PHP isset), not just if value is truthy
+                has_bubblefeedid = 'bubblefeedid' in link and link.get('bubblefeedid') is not None
+                if (is_seom(servicetype_val) or is_bron(servicetype_val)) and has_bubblefeedid:
                     # PHP line 417: Query doesn't filter by deleted != 1
                     support_sql = """
                         SELECT id, restitle FROM bwp_bubblefeedsupport 
                         WHERE bubblefeedid = %s AND LENGTH(resfulltext) > 300
                     """
+                    bubblefeedid_val = link.get('bubblefeedid')
                     supps = db.fetch_all(support_sql, (bubblefeedid_val,))
                     if supps:
                         tsups = ''
@@ -1570,8 +1573,9 @@ def build_bcpage_wp(
                                 if link.get('script_version', 0) >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
                                     suppurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(supp['restitle'])) + '/' + str(supp['id']) + '/'
                                 else:
-                                    # CodeURL equivalent - simplified
-                                    suppurl = linkdomain + '/?Action=1&k=' + seo_slug(seo_filter_text_custom(supp['restitle'])) + '&PageID=' + str(supp['id'])
+                                    # PHP line 429: CodeURL($links[$i]['id']) . '?Action=1&amp;k=' ...
+                                    # Use &amp; for HTML entities like PHP
+                                    suppurl = linkdomain + '/?Action=1&amp;k=' + seo_slug(seo_filter_text_custom(supp['restitle'])) + '&amp;PageID=' + str(supp['id'])
                             elif link.get('wp_plugin') == 1 and link.get('status') in ['2', '10']:
                                 # Use toAscii(html_entity_decode(seo_text_custom(...))) for WP plugin
                                 import html
