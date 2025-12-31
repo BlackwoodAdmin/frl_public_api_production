@@ -467,21 +467,37 @@ def check_image_src_gpt(string: str) -> int:
 
 def is_bron(servicetype: Optional[int]) -> bool:
     """Check if service type is BRON, matching PHP isBRON function."""
-    if not servicetype:
+    if servicetype is None:
+        return False
+    # Convert to int to match PHP (int)$servicetype
+    try:
+        servicetype_int = int(servicetype)
+    except (ValueError, TypeError):
+        return False
+    if servicetype_int == 0:
         return False
     # Use %% to escape % for PyMySQL (which uses Python % formatting)
+    # PHP: servicetype LIKE 'BRON %' (with space after BRON)
     sql = "SELECT * FROM bwp_services WHERE servicetype LIKE 'BRON %%' AND servicetype != 'SEOM 5' AND id = %s ORDER BY keywords"
-    result = db.fetch_all(sql, (servicetype,))
+    result = db.fetch_all(sql, (servicetype_int,))
     return bool(result)
 
 
 def is_seom(servicetype: Optional[int]) -> bool:
     """Check if service type is SEOM, matching PHP isSEOM function."""
-    if not servicetype:
+    if servicetype is None:
+        return False
+    # Convert to int to match PHP (int)$servicetype
+    try:
+        servicetype_int = int(servicetype)
+    except (ValueError, TypeError):
+        return False
+    if servicetype_int == 0:
         return False
     # Use %% to escape % for PyMySQL (which uses Python % formatting)
+    # PHP: servicetype LIKE 'SEOM %' (with space after SEOM)
     sql = "SELECT * FROM bwp_services WHERE servicetype LIKE 'SEOM %%' AND servicetype != 'SEOM 5' AND id = %s ORDER BY keywords"
-    result = db.fetch_all(sql, (servicetype,))
+    result = db.fetch_all(sql, (servicetype_int,))
     return bool(result)
 
 
@@ -1546,23 +1562,22 @@ def build_bcpage_wp(
                 
                 # Support links for SEOM/BRON services
                 # PHP line 415: if((isSEOM($links[$i]['servicetype']) || isBRON($links[$i]['servicetype'])) && isset($links[$i]['bubblefeedid']))
-                # isset() checks if key exists, not if value is truthy
+                # isset() checks if key exists AND value is not NULL
+                # Get servicetype from the linked domain (d.servicetype in the query)
                 servicetype_val = link.get('servicetype')
-                # Convert to int if it's a string or None
-                if servicetype_val is not None:
-                    try:
-                        servicetype_val = int(servicetype_val)
-                    except (ValueError, TypeError):
-                        servicetype_val = None
-                # Check if bubblefeedid key exists (PHP isset), not just if value is truthy
-                has_bubblefeedid = 'bubblefeedid' in link and link.get('bubblefeedid') is not None
+                # Get bubblefeedid - this is b.id from bwp_bubblefeed (the id of the row whose restitle was just displayed)
+                bubblefeedid_val = link.get('bubblefeedid')
+                # PHP isset() returns true if key exists AND value is not NULL
+                has_bubblefeedid = 'bubblefeedid' in link and bubblefeedid_val is not None
+                
+                # Check if the linked domain is SEOM or BRON
                 if (is_seom(servicetype_val) or is_bron(servicetype_val)) and has_bubblefeedid:
                     # PHP line 417: Query doesn't filter by deleted != 1
                     support_sql = """
                         SELECT id, restitle FROM bwp_bubblefeedsupport 
                         WHERE bubblefeedid = %s AND LENGTH(resfulltext) > 300
                     """
-                    bubblefeedid_val = link.get('bubblefeedid')
+                    # Query bwp_bubblefeedsupport where bubblefeedid matches the bwp_bubblefeed.id
                     supps = db.fetch_all(support_sql, (bubblefeedid_val,))
                     if supps:
                         tsups = ''
