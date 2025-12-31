@@ -277,6 +277,53 @@ async def articles_endpoint(
                         wp_plugin=domain_category.get('wp_plugin', 0)
                     )
                     
+                    # PHP Articles.php includes feed-home.css.php at lines 255 and 471
+                    # Add feed-home.css.php CSS before </head> or at the end of <head>
+                    feed_home_css = '''<style type="text/css">
+ul.mdubgwi-footer-nav {margin:0 auto !important;padding: 0px !important;overflow:visible !important}
+
+#mdubgwi-hidden-button {  height:0px !important; width:0px !important;	 }
+
+.mdubgwi-button { display:block!important; visibility:visible!important; height:20px !important; width:250px !important; margin:0px !important; padding:0 !important; }
+
+.mdubgwi-footer-section {z-index: 99999999 !important; overflow:visible !important; display:block !important; position: relative !important; bottom: 0px !important; width: 250px !important; margin:0 auto !important; }
+.mdubgwi-footer-section.plain ul {list-style: none !important; margin:0 auto !important; text-align:center!important;}
+
+.mdubgwi-footer-nav li ul li {border:none !important;overflow-x: visible !important;overflow-y: visible !important;text-align:center !important; margin:0px !important;position: relative!important; color: #00397c !important; padding:0px !important; display:block !important; }
+.mdubgwi-footer-section.num-plain li {list-style: none !important; display:inline !important;}
+.num-lite li ul  { position: absolute !important; bottom: 45px !important; }
+.mdubgwi-footer-nav li ul  {position: absolute !important;left:53% !important; min-width:100px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-sub-nav {width:450px;}
+.mdubgwi-footer-nav li ul li ul {min-width:450px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-footer-nav:hover li ul {-ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; list-style:none !important; display: block !important; visibility: visible !important; z-index: 999999 !important; }
+.mdubgwi-footer-nav:hover li ul li ul {min-width:450px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-footer-nav li a {background:transparent !important; padding:5px 5px !important;text-align:center !important;  text-decoration:none !important; border:0 !important; line-height: 18px !important; font-size:13px !important; color: #00397c; }
+.mdubgwi-footer-nav li {list-style:none !important; background:transparent !important; padding:5px 5px !important;text-align:center !important;  color: #00397c; text-decoration:none !important; border:0 !important; line-height: 18px !important; font-size:13px !important; }
+.mdubgwi-footer-nav li ul { padding:5px 5px 10px 5px !important; margin:0 !important; }
+.mdubgwi-footer-nav li ul:hover {-ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=1.0)" !important; -moz-opacity: 1.0 !important; -khtml-opacity: 1.0 ! important!important;  opacity: 1.0 !important;      -webkit-transition: opacity 1s ease!important;     -moz-transition: opacity 1s ease!important;     -o-transition: opacity 1s ease!important;     -ms-transition: opacity 1s ease!important;        transition: opacity 1s ease!important;  list-style:none !important; display: block !important; visibility: visible !important; z-index: 999999 !important; }
+.mdubgwi-footer-nav li ul:hover li ul {min-width: 450px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-footer-nav li ul li {border:none !important;background:transparent !important;overflow-x: visible !important;overflow-y: visible !important; text-align: center !important;margin:0px !important; position: relative!important; list-style:none !important; }
+.mdubgwi-footer-nav li ul li:hover ul{ display: block !important; visibility: visible !important; z-index: 999999 !important; -webkit-transition: all 1s ease-out!important; -moz-transition: all 1s ease-out!important; -o-transition: all 1s ease-out!important; -ms-transition: all 1s ease-out!important; transition: all 1s ease-out!important;}
+.mdubgwi-footer-nav li ul li ul {border:none !important;bottom:0px !important;padding: 5px 5px 15px 5px !important;  -webkit-transition: all 1s ease-out!important; -moz-transition: all 1s ease-out!important; -o-transition: all 1s ease-out!important; -ms-transition: all 1s ease-out!important; transition: all 1s ease-out!important;position: absolute !important; }
+.mdubgwi-footer-nav li ul li ul li {border:none !important; background:transparent !important; overflow-x: visible !important;overflow-y: visible !important;left:0 !important; text-align: center !important;margin:0px !important; list-style:none !important; padding:0px 5px !important; }
+.ngodkrbsitr-spacer { clear:both!important; height:5px !important; display:block!important;width:100%!important; }
+.ngodkrbsitr-social { margin: 0 3px !important; padding: 0px !important; float:left!important;	 }
+.align-left { float:left!important; border:0!important; margin-right:1% !important; margin-bottom:10px !important; }
+.align-right { float:right!important; border:0!important; margin-left:1% !important; text-align:right!important; margin-bottom:10px !important; }
+img.align-left { max-width:100%!important;" }
+.mdubgwi-sub-nav li ul  {display:none !important; visibility:hidden !important;}
+.mdubgwi-sub-nav li:hover ul {display:block !important; visibility:visible !important;}
+</style>
+'''
+                    
+                    # Insert feed-home.css.php CSS before </head>
+                    if '</head>' in full_page_html:
+                        head_pos = full_page_html.lower().find('</head>')
+                        full_page_html = full_page_html[:head_pos] + feed_home_css + full_page_html[head_pos:]
+                    else:
+                        # If no </head> found, append to the end
+                        full_page_html += feed_home_css
+                    
                     return HTMLResponse(content=full_page_html)
             
             elif cmspagetype == 5 and cmspage:
