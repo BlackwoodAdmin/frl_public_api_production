@@ -7,6 +7,23 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
+def get_script_version_num(script_version) -> float:
+    """Convert script_version to float for comparison (handles '5.0', '5.0.x', etc.)."""
+    if script_version is None:
+        return 0.0
+    if isinstance(script_version, (int, float)):
+        return float(script_version)
+    try:
+        script_version_str = str(script_version)
+        # Handle versions like '5.0.x' by taking first two parts
+        parts = script_version_str.split('.')
+        if len(parts) > 1:
+            return float(parts[0] + '.' + parts[1])
+        return float(script_version_str)
+    except (ValueError, TypeError):
+        return 0.0
+
+
 def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings: Dict[str, Any]) -> Dict[str, str]:
     """
     Build footer HTML for WordPress plugin (feedit=2).
@@ -1531,14 +1548,16 @@ def build_bcpage_wp(
                     linkurl = linkdomain + '/' + slug_text + '-' + str(link.get('bubblecatid', '')) + '/'
                 elif not link.get('bubblecat') and link.get('wp_plugin') != 1 and (len(link.get('resfulltext', '')) >= 50 or len(link.get('resshorttext', '')) >= 50) and link.get('status') in ['2', '10']:
                     # PHP line 350-355: Non-WP plugin without bubblecat
-                    if link.get('script_version', 0) >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
+                    script_version_num = get_script_version_num(link.get('script_version'))
+                    if script_version_num >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
                         linkurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '/' + str(link.get('bubblefeedid', '')) + '/'
                     else:
                         # CodeURL equivalent - simplified
                         linkurl = linkdomain + '/?Action=1&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '&PageID=' + str(link.get('bubblefeedid', ''))
                 elif link.get('wp_plugin') != 1 and link.get('status') in ['2', '10']:
                     # PHP line 357-362: Non-WP plugin with bubblecat
-                    if link.get('script_version', 0) >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
+                    script_version_num = get_script_version_num(link.get('script_version'))
+                    if script_version_num >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
                         linkurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(link.get('bubblecat', ''))) + '/' + str(link.get('bubblecatid', '')) + '/'
                     else:
                         # CodeURL equivalent - simplified
@@ -1602,7 +1621,8 @@ def build_bcpage_wp(
                             
                             if link.get('wp_plugin') != 1 and link_status in [2, 10, 8]:
                                 # Build suppurl for non-WP plugin
-                                if link.get('script_version', 0) >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
+                                script_version_num = get_script_version_num(link.get('script_version'))
+                                if script_version_num >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
                                     suppurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(supp['restitle'])) + '/' + str(supp['id']) + '/'
                                 else:
                                     # PHP line 429: CodeURL($links[$i]['id']) . '?Action=1&amp;k=' ...
@@ -1642,7 +1662,8 @@ def build_bcpage_wp(
                     imageurl = linkdomainalone
                 elif haslinkspg_count > 0 and link.get('wp_plugin') != 1 and link.get('status') in ['2', '10', '8']:
                     # PHP line 390-395: Non-WP plugin with haslinkspg
-                    if link.get('script_version', 0) >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
+                    script_version_num = get_script_version_num(link.get('script_version'))
+                    if script_version_num >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
                         imageurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', ''))) + '/' + str(haslinkspg.get('bubblefeedid', '')) + 'bc/'
                     else:
                         # CodeURL equivalent - simplified
@@ -1881,7 +1902,8 @@ def build_bcpage_wp(
                     orphanlinkspg = db.fetch_row(orphan_sql, (haslinkspg.get('bubblefeedid', ''), link['id']))
                     if orphanlinkspg and link.get('wp_plugin') != 1:
                         # PHP line 721-726: Non-WP plugin orphan link
-                        if link.get('script_version', 0) >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
+                        script_version_num = get_script_version_num(link.get('script_version'))
+                        if script_version_num >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
                             orphlink = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(orphanlinkspg.get('restitle', ''))) + '/' + str(orphanlinkspg.get('bubblefeedid', '')) + 'bc/'
                         else:
                             # CodeURL equivalent - simplified
@@ -2040,7 +2062,8 @@ def build_bcpage_wp(
                 linkurl = linkdomain + '/' + slug_text + '-' + str(linkdc.get('bubbafeedid', '')) + 'dc'
             elif linkdc.get('wp_plugin') != 1 and len(linkdc.get('resfulltext', '')) >= 50 and linkdc.get('status') in ['2', '10']:
                 # PHP line 908-913: Non-WP plugin
-                if linkdc.get('script_version', 0) > 3.2 and linkdc.get('wp_plugin') != 1 and linkdc.get('iswin') != 1 and linkdc.get('usepurl') != 0:
+                script_version_num = get_script_version_num(linkdc.get('script_version'))
+                if script_version_num > 3.2 and linkdc.get('wp_plugin') != 1 and linkdc.get('iswin') != 1 and linkdc.get('usepurl') != 0:
                     linkurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(linkdc.get('bubbatitle', ''))) + '/' + str(linkdc.get('bubbafeedid', '')) + 'dc'
                 else:
                     # CodeURL equivalent - simplified
@@ -2081,7 +2104,8 @@ def build_bcpage_wp(
                 imageurl = linkdomainalone
             elif haslinkspg_dc_count > 0 and linkdc.get('wp_plugin') != 1 and linkdc.get('status') in ['2', '10', '8']:
                 # PHP line 938-943: Non-WP plugin with haslinkspg
-                if linkdc.get('script_version', 0) > 3.2 and linkdc.get('wp_plugin') != 1 and linkdc.get('iswin') != 1 and linkdc.get('usepurl') != 0:
+                script_version_num = get_script_version_num(linkdc.get('script_version'))
+                if script_version_num > 3.2 and linkdc.get('wp_plugin') != 1 and linkdc.get('iswin') != 1 and linkdc.get('usepurl') != 0:
                     imageurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(haslinkspg_dc.get('restitle', ''))) + '/' + str(haslinkspg_dc.get('bubblefeedid', '')) + 'bc/'
                 else:
                     # CodeURL equivalent - simplified
