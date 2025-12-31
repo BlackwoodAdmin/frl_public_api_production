@@ -796,7 +796,7 @@ def build_bcpage_wp(
         links_sql = """
             SELECT d.*, b.restitle, b.resshorttext, b.resfulltext, b.linkouturl, b.resname, b.resaddress, b.resphone, 
                    l.linkformat, l.deeplink, l.relevant, b.id AS bubblefeedid, b.title, b.categoryid,
-                   s.servicetype AS servicename, s.price,
+                   s.servicetype AS servicename, s.price, d.servicetype,
                    bc.category AS bubblecat, bc.bubblefeedid AS bubblecatid,
                    c.category AS subcat,
                    mc.maincategories_name AS maincat,
@@ -940,7 +940,7 @@ def build_bcpage_wp(
                                 supp_title = custom_ucfirst_words(seo_text_custom(supp['restitle']))
                                 tsups += '- <span style="font-size:12px;line-height:13px;"><strong> <a title="' + supp_title + '" href="' + suppurl + '" target="_blank"' + follow + '> ' + supp_title + ' </a> </strong></span> '
                         
-                        tsups = tsups.lstrip('-')
+                        tsups = tsups.lstrip('- ').strip()
                         if tsups:
                             bcpage += tsups + '\n'
                 
