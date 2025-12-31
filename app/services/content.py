@@ -321,12 +321,9 @@ def wrap_content_with_header_footer(
     # Build header section (PHP lines 263-294)
     ishead = '</head>' in header.lower() if header else False
     
-    # Check if content contains Bootstrap container classes (PHP line 266 in websitereference-wp.php)
-    # Bootstrap CSS/JS should only be included when this condition is met
-    needs_bootstrap = 'container justify-content-center' in content.lower() if content else False
-    
-    # Include feed.css.php (CSS always included)
-    feed_css = '''<style type="text/css">
+    # Include feed.css.php and feed.js.php (PHP lines 272-273, 288-289)
+    feed_css_js = '''<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+<style type="text/css">
 .seo-automation-main-table .row .col-md-6 {
 /*	display:list-item; */
 }
@@ -508,17 +505,8 @@ ul.mdubgwi-footer-nav {padding: 0px !important;overflow:visible !important}
 .mdubgwi-sub-nav li:hover ul {overflow:visible !important; display:block !important; visibility:visible !important;}
 .container.justify-content-center {max-width:100%;margin-bottom:15px;}
 </style>
-<script type="text/javascript" src="https://apis.google.com/js/plusone.js"></script>'''
-    
-    # Bootstrap CSS/JS (only included when condition is met, matching PHP line 266-271)
-    bootstrap_css_js = ''
-    if needs_bootstrap:
-        bootstrap_css_js = '''<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+<script type="text/javascript" src="https://apis.google.com/js/plusone.js"></script><script src="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
 '''
-    
-    # Combine CSS and JS
-    feed_css_js = bootstrap_css_js + feed_css
     
     if not ishead:
         # Header doesn't contain </head> - output full HTML structure
