@@ -750,6 +750,29 @@ def get_domain_keywords(domainid: int) -> list:
     return []
 
 
+def get_domain_keywords_from_bubblefeed(domainid: int, displayorder: int = 0) -> list:
+    """
+    Get domain keywords from bwp_bubblefeed (equivalent to PHP DomainKeywords function).
+    PHP: DomainKeywords($domainid, $displayorder=0)
+    Returns array of lowercase trimmed restitle values.
+    """
+    if displayorder:
+        sql = """
+            SELECT restitle FROM bwp_bubblefeed 
+            WHERE domainid = %s AND deleted != 1 
+            ORDER BY CASE WHEN active = 1 THEN 0 ELSE 1 END, restitle
+        """
+    else:
+        sql = """
+            SELECT restitle FROM bwp_bubblefeed 
+            WHERE domainid = %s AND deleted != 1 
+            ORDER BY createdDate
+        """
+    restitles = db.fetch_all(sql, (domainid,))
+    keywords = [str(row['restitle']).lower().strip() for row in restitles if row.get('restitle')]
+    return keywords
+
+
 def seo_filter_text_custom(text: str) -> str:
     """Clean text similar to PHP seo_filter_text_custom."""
     import re
@@ -1887,74 +1910,86 @@ def build_bcpage_wp(
     else:
         resurl = dl + '/' + seo_slug(seo_filter_text_custom(res['restitle'])) + '-' + str(res['id']) + '/'
     
-    # Start building page
-    bcpage = '<div class="seo-automation-main-table" style="margin-left:auto;margin-right:auto;display:block;">\n'
-    bcpage += '<div class="seo-automation-spacer"></div>\n'
+    # Start building page (PHP lines 239-240)
+    bcpage = '<div class="ngodkrbsitr-main-table"><div class="seo-automation-spacer"></div>\n'
+    bcpage += '<div class="ngodkrbsitr-top-container">\n'
     
-    # Handle video or image
+    # Build resurl for main keyword link (PHP lines 125-135)
+    # PHP: if ($domain['status'] == 2 || $domain['status'] == 10)
+    domain_status = domain_data.get('status')
+    domain_status_str = str(domain_status) if domain_status is not None else ''
+    script_version_num = get_script_version_num(domain_data.get('script_version'))
+    
+    if domain_status_str in ['2', '10']:
+        # PHP: if($rd == 1 && $domain_category['script_version'] >= 3 && $domain_category['wp_plugin'] != 1 && $domain_category['iswin'] != 1 && $domain_category['usepurl'] != 0)
+        # For now, use CodeURL equivalent (simplified)
+        resurl = code_url(domainid, domain_data, domain_settings) + "?Action=1&amp;k=" + seo_slug(seo_filter_text_custom(res.get('restitle', ''))) + '&amp;PageID=' + str(res.get('id', ''))
+    else:
+        resurl = dl
+    
+    # PHP line 241: H1 with " - Resources" suffix
+    bcpage += f'<h1 class="h1"><a href="{resurl}" style="">{clean_title(seo_filter_text_custom(res.get("restitle", "")))} - Resources</a></h1>\n'
+    
+    # PHP lines 242-257: Supporting keywords as H2 links for SEOM/BRON
     servicetype = domain_data.get('servicetype')
     isSEOM_val = is_seom(servicetype)
     isBRON_val = is_bron(servicetype)
     
-    if not domain_data.get('wr_video'):
-        bcpage += f'<h2 style="text-align:center;margin:0 0 15px 0;"><a href="{resurl}" target="_blank">{clean_title(seo_filter_text_custom(res.get("restitle", "")))}</a></h2>\n'
-        
-        # Support links for SEOM/BRON
-        if isSEOM_val or isBRON_val:
-            support_sql = """
-                SELECT restitle, id FROM bwp_bubblefeedsupport 
-                WHERE domainid = %s AND bubblefeedid = %s AND deleted != 1 AND LENGTH(resfulltext) > 300
-            """
-            supportkwords = db.fetch_all(support_sql, (domainid, res['id']))
-            if supportkwords:
-                supportlks = ''
-                for support in supportkwords:
-                    # PHP line 144: Use toAscii(html_entity_decode(seo_text_custom(...))) for URL
-                    import html
+    if isSEOM_val or isBRON_val:
+        support_sql = """
+            SELECT restitle, id FROM bwp_bubblefeedsupport 
+            WHERE domainid = %s AND bubblefeedid = %s AND deleted != 1 AND LENGTH(resfulltext) > 300 
+            ORDER BY LENGTH(restitle) DESC
+        """
+        supportkwords = db.fetch_all(support_sql, (domainid, res['id']))
+        if supportkwords:
+            for support in supportkwords:
+                # PHP line 249-252: Build resurl1 for support keyword
+                if script_version_num >= 3 and domain_data.get('wp_plugin') != 1 and domain_data.get('iswin') != 1 and domain_data.get('usepurl') != 0:
+                    # Use vardomain format
+                    cdomain = domain_data['domain_name'].split('.')
+                    vardomain = cdomain[0] if cdomain else ''
                     slug_text = seo_text_custom(support['restitle'])
                     slug_text = html.unescape(slug_text)
                     slug_text = to_ascii(slug_text)
                     slug_text = slug_text.lower()
                     slug_text = slug_text.replace(' ', '-')
-                    resurl1 = dl + '/' + slug_text + '-' + str(support['id']) + '/'
-                    supportlks += f' <strong><a href="{resurl1}" style="">{clean_title(seo_filter_text_custom(support["restitle"]))}</a></strong> -  '
-                supportlks = supportlks.rstrip(' - ')
-                bcpage += supportlks + '<br>\n'
-        
-        if domain_data.get('showsnapshot') == 1:
-            bcpage += f'<a href="{resurl}" target="_blank"><img src="//imagehosting.space/feed/pageimage.php?domain={domain_data["domain_name"]}" alt="{clean_title(seo_filter_text_custom(res.get("restitle", "")))}" style="width:160px !important;height:130px;" class="align-left"></a>\n'
-    else:
-        # Video
-        vid = extract_youtube_video_id(domain_data['wr_video'])
-        if vid:
-            bcpage += f'<div class="vid-container"><iframe style="max-width:100% !important;margin-bottom:20px;" src="//www.youtube.com/embed/{vid}" width="900" height="480"></iframe></div>\n'
-            bcpage += '<div class="seo-automation-spacer"></div>\n'
-        
-        bcpage += f'<h2 style="text-align:center;margin:0 0 15px 0;"><a href="{resurl}" target="_blank">{clean_title(seo_filter_text_custom(res.get("restitle", "")))}</a></h2>\n'
-        
-        # Support links for SEOM/BRON
-        if isSEOM_val or isBRON_val:
-            support_sql = """
-                SELECT restitle, id FROM bwp_bubblefeedsupport 
-                WHERE domainid = %s AND bubblefeedid = %s AND deleted != 1 AND LENGTH(resfulltext) > 300
-            """
-            supportkwords = db.fetch_all(support_sql, (domainid, res['id']))
-            if supportkwords:
-                supportlks = ''
-                for support in supportkwords:
-                    # PHP line 186: Use toAscii(html_entity_decode(seo_text_custom(...))) for URL
-                    import html
-                    slug_text = seo_text_custom(support['restitle'])
-                    slug_text = html.unescape(slug_text)
-                    slug_text = to_ascii(slug_text)
-                    slug_text = slug_text.lower()
-                    slug_text = slug_text.replace(' ', '-')
-                    resurl1 = dl + '/' + slug_text + '-' + str(support['id']) + '/'
-                    supportlks += f' <strong><a href="{resurl1}" style="">{clean_title(seo_filter_text_custom(support["restitle"]))}</a></strong> -  '
-                supportlks = supportlks.rstrip(' - ')
-                bcpage += supportlks + '<br>\n'
+                    resurl1 = dl + '/' + vardomain + '/' + slug_text + '/' + str(support['id']) + '/'
+                else:
+                    # Use CodeURL
+                    resurl1 = code_url(domainid, domain_data, domain_settings) + "?Action=1&amp;k=" + seo_slug(seo_filter_text_custom(support['restitle'])) + '&amp;PageID=' + str(support['id'])
+                
+                # PHP line 254: H2 link for support keyword
+                bcpage += f'<h2 class="h2"><a href="{resurl1}" style="">{custom_ucfirst_words(clean_title(seo_filter_text_custom(support["restitle"])))}</a></h2>\n'
     
-    # Get resfeedtext or resshorttext
+    # PHP lines 258-261: Social media icons (if showgoogleplusone)
+    # Note: showgoogleplusone is not in domain_data, so we'll skip for now
+    
+    # PHP line 262: Spacer
+    bcpage += '<div class="ngodkrbsitr-spacer"></div>\n'
+    
+    # PHP lines 264-283: Video or image
+    if not domain_data.get('wr_video'):
+        # PHP line 265-267: Image
+        bcpage += f'<a href="{resurl}" target="_blank"><img src="//imagehosting.space/feed/pageimage.php?domain={domain_data["domain_name"]}" alt="{clean_title(seo_filter_text_custom(res.get("restitle", "")))}" style="width:160px  !important;height:130px;" class="align-left"></a>\n'
+    else:
+        # PHP lines 271-282: Video
+        vid = domain_data['wr_video']
+        vid = seo_filter_text_custom(vid)
+        vid = vid.replace('https://www.', '')
+        vid = vid.replace('http://www.', '')
+        vid = vid.replace('http://', '')
+        vid = vid.replace('//', '')
+        vid = vid.replace('youtu.be/', '')
+        vid = vid.replace('youtube.com/embed/', '')
+        vid = vid.replace('youtube.com/watch?v=', '')
+        vid = vid.replace('www.', '')
+        # Remove &feature=... and similar parameters
+        vid = re.sub(r'&.*feature.*', '', vid)
+        if vid:
+            bcpage += f'<div class="vid-outer"><div class="vid-container"><iframe style="max-width:100%;" src="//www.youtube.com/embed/{vid}" width="900" height="480"></iframe></div></div>\n'
+    
+    # Get resfeedtext or resshorttext (PHP lines 115-123)
     if res.get('resfeedtext') and res['resfeedtext'].strip():
         shorttext = res['resfeedtext']
         shorttext = shorttext.replace('Table of Contents', '').strip()
@@ -1964,11 +1999,19 @@ def build_bcpage_wp(
     else:
         shorttext = ''
     
+    # PHP line 285: Output shorttext
     if shorttext:
         shorttext = html.unescape(str(shorttext))
-        bcpage += shorttext + '\n'
+        bcpage += seo_filter_text_custom(shorttext) + '\n'
     
-    # Additional Resources section (keyword links)
+    # PHP line 286: Close ngodkrbsitr-top-container
+    bcpage += '</div>\n'
+    
+    # PHP lines 289-292: Spacer and "Additional Resources" header
+    bcpage += '<div class="ngodkrbsitr-spacer"></div><div class="seo-automation-tag-container" style="border-bottom:0px solid black; border-top:0px solid black;height:10px;"></div>\n'
+    bcpage += '<h3 style="text-align:left;font-size:18px;font-weight:bold;">Additional Resources:</h3>\n'
+    
+    # Additional Resources section (keyword links) - PHP lines 297-1337
     domain_status = domain_data.get('status')
     # Convert to string for comparison (handles both int and str from DB)
     domain_status_str = str(domain_status) if domain_status is not None else ''
@@ -2000,12 +2043,7 @@ def build_bcpage_wp(
         links = db.fetch_all(links_sql, (domainid, res['id'], domain_data.get('domainip', '')))
         
         if links:
-            bcpage += '<div class="seo-automation-spacer"></div>\n'
-            bcpage += '<h3 style="text-align:left;font-size:22px;font-weight:bold;">Additional Resources:</h3>\n'
-            bcpage += '<div class="seo-automation-tag-container" style="border-bottom:0px solid black; border-top:0px solid black;;height:10px;"></div>\n'
-            bcpage += '<div class="seo-automation-spacer"></div>\n'
-            
-            # Process each link
+            # Process each link (header already added above)
             for link in links:
                 # Get link settings
                 link_settings_sql = "SELECT * FROM bwp_domain_settings WHERE domainid = %s"
