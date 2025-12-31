@@ -15,6 +15,7 @@ router = APIRouter()
 @router.api_route("/Article.php", methods=["GET", "POST"])
 async def article_endpoint(
     request: Request,
+    # Query parameters (for GET and POST with query string)
     domain: Optional[str] = Query(None, alias="domain"),
     Action: Optional[str] = Query(None),
     apiid: Optional[str] = Query(None),
@@ -43,6 +44,10 @@ async def article_endpoint(
         # First, check query params (POST requests can have params in URL too)
         # PHP $_REQUEST merges $_GET and $_POST, so we check both
         query_params = dict(request.query_params)
+        logger.debug(f"POST request - Query params: {query_params}")
+        
+        # Update parameters from query string (POST can have params in URL)
+        # Use query params as base, then override with body if present
         domain = domain or query_params.get("domain")
         Action = Action or query_params.get("Action")
         apiid = apiid or query_params.get("apiid")
@@ -56,41 +61,110 @@ async def article_endpoint(
         debug = debug or query_params.get("debug", "0")
         agent = agent or query_params.get("agent")
         
-        # Then try to parse body as form data
+        # Then try to parse body as form data or JSON (PHP $_REQUEST includes both GET and POST)
+        content_type = request.headers.get("content-type", "")
+        logger.debug(f"POST request - Content-Type: {content_type}")
+        
+        # Try to parse body - WordPress might send form-encoded or JSON
         try:
-            form_data = await request.form()
-            # Override with form data if present (POST body takes precedence)
-            domain = domain or form_data.get("domain")
-            Action = Action or form_data.get("Action")
-            apiid = apiid or form_data.get("apiid")
-            apikey = apikey or form_data.get("apikey")
-            kkyy = kkyy or form_data.get("kkyy")
-            feededit = feededit or form_data.get("feedit")
-            k = k or form_data.get("k")
-            key = key or form_data.get("key")
-            pageid = pageid or form_data.get("pageid")
-            version = version or form_data.get("version", version)
-            debug = debug or form_data.get("debug", debug)
-            agent = agent or form_data.get("agent")
-        except Exception:
-            # If form parsing fails, try JSON
-            try:
-                json_data = await request.json()
-                domain = domain or json_data.get("domain")
-                Action = Action or json_data.get("Action")
-                apiid = apiid or json_data.get("apiid")
-                apikey = apikey or json_data.get("apikey")
-                kkyy = kkyy or json_data.get("kkyy")
-                feededit = feededit or json_data.get("feedit")
-                k = k or json_data.get("k")
-                key = key or json_data.get("key")
-                pageid = pageid or json_data.get("pageid")
-                version = version or json_data.get("version", version)
-                debug = debug or json_data.get("debug", debug)
-                agent = agent or json_data.get("agent")
-            except Exception:
-                # If both fail, we already have query params above
-                pass
+            # Try form data first (most common for WordPress POST requests)
+            if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+                try:
+                    form_data = await request.form()
+                    logger.debug(f"POST request - Form data: {dict(form_data)}")
+                    # Override with form data if present (POST body takes precedence)
+                    if form_data.get("domain"):
+                        domain = form_data.get("domain")
+                    if form_data.get("Action"):
+                        Action = form_data.get("Action")
+                    if form_data.get("apiid"):
+                        apiid = form_data.get("apiid")
+                    if form_data.get("apikey"):
+                        apikey = form_data.get("apikey")
+                    if form_data.get("kkyy"):
+                        kkyy = form_data.get("kkyy")
+                    if form_data.get("feedit"):
+                        feededit = form_data.get("feedit")
+                    if form_data.get("k"):
+                        k = form_data.get("k")
+                    if form_data.get("key"):
+                        key = form_data.get("key")
+                    if form_data.get("pageid"):
+                        pageid = form_data.get("pageid")
+                    if form_data.get("version"):
+                        version = form_data.get("version")
+                    if form_data.get("debug"):
+                        debug = form_data.get("debug")
+                    if form_data.get("agent"):
+                        agent = form_data.get("agent")
+                except Exception as e:
+                    logger.debug(f"Form data parsing failed: {e}")
+            # Try JSON if content type indicates JSON or if no content type specified
+            elif "application/json" in content_type or not content_type:
+                try:
+                    json_data = await request.json()
+                    logger.debug(f"POST request - JSON data: {json_data}")
+                    if json_data.get("domain"):
+                        domain = json_data.get("domain")
+                    if json_data.get("Action"):
+                        Action = json_data.get("Action")
+                    if json_data.get("apiid"):
+                        apiid = json_data.get("apiid")
+                    if json_data.get("apikey"):
+                        apikey = json_data.get("apikey")
+                    if json_data.get("kkyy"):
+                        kkyy = json_data.get("kkyy")
+                    if json_data.get("feedit"):
+                        feededit = json_data.get("feedit")
+                    if json_data.get("k"):
+                        k = json_data.get("k")
+                    if json_data.get("key"):
+                        key = json_data.get("key")
+                    if json_data.get("pageid"):
+                        pageid = json_data.get("pageid")
+                    if json_data.get("version"):
+                        version = json_data.get("version")
+                    if json_data.get("debug"):
+                        debug = json_data.get("debug")
+                    if json_data.get("agent"):
+                        agent = json_data.get("agent")
+                except Exception as e2:
+                    logger.debug(f"JSON parsing failed: {e2}")
+                    # If JSON fails and no content type, try form data as fallback
+                    if not content_type:
+                        try:
+                            form_data = await request.form()
+                            logger.debug(f"POST request - Form data (fallback): {dict(form_data)}")
+                            if form_data.get("domain"):
+                                domain = form_data.get("domain")
+                            if form_data.get("Action"):
+                                Action = form_data.get("Action")
+                            if form_data.get("apiid"):
+                                apiid = form_data.get("apiid")
+                            if form_data.get("apikey"):
+                                apikey = form_data.get("apikey")
+                            if form_data.get("kkyy"):
+                                kkyy = form_data.get("kkyy")
+                            if form_data.get("feedit"):
+                                feededit = form_data.get("feedit")
+                            if form_data.get("k"):
+                                k = form_data.get("k")
+                            if form_data.get("key"):
+                                key = form_data.get("key")
+                            if form_data.get("pageid"):
+                                pageid = form_data.get("pageid")
+                            if form_data.get("version"):
+                                version = form_data.get("version")
+                            if form_data.get("debug"):
+                                debug = form_data.get("debug")
+                            if form_data.get("agent"):
+                                agent = form_data.get("agent")
+                        except Exception as e3:
+                            logger.debug(f"Form data fallback also failed: {e3}")
+        except Exception as e:
+            logger.debug(f"Body parsing failed: {e}")
+        
+        logger.debug(f"POST request - Final extracted params - domain: {domain}, apiid: {apiid}, apikey: {apikey}, kkyy: {kkyy}, feededit: {feededit}")
     
     # WordPress plugin feed routing (kkyy-based)
     if apiid and apikey and kkyy:
