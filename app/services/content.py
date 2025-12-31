@@ -309,12 +309,196 @@ def wrap_content_with_header_footer(
     # Build header section (PHP lines 263-294)
     ishead = '</head>' in header.lower() if header else False
     
+    # Include feed.css.php and feed.js.php (PHP lines 272-273, 288-289)
+    feed_css_js = '''<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+<style type="text/css">
+.seo-automation-main-table .row .col-md-6 {
+/*	display:list-item; */
+}
+.moinfomation { margin-left:60px !important;}
+
+.vid-container { float:none!important; margin:0px auto!important; text-align:center!important; }
+
+.xr007div {
+    background-color: #fff !important;
+    color:#000 !important;
+}
+.xr007div ul {
+	-webkit-font-smoothing:antialiased;
+	text-shadow:0 1px 0 #FFF;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    background-color: inherit !important;
+}
+.xr007div li.cfl707 {
+     margin: 0;
+    padding: 15px;
+    position: relative;
+  	 width:100%;
+  	 background-color: inherit !important;
+}
+.xr007div li.cfl707 {
+     display: block;
+    text-decoration: none;
+    -webkit-transition: all .35s ease;
+       -moz-transition: all .35s ease;
+        -ms-transition: all .35s ease;
+         -o-transition: all .35s ease;
+            transition: all .35s ease;
+}
+.xr007div li.cfl707 ul {
+    left: 0;
+    opacity: 0;
+    position: absolute;
+    top: 35px;
+    visibility: hidden;
+    z-index: 1;
+    -webkit-transition: all .35s ease;
+       -moz-transition: all .35s ease;
+        -ms-transition: all .35s ease;
+         -o-transition: all .35s ease;
+            transition: all .35s ease;
+	background-color: inherit !important;
+}
+.xr007div li.cfl707:hover ul {
+    opacity: 1;
+    top: 25px;
+    visibility: visible;
+    background-color: inherit !important;
+}
+.xr007div li.cfl707 ul li.cfl707 {
+    float: none;
+    width: 100%;
+    background-color: inherit !important;
+}
+
+/* Clearfix */
+
+/* Clearfix */
+
+.cf707:after, .cf707:before {
+    content:"";
+    display:table;
+}
+.cf707:after {
+    clear:both;
+}
+.cf707 {
+    zoom:1;
+}
+.ngodkrbsitr-sidebar {   max-width: 29% !important; width: 300px !important; margin: 0 !important; border: 1px solid !important;; padding: 15px 2% !important;;}
+.wr-fulltext { text-align:left!important; padding0px !important; /*max-width:65% !important; */ margin:0!important; float: left !important; }
+.wr-fulltext-blog { text-align:left!important; padding0px !important; max-width:65% !important; margin:0!important; float: right !important; }
+.ngodkrbsitr-sidebar input, .ngodkrbsitr-sidebar textarea { max-width:85% !important;	 }
+.google-map a { font-size:12px !important;	 }
+.fb-comments { width:100% !important;	 	 }			
+.fb-comments, .fb-comments iframe[style] { max-width: 100% !important; }		
+.mdubgwi-fb-comments { font-weight:bold!important; font-size:18px !important;line-height: 20px !important;}
+.google-map { padding-top:30px !important; width:290px !important; overflow:hidden!important;		 }			
+.google-map iframe { position:static!important;}
+.ngodkrbsitr-spacer { clear:both!important; height:5px !important; display:block!important;width:100%!important; }
+.ngodkrbsitr-social { margin: 0 3px !important; padding: 0px !important; float:left!important;	 }
+.ngodkrbsitr-social-container {float:left!important; margin: 0px 0px 10px !important;}
+.related-art-social img { margin: 0 1px !important; padding: 0px !important; max-width: 16px !important;height:auto !important; text-align:left!important; display:inline !important;}
+.related-art-social {text-align:center  !important; margin:0 auto  !important;}
+.ngodkrbsitr-sidebar li { padding:5px 0!important; margin:0!important; text-align:center!important; }
+.ngodkrbsitr-main-table-blog .ngodkrbsitr-sidebar li { font-weight:bold !important; }
+.ngodkrbsitr-main-table-blog li { margin:0px !important;list-style:none !important;	 font-size:16px !important; font-weight:normal !important; }
+.ngodkrbsitr-main-table-blog li a {background:transparent !important;margin:0px !important; font-size:12px !important; font-weight:normal!important; text-decoration:none !important; color: inherit!important; }
+.ngodkrbsitr-main-table-notlive, .ngodkrbsitr-main-table, .ngodkrbsitr-main-table-blog {z-index: 99999999 !important;  margin:0 auto 85px !important; width:90%; max-width:1250px; border:0!important; padding:5px 2%!important; }
+.align-left { float:left!important; border:0!important; margin-right:1% !important; margin-bottom:10px !important; }
+.align-right { float:right!important; margin-left:1% !important; text-align:right!important; margin-bottom:10px !important; }
+img.align-left { max-width:100%!important; }
+.vid-container { float:none !important; width:100% !important; margin:0 auto 20px !important; text-align:center !important;}
+.vid-container iframe { max-width:100% !important; border:none; !important;}
+.snapshot-container { vertical-align:middle!important; text-align:center!important; width:120px !important;   margin: 5px 0 35px 10px !important; padding: 0px !important; float:right!important; overflow:hidden!important; }
+.snapshot-container img { float:right!important; border:0px !important; margin:0!important; }
+.ngodkrbsitr-tag-container { text-align:left!important; font-size:13px;}
+.ngodkrbsitr-top-container { min-height:220px  }
+.ngodkrbsitr-container { text-align:justify!important; vertical-align:top!important; padding:0px !important; min-height:130px !important;	!important; background: inherit !important; }
+.ngodkrbsitr-containerwr { text-align:justify!important; vertical-align:top!important; padding:0 15px 5px !important; }
+.h1 a {clear:none !important;display:block !important;border:none !important;text-decoration:none !important; color: inherit!important; }
+.h1 {display:block !important;clear:none !important;border:none !important;display:block !important;background:transparent !important;display:block!important; text-align:left !important; padding:0px !important; font-size: 30px !important; margin:10px 0px 10px !important; font-weight:bold!important; }
+.h2 a {display:block !important;clear:none !important;border:none !important;font-size: 22px !important; text-decoration:none!important; color:inherit!important; }
+.h2 {display:block !important;clear:none !important;border:none !important;display:block !important; background:transparent !important;text-align:left !important; font-size: 14px !important; margin:5px 0 5px !important; padding:0px !important; font-weight:bold !important; }
+.h3{display:block !important;clear:none !important;border:none !important;font-size:13px !important;}
+.h4{display:block !important;clear:none !important;border:none !important;font-size:12px !important;}
+ul.mdubgwi-footer-nav {padding: 0px !important;overflow:visible !important}
+
+#mdubgwi-hidden-button {  height:0px !important; width:0px !important;	 }
+
+.mdubgwi-button { display:block!important; visibility:visible!important; height:20px !important; width:150px !important; margin:0px !important; padding:0 !important; }
+
+.mdubgwi-footer-section {z-index: 99999999 !important; overflow:visible !important; display:block !important; position: relative !important; bottom: 0px !important; width: 250px !important; margin:0 auto !important; }
+.mdubgwi-footer-section.plain ul {list-style: none !important; margin:0 auto !important; text-align:center!important;}
+
+.mdubgwi-footer-nav li ul li {border:none !important;overflow-x: visible !important;overflow-y: visible !important;text-align:center !important; margin:0px !important;position: relative!important; color: #00397c !important; padding:0px !important; display:block !important; }
+.mdubgwi-footer-section.num-plain li {list-style: none !important; display:inline !important;}
+.num-lite li ul  { position: absolute !important; bottom: 45px !important; }
+.mdubgwi-footer-nav li ul  {position: absolute !important;left:43% !important; min-width:100px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-sub-nav {width:350px;}
+.mdubgwi-footer-nav li ul li ul {min-width:200px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-footer-nav:hover li ul {overflow:visible !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; list-style:none !important; display: block !important; visibility: visible !important; z-index: 999999 !important; }
+.mdubgwi-footer-nav:hover li ul li ul {overflow:visible !important; min-width:200px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-footer-nav li a {background:transparent !important; padding:5px 5px !important;text-align:center !important;  color: #00397c; text-decoration:none !important; border:0 !important; line-height: 18px !important; font-size:13px !important; color: #00397c !important; }
+.mdubgwi-footer-nav li {list-style:none !important; background:transparent !important; padding:5px 5px !important;text-align:center !important;  color: #00397c; text-decoration:none !important; border:0 !important; line-height: 18px !important; font-size:13px !important; }
+.mdubgwi-footer-nav li ul li a {display:inline !important;border:none !important;background:transparent !important; margin:0px !important; text-align:center !important;  color: #00397c !important; text-decoration:none !important; border:0 !important; line-height: 18px !important; font-size:13px !important; }
+.mdubgwi-footer-nav li ul { padding:5px 5px 10px 5px !important; margin:0 !important; }
+.mdubgwi-footer-nav li ul:hover {overflow:visible !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=1.0)" !important; -moz-opacity: 1.0 !important; -khtml-opacity: 1.0 ! important!important;  opacity: 1.0 !important;      -webkit-transition: opacity 1s ease!important;     -moz-transition: opacity 1s ease!important;     -o-transition: opacity 1s ease!important;     -ms-transition: opacity 1s ease!important;        transition: opacity 1s ease!important;  list-style:none !important; display: block !important; visibility: visible !important; z-index: 999999 !important; }
+.mdubgwi-footer-nav li ul:hover li ul {overflow:visible !important;  min-width:200px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-footer-nav li ul li {border:none !important;background:transparent !important;overflow-x: visible !important;overflow-y: visible !important; text-align: center !important;margin:0px !important; position: relative!important; list-style:none !important; }
+.mdubgwi-footer-nav li ul li:hover ul{overflow:visible !important;  display: block !important; visibility: visible !important; z-index: 999999 !important; -webkit-transition: all 1s ease-out!important; -moz-transition: all 1s ease-out!important; -o-transition: all 1s ease-out!important; -ms-transition: all 1s ease-out!important; transition: all 1s ease-out!important;}
+.mdubgwi-footer-nav li ul li ul {border:none !important;bottom:0px !important;padding: 5px 5px 15px 5px !important;  -webkit-transition: all 1s ease-out!important; -moz-transition: all 1s ease-out!important; -o-transition: all 1s ease-out!important; -ms-transition: all 1s ease-out!important; transition: all 1s ease-out!important;position: absolute !important; }
+.mdubgwi-footer-nav li ul li ul li {border:none !important; background:transparent !important; overflow-x: visible !important;overflow-y: visible !important;left:0 !important; text-align: center !important;margin:0px !important; list-style:none !important; padding:0px 5px !important; }
+.bwp_citation_conatainer div {padding:0px !important;margin:0px !important;}
+.bwp_citation_conatainer {text-align:left !important; float:left !important; width:44% !important; margin:15px 10px 45px 0 !important;}
+.bwp_citation_conatainer .citation_map_container {padding:0px !important;float:left !important;margin:0 8px 0 0 !important}
+.bwp_citation_conatainer .citation_map_container img {padding:0px !important;float:left!important; border:0px !important; margin:0 0 0 7px !important; }
+.citation_map_container {float:left !important; margin:0 0 0 8px !important;}
+.bwp_citation_conatainer .ngodkrbsitr-social { margin: 0 3px !important; padding: 0px !important; float:left!important;	 }
+.bwp_citation_conatainer .ngodkrbsitr-social-container {float:left!important; margin: 0px 0px 10px !important;}
+.bwp_citation_conatainer .related-art-social img { margin: 0 1px !important; padding: 0px !important; max-width: 16px !important;height:auto !important; text-align:left!important; display:inline !important;}
+.bwp_citation_conatainer .related-art-social {clear:left !important;float:left !important;text-align:center  !important; margin:0 auto  !important;}
+.bwp_citation_conatainer br {font-size:3px !important;line-height:3px !important;}
+.bwp_citation_conatainer p {float:left !important;}
+.mobileclear-343 {margin:0 !important; padding:0px !important;height:10px !important;}
+.bwp_citation_conatainer a {float:left !important;}
+@media (min-width: 768px) and (max-width: 979px) { 
+.ngodkrbsitr-container { text-align:left!important; }	 
+.align-left, .align-right { float:left!important; margin- right:1% !important; text-align: left !important; } 
+.vid-container iframe { max-height:320px !important; }
+.bwp_citation_conatainer {margin:15px 10px 10px 10px !important; width:50% !important;}
+}
+@media (max-width: 767px) { 
+.mobileclear-343 {clear:both;}
+.bwp_citation_conatainer .related-art-social {float:left  !important;}
+.bwp_citation_conatainer {padding: 0px 10% !important; text-align:left !important; float:none !important; width:80% !important; margin:15px auto !important;}
+.bwp_citation_conatainer .citation_map_container {margin:0 !important}
+.bwp_citation_conatainer .citation_map_container img { border:0px !important; margin:0 10px 0 10px !important; }
+.citation_map_container { margin:0 0 0 10px !important;}
+.align-left, .align-right { float:none !important; margin:25px auto !important; text-align: left !important; display:block !important; } 
+.vid-container iframe { max-height:320px !important; }
+.ngodkrbsitr-main-table .h1, .ngodkrbsitr-main-table .h2, .ngodkrbsitr-main-table .h3, .ngodkrbsitr-main-table .h4, .ngodkrbsitr-main-table .h5, .ngodkrbsitr-main-table .h6, .ngodkrbsitr-main-table  h1, .ngodkrbsitr-main-table  h2, .ngodkrbsitr-main-table  h3, .ngodkrbsitr-main-table  h4, .ngodkrbsitr-main-table  h5, .ngodkrbsitr-main-table  h6 {
+    margin-top: 0.ngodkrbsitr-main-table .5rem;
+    margin-bottom: 0.5rem;
+}
+.ngodkrbsitr-container { text-align:left !important; }	 
+.align-left, .align-right { float:none !important; display:block !important; margin:0 auto !important; text-align:  !important; } img.align-left { max-width:100%!important; } 
+.ngodkrbsitr-social-container { float: none!important;	 display:block!important; margin:0 auto!important; }	 
+.mdubgwi-sub-nav li ul  {display:none !important; visibility:hidden !important;}
+.mdubgwi-sub-nav li:hover ul {overflow:visible !important; display:block !important; visibility:visible !important;}
+.container.justify-content-center {max-width:100%;margin-bottom:15px;}
+</style>
+<script type="text/javascript" src="https://apis.google.com/js/plusone.js"></script><script src="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+'''
+    
     if not ishead:
         # Header doesn't contain </head> - output full HTML structure
         full_page += '<html>\n'
         full_page += '<head>\n'
-        # Note: feed.js.php and feed.css.php would be included here in PHP
-        # For now, we'll just include the metaheader
+        full_page += feed_css_js
         full_page += metaheader
         if canonical_url:
             full_page += f'<link href="{canonical_url}" rel="canonical" />\n'
@@ -329,7 +513,7 @@ def wrap_content_with_header_footer(
         if head_pos >= 0:
             full_page += header[:head_pos]  # Everything before </head>
             full_page += metaheader
-            # Note: feed.js.php and feed.css.php would be included here in PHP
+            full_page += feed_css_js
             if canonical_url:
                 full_page += f'<link href="{canonical_url}" rel="canonical" />\n'
             full_page += header[head_pos:]  # </head> and everything after
@@ -1624,7 +1808,22 @@ def build_page_wp(
     )
     wpage += article_links_html
     
+    # Add premiumstyles.css and closing styles (matching build_bcpage_wp)
+    wpage += '<div class="seo-automation-spacer"></div>\n'
+    wpage += '<div class="seo-automation-tag-container" style="border-bottom:1px solid black; border-top:1px solid black;"></div>\n'
+    wpage += '<link rel="stylesheet" id="SEO_Automation_premium_0_X-css" href="https://public.imagehosting.space/external_files/premiumstyles.css" type="text/css" media="all" />\n'
+    wpage += '<div class="seo-automation-spacer"></div>\n'
     wpage += '</div>\n'
+    wpage += '''<style>
+.ngodkrbsitr-spacer{clear:both;}
+.citation_map_container iframe {
+	width:130px !important;
+}
+.vid-container iframe {
+	width:100% !important;
+}
+</style>
+'''
     
     return wpage
 
