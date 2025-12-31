@@ -1592,7 +1592,15 @@ def build_bcpage_wp(
                         tsups = ''
                         for supp in supps:
                             suppurl = ''
-                            if link.get('wp_plugin') != 1 and link.get('status') in ['2', '10', '8']:
+                            # Convert status to int for comparison (PHP compares integers)
+                            link_status = link.get('status')
+                            if link_status is not None:
+                                try:
+                                    link_status = int(link_status)
+                                except (ValueError, TypeError):
+                                    link_status = None
+                            
+                            if link.get('wp_plugin') != 1 and link_status in [2, 10, 8]:
                                 # Build suppurl for non-WP plugin
                                 if link.get('script_version', 0) >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
                                     suppurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(supp['restitle'])) + '/' + str(supp['id']) + '/'
@@ -1600,7 +1608,7 @@ def build_bcpage_wp(
                                     # PHP line 429: CodeURL($links[$i]['id']) . '?Action=1&amp;k=' ...
                                     # Use &amp; for HTML entities like PHP
                                     suppurl = linkdomain + '/?Action=1&amp;k=' + seo_slug(seo_filter_text_custom(supp['restitle'])) + '&amp;PageID=' + str(supp['id'])
-                            elif link.get('wp_plugin') == 1 and link.get('status') in ['2', '10']:
+                            elif link.get('wp_plugin') == 1 and link_status in [2, 10]:
                                 # Use toAscii(html_entity_decode(seo_text_custom(...))) for WP plugin
                                 import html
                                 supp_slug_text = seo_text_custom(supp['restitle'])
