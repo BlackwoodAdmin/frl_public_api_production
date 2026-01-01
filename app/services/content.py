@@ -3,8 +3,50 @@ from app.database import db
 from typing import Dict, Any, Optional
 import logging
 from datetime import datetime
+import re
+import json
+import os
 
 logger = logging.getLogger(__name__)
+
+# #region agent log
+def _debug_log(location: str, message: str, data: dict, hypothesis_id: str = ""):
+    """Helper function to write debug logs in NDJSON format."""
+    log_path = r"d:\www\FRLPublic\.cursor\debug.log"
+    try:
+        log_entry = {
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(datetime.now().timestamp() * 1000)
+        }
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(log_entry) + '\n')
+    except Exception:
+        pass  # Silently fail if logging fails
+
+def _count_divs(html: str) -> dict:
+    """Count opening and closing div tags, and find elementor elementor-3833."""
+    if not html:
+        return {"open": 0, "close": 0, "net": 0, "elementor_3833_open": 0, "elementor_3833_close": 0}
+    open_divs = len(re.findall(r'<div[^>]*>', html, re.IGNORECASE))
+    close_divs = len(re.findall(r'</div>', html, re.IGNORECASE))
+    elementor_3833_open = len(re.findall(r'class="[^"]*elementor[^"]*elementor-3833[^"]*"', html, re.IGNORECASE))
+    elementor_3833_close = 0
+    # Find closing divs that might close elementor-3833 (look for pattern before </article> or </main>)
+    matches = re.finditer(r'</div>\s*(?:</article>|</main>|<footer)', html, re.IGNORECASE)
+    elementor_3833_close = len(list(matches))
+    return {
+        "open": open_divs,
+        "close": close_divs,
+        "net": open_divs - close_divs,
+        "elementor_3833_open": elementor_3833_open,
+        "elementor_3833_close": elementor_3833_close
+    }
+# #endregion
 
 
 def get_script_version_num(script_version) -> float:
@@ -22,18 +64,6 @@ def get_script_version_num(script_version) -> float:
         return float(script_version_str)
     except (ValueError, TypeError):
         return 0.0
-
-
-def get_css_class_prefix(wp_plugin: Any) -> str:
-    """
-    Get CSS class prefix based on wp_plugin value.
-    WordPress (wp_plugin == 1): 'seo-automation'
-    PHP (wp_plugin != 1): 'ngodkrbsitr'
-    """
-    if wp_plugin == 1:
-        return 'seo-automation'
-    else:
-        return 'ngodkrbsitr'
 
 
 def get_header_footer(domainid: int, domain_status: Any, keyword: str = '', category: str = '', alttemplate: Optional[int] = None) -> Dict[str, Any]:
@@ -109,6 +139,17 @@ def get_header_footer(domainid: int, domain_status: Any, keyword: str = '', cate
     # Decode header and footer
     header = html.unescape(header_footer.get('domain_header', '')) if header_footer else ''
     footer = html.unescape(header_footer.get('domain_footer', '')) if header_footer else ''
+    
+    # #region agent log
+    header_div_counts = _count_divs(header)
+    footer_div_counts = _count_divs(footer)
+    _debug_log("content.py:get_header_footer", "After header/footer decoded", {
+        "header_length": len(header),
+        "footer_length": len(footer),
+        "header_div_counts": header_div_counts,
+        "footer_div_counts": footer_div_counts
+    }, "C")
+    # #endregion
     
     # Add style tag if domain_smalltextcolor is set (PHP line 971-975)
     if header_footer and header_footer.get('domain_smalltextcolor'):
@@ -308,6 +349,22 @@ def wrap_content_with_header_footer(
         websitereferencesimple: If True, skip header/footer (for simple mode)
         wp_plugin: If 1, skip header/footer (WordPress handles it)
     """
+    # #region agent log
+    _debug_log("content.py:wrap_content_with_header_footer", "Function entry", {
+        "content_length": len(content) if content else 0,
+        "header_length": len(header) if header else 0,
+        "footer_length": len(footer) if footer else 0,
+        "wp_plugin": wp_plugin,
+        "websitereferencesimple": websitereferencesimple
+    }, "B")
+    content_div_counts = _count_divs(content) if content else {}
+    header_div_counts = _count_divs(header) if header else {}
+    _debug_log("content.py:wrap_content_with_header_footer", "Input div counts", {
+        "content_div_counts": content_div_counts,
+        "header_div_counts": header_div_counts
+    }, "B")
+    # #endregion
+    
     # WordPress plugin doesn't use header/footer (WordPress handles it)
     if wp_plugin == 1:
         return content
@@ -535,28 +592,120 @@ ul.mdubgwi-footer-nav {padding: 0px !important;overflow:visible !important}
             full_page += header
         # Note: feed.bodytop.php would be included here in PHP
     
+    # #region agent log
+    div_counts_after_header = _count_divs(full_page)
+    _debug_log("content.py:wrap_content_with_header_footer", "After header added", {
+        "full_page_length": len(full_page),
+        "div_counts": div_counts_after_header
+    }, "B")
+    # #endregion
+    
     # Add main content
     full_page += content
+    
+    # #region agent log
+    div_counts_after_content = _count_divs(full_page)
+    _debug_log("content.py:wrap_content_with_header_footer", "After content added", {
+        "full_page_length": len(full_page),
+        "div_counts": div_counts_after_content
+    }, "B")
+    # #endregion
     
     # Build footer section (PHP lines 1761-1785)
     isfoothtml = '</html>' in footer.lower() if footer else False
     isfootbody = '</body>' in footer.lower() if footer else False
     
+    # Check if footer should be inserted before closing elementor elementor-3833 div
+    # The footer from the database contains the contact info section (elementor-element-d448dc3)
+    # which should be INSIDE the elementor elementor-3833 div
+    if footer:
+        import re
+        
+        # Check if the footer contains elementor-element-d448dc3 (contact info section)
+        has_contact_section = 'elementor-element-d448dc3' in footer.lower()
+        
+        if has_contact_section:
+            # The footer contains the contact info section that should be inside elementor elementor-3833
+            # Find the closing </div> for elementor elementor-3833
+            # This div closes after the main content but before the WordPress footer
+            # Look for </div> followed by </article> or </main> or <footer class="wd-footer"
+            # We need to insert the footer BEFORE this closing div
+            
+            # First, try to find the closing </div> for elementor elementor-3833 by looking backwards from </article>
+            # Pattern 1: Find </div> that closes elementor-3833, followed by </article> or </main> or <footer
+            closing_div_pattern = r'(</div>\s*(?:</article>|</main>|<footer\s+class="wd-footer"))'
+            matches = list(re.finditer(closing_div_pattern, full_page, re.IGNORECASE | re.DOTALL))
+            
+            # Pattern 2: Find </div> before </article> (more flexible whitespace)
+            if not matches:
+                article_pattern = r'(</div>\s*</article>)'
+                matches = list(re.finditer(article_pattern, full_page, re.IGNORECASE | re.DOTALL))
+            
+            # Pattern 3: Find </div> before </main>
+            if not matches:
+                main_pattern = r'(</div>\s*</main>)'
+                matches = list(re.finditer(main_pattern, full_page, re.IGNORECASE | re.DOTALL))
+            
+            # Pattern 4: Find </div> before <footer class="wd-footer"
+            if not matches:
+                footer_pattern = r'(</div>\s*<footer\s+class="wd-footer")'
+                matches = list(re.finditer(footer_pattern, full_page, re.IGNORECASE | re.DOTALL))
+            
+            if matches:
+                # Insert footer before the last match (which should be the closing div for elementor elementor-3833)
+                last_match = matches[-1]
+                insert_pos = last_match.start()
+                # #region agent log
+                _debug_log("content.py:wrap_content_with_header_footer", "Before footer insertion", {
+                    "insert_pos": insert_pos,
+                    "matches_count": len(matches),
+                    "context_before": full_page[max(0, insert_pos-100):insert_pos],
+                    "context_after": full_page[insert_pos:min(len(full_page), insert_pos+100)]
+                }, "B")
+                # #endregion
+                full_page = full_page[:insert_pos] + footer + full_page[insert_pos:]
+            else:
+                # Fallback: append footer after content
+                # #region agent log
+                _debug_log("content.py:wrap_content_with_header_footer", "Appending footer (no match found)", {}, "B")
+                # #endregion
+                full_page += footer
+        else:
+            # Footer doesn't contain contact section, append normally
+            # #region agent log
+            _debug_log("content.py:wrap_content_with_header_footer", "Appending footer (no contact section)", {}, "B")
+            # #endregion
+            full_page += footer
+    
+    # #region agent log
+    div_counts_after_footer = _count_divs(full_page)
+    _debug_log("content.py:wrap_content_with_header_footer", "After footer added", {
+        "full_page_length": len(full_page),
+        "div_counts": div_counts_after_footer
+    }, "B")
+    # #endregion
+    
     if not isfoothtml and not isfootbody:
         # Footer doesn't contain </html> or </body>
-        full_page += footer if footer else ''
         # Note: webtabs.inc.php and feed.footer.php would be included here in PHP
         full_page += '</body>\n'
         full_page += '</html>\n'
     elif not isfootbody:
         # Footer contains </html> but not </body>
-        full_page += footer if footer else ''
         # Note: webtabs.inc.php and feed.footer.php would be included here in PHP
         full_page += '</body>\n'
     else:
         # Footer contains </body> (and possibly </html>)
         # Note: webtabs.inc.php and feed.footer.php would be included here in PHP
-        full_page += footer if footer else ''
+        pass
+    
+    # #region agent log
+    div_counts_final = _count_divs(full_page)
+    _debug_log("content.py:wrap_content_with_header_footer", "Function exit", {
+        "full_page_length": len(full_page),
+        "div_counts": div_counts_final
+    }, "B")
+    # #endregion
     
     return full_page
 
@@ -790,7 +939,9 @@ def get_domain_keywords_from_bubblefeed(domainid: int, displayorder: int = 0) ->
 def seo_filter_text_custom(text: str) -> str:
     """Clean text similar to PHP seo_filter_text_custom."""
     import re
-    text = text.strip()
+    if text is None:
+        return ''
+    text = str(text).strip()
     text = re.sub(r'&(amp;)+', '&', text)
     text = text.replace('&amp;amp;', '&amp;')
     text = text.replace('&amp;mdash;', '&mdash;')
@@ -817,7 +968,9 @@ def seo_filter_text_custom(text: str) -> str:
 def seo_text_custom(text: str) -> str:
     """Clean text similar to PHP seo_text_custom."""
     import re
-    text = text.strip()
+    if text is None:
+        return ''
+    text = str(text).strip()
     text = re.sub(r'&(amp;)+', '&', text)
     text = text.replace("&#39;", "'")
     text = text.replace("&#124;", "|")
@@ -852,8 +1005,10 @@ def to_ascii(text: str) -> str:
     Note: PHP toAscii expects text to already be processed by seo_text_custom and html_entity_decode.
     """
     import re
+    if text is None:
+        return ''
     # Text should already be processed by seo_text_custom and html_entity_decode before calling this
-    text = text.replace(' &#x26;', '')
+    text = str(text).replace(' &#x26;', '')
     # Basic transliteration (simplified - full version has extensive table)
     text = text.replace("'", "")
     text = text.replace('#039;', '')
@@ -875,6 +1030,9 @@ def seo_slug(text: str) -> str:
 
 def clean_title(text: str) -> str:
     """Clean title for display (simplified version of seo_automation_clean_title)."""
+    if text is None:
+        return ''
+    text = str(text)
     text_lower = text.lower()
     if text.strip() == text_lower.strip():
         # Title case
@@ -1477,21 +1635,27 @@ def build_page_wp(
     if domain_data.get('resourcesactive') != 1:
         return '<p>This feature is not available for your current package. Please upgrade your package. [ID-01]</p>'
     
-    # Get CSS class prefix based on wp_plugin
-    css_prefix = get_css_class_prefix(domain_data.get('wp_plugin'))
+    # #region agent log
+    _debug_log("content.py:build_page_wp", "Function entry", {"bubbleid": bubbleid, "domainid": domainid}, "A")
+    # #endregion
     
-    wpage = f'<div class="{css_prefix}-main-table" style="margin-left:auto;margin-right:auto;display:block;">\n'
-    wpage += f'<div class="{css_prefix}-spacer"></div>\n'
+    wpage = '<div class="seo-automation-main-table" style="margin-left:auto;margin-right:auto;display:block;">\n'
+    wpage += '<div class="seo-automation-spacer"></div>\n'
+    
+    # #region agent log
+    div_counts = _count_divs(wpage)
+    _debug_log("content.py:build_page_wp", "After opening main div", {"wpage_length": len(wpage), "div_counts": div_counts}, "A")
+    # #endregion
     
     # Check if resfulltext contains Bootstrap container classes and add Bootstrap CSS/JS if needed (PHP lines 266-275)
     resfulltext = res.get('resfulltext', '')
     if resfulltext and 'container justify-content-center' in resfulltext.lower():
-        wpage += f'''
+        wpage += '''
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
 
-<style>.wr-fulltext img {{height: auto !important;min-width:100%;}}@media (min-width: 992px){{.wr-fulltext img {{min-width:0;}}}}.container.justify-content-center {{max-width:100%;margin-bottom:15px;}}.ngodkrbsitr-spacer{{clear:both;}}.{css_prefix}-main-table h1:after, .{css_prefix}-main-table h2:after, .{css_prefix}-main-table h3:after, .{css_prefix}-main-table h4:after, .{css_prefix}-main-table h5:after, .{css_prefix}-main-table h6:after {{display: none !important;clear: none !important;}} .{css_prefix}-main-table h1, .{css_prefix}-main-table h2, .{css_prefix}-main-table h3, .{css_prefix}-main-table h4, .{css_prefix}-main-table h5, .{css_prefix}-main-table h6 {{clear: none !important;}}.{css_prefix}-main-table .row .col-md-6 {{	/* display:list-item; */ }} </style>
+<style>.wr-fulltext img {height: auto !important;min-width:100%;}@media (min-width: 992px){.wr-fulltext img {min-width:0;}}.container.justify-content-center {max-width:100%;margin-bottom:15px;}.ngodkrbsitr-spacer{clear:both;}.seo-automation-main-table h1:after, .seo-automation-main-table h2:after, .seo-automation-main-table h3:after, .seo-automation-main-table h4:after, .seo-automation-main-table h5:after, .seo-automation-main-table h6:after {display: none !important;clear: none !important;} .seo-automation-main-table h1, .seo-automation-main-table h2, .seo-automation-main-table h3, .seo-automation-main-table h4, .seo-automation-main-table h5, .seo-automation-main-table h6 {clear: none !important;}.seo-automation-main-table .row .col-md-6 {	/* display:list-item; */ } </style>
 '''
     
     # Handle YouTube video embedding (PHP lines 282-465)
@@ -1507,7 +1671,7 @@ def build_page_wp(
     if video_id:
         title_attr = clean_title(seo_filter_text_custom(res.get("restitle", "")))
         wpage += f'<div class="vid-container dddd"><iframe title="{title_attr}" style="max-width:100%;margin-bottom:20px;" src="//www.youtube.com/embed/{video_id}" width="900" height="480"></iframe></div>'
-        wpage += f'<div class="{css_prefix}-spacer"></div>\n'
+        wpage += '<div class="seo-automation-spacer"></div>\n'
     
     # Handle snapshot/image insertion (PHP lines 327-463)
     if domain_data.get('showsnapshot') == 1 and check_image_src_gpt(html.unescape(seo_filter_text_custom(res.get('resfulltext', '')))) == 1:
@@ -1619,8 +1783,6 @@ def build_page_wp(
         wpage += linkedtexted
         wpage += '</div>\n'
     
-    wpage += '</div>\n'
-    
     # Related posts - drip content (bubbafeed) (PHP lines 879-917)
     if res.get('id'):
         bubba_sql = """
@@ -1632,8 +1794,8 @@ def build_page_wp(
         resbubba = db.fetch_all(bubba_sql, (res['id'],))
         
         if resbubba:
-            wpage += f'<div class="{css_prefix}-spacer"></div>\n'
-            wpage += f'<div class="{css_prefix}-container-wr-full">\n'
+            wpage += '<div class="seo-automation-spacer"></div>\n'
+            wpage += '<div class="seo-automation-container-wr-full">\n'
             
             for bubba in resbubba:
                 title = clean_title(seo_filter_text_custom(bubba.get('bubbatitle', '')))
@@ -1641,7 +1803,7 @@ def build_page_wp(
                 titlelink = to_ascii(html.unescape(titlelink))
                 resurl_bubba = linkdomain + '/' + seo_text_custom(titlelink) + '-' + str(bubba['id']) + 'dc'
                 
-                wpage += f'<div class="{css_prefix}-containerwr moinfomation">\n'
+                wpage += '<div class="seo-automation-containerwr moinfomation">\n'
                 wpage += f'<h2 class="h2"><a target="_top" title="{title}" href="{resurl_bubba}">{title}</a></h2>\n'
                 
                 bubbatext = strip_html(html.unescape(seo_filter_text_custom(bubba.get('resfulltext', ''))))
@@ -1649,7 +1811,7 @@ def build_page_wp(
                 bubbatext = bubbatext.replace('//gallery.imagehosting.space/gallery/', '//gallery.imagehosting.space/thumbs/')
                 wpage += bubbatext
                 wpage += '</div>\n'
-                wpage += f'<div class="{css_prefix}-spacer"></div>\n'
+                wpage += '<div class="seo-automation-spacer"></div>\n'
             
             wpage += '</div>\n'
     
@@ -1668,17 +1830,17 @@ def build_page_wp(
         
         if resrelated:
             wpage += '<h2 class="h1">Related Posts</h2>\n'
-            wpage += f'<div class="{css_prefix}-spacer"></div>\n'
-            wpage += f'<div class="{css_prefix}-container-wr-full">\n'
+            wpage += '<div class="seo-automation-spacer"></div>\n'
+            wpage += '<div class="seo-automation-container-wr-full">\n'
             
             for rel in resrelated:
                 resfulltext_rel = html.unescape(seo_filter_text_custom(rel.get('resfulltext', '')))
                 if len(resfulltext_rel) > 50:
-                    wpage += f'<div class="{css_prefix}-containerwr">\n'
+                    wpage += '<div class="seo-automation-containerwr">\n'
                     titledecoded = seo_filter_text_custom(rel.get('restitle', ''))
                     wpage += f'<h2 class="h2"><a target="_top" title="{titledecoded}" href="/">{titledecoded}</a></h2>\n'
                     wpage += resfulltext_rel
-                    wpage += f'<div class="{css_prefix}-spacer"></div>\n'
+                    wpage += '<div class="seo-automation-spacer"></div>\n'
                     
                     # Get bubbafeed for related article (PHP lines 977-1016)
                     bubba_rel_sql = """
@@ -1696,7 +1858,7 @@ def build_page_wp(
                             titlelink_rel = to_ascii(html.unescape(titlelink_rel))
                             resurl_bubba_rel = linkdomain + '/' + seo_text_custom(titlelink_rel) + '-' + str(bubba_rel['id']) + 'dc'
                             
-                            wpage += f'<div class="{css_prefix}-containerwr moinfomation">\n'
+                            wpage += '<div class="seo-automation-containerwr moinfomation">\n'
                             wpage += f'<h2 class="h2"><a target="_top" title="{title_rel}" href="{resurl_bubba_rel}">{title_rel}</a></h2>\n'
                             
                             bubbatext_rel = strip_html(html.unescape(seo_filter_text_custom(bubba_rel.get('resfulltext', ''))))
@@ -1704,7 +1866,7 @@ def build_page_wp(
                             bubbatext_rel = bubbatext_rel.replace('//gallery.imagehosting.space/gallery/', '//gallery.imagehosting.space/thumbs/')
                             wpage += bubbatext_rel
                             wpage += '</div>\n'
-                            wpage += f'<div class="{css_prefix}-spacer"></div>\n'
+                            wpage += '<div class="seo-automation-spacer"></div>\n'
                     
                     wpage += '</div>\n'
             
@@ -1746,7 +1908,7 @@ def build_page_wp(
                         map_val = 1
             
             if map_val == 1:
-                wpage += f'<div class="{css_prefix}-spacer"></div>\n'
+                wpage += '<div class="seo-automation-spacer"></div>\n'
                 wpage += '<div class="google-map">\n'
                 mpadd = ''
                 
@@ -1855,17 +2017,18 @@ def build_page_wp(
     wpage += article_links_html
     
     # Add premiumstyles.css and closing styles (matching build_bcpage_wp)
-    wpage += f'<div class="{css_prefix}-spacer"></div>\n'
-    wpage += f'<div class="{css_prefix}-tag-container" style="border-bottom:1px solid black; border-top:1px solid black;"></div>\n'
+    wpage += '<div class="seo-automation-spacer"></div>\n'
+    wpage += '<div class="seo-automation-tag-container" style="border-bottom:1px solid black; border-top:1px solid black;"></div>\n'
     wpage += '<link rel="stylesheet" id="SEO_Automation_premium_0_X-css" href="https://public.imagehosting.space/external_files/premiumstyles.css" type="text/css" media="all" />\n'
-    wpage += f'<div class="{css_prefix}-spacer"></div>\n'
+    wpage += '<div class="seo-automation-spacer"></div>\n'
+    
+    # #region agent log
+    div_counts_before_close = _count_divs(wpage)
+    _debug_log("content.py:build_page_wp", "Before closing main div", {"wpage_length": len(wpage), "div_counts": div_counts_before_close}, "A")
+    # #endregion
+    
     wpage += '</div>\n'
     wpage += '''<style>
-.wr-fulltext img {height: auto !important;min-width:100%;}
-@media (min-width: 992px){.wr-fulltext img {min-width:0;}}
-img {padding:10px;}
-h1:after, h2:after, h3:after, h4:after, h5:after, h6:after {display: none !important;clear: none !important;}
-h1, h2, h3, h4, h5, h6 {clear: none !important;}
 .ngodkrbsitr-spacer{clear:both;}
 .citation_map_container iframe {
 	width:130px !important;
@@ -1875,6 +2038,11 @@ h1, h2, h3, h4, h5, h6 {clear: none !important;}
 }
 </style>
 '''
+    
+    # #region agent log
+    div_counts_final = _count_divs(wpage)
+    _debug_log("content.py:build_page_wp", "Function exit", {"wpage_length": len(wpage), "div_counts": div_counts_final}, "A")
+    # #endregion
     
     return wpage
 
@@ -1932,12 +2100,9 @@ def build_bcpage_wp(
     else:
         resurl = dl + '/' + seo_slug(seo_filter_text_custom(res['restitle'])) + '-' + str(res['id']) + '/'
     
-    # Get CSS class prefix based on wp_plugin
-    css_prefix = get_css_class_prefix(domain_data.get('wp_plugin'))
-    
     # Start building page (PHP lines 239-240)
-    bcpage = f'<div class="{css_prefix}-main-table"><div class="{css_prefix}-spacer"></div>\n'
-    bcpage += f'<div class="{css_prefix}-top-container">\n'
+    bcpage = '<div class="ngodkrbsitr-main-table"><div class="seo-automation-spacer"></div>\n'
+    bcpage += '<div class="ngodkrbsitr-top-container">\n'
     
     # Build resurl for main keyword link (PHP lines 125-135)
     # PHP: if ($domain['status'] == 2 || $domain['status'] == 10)
@@ -1991,7 +2156,7 @@ def build_bcpage_wp(
     # Note: showgoogleplusone is not in domain_data, so we'll skip for now
     
     # PHP line 262: Spacer
-    bcpage += f'<div class="{css_prefix}-spacer"></div>\n'
+    bcpage += '<div class="ngodkrbsitr-spacer"></div>\n'
     
     # PHP lines 264-283: Video or image
     if not domain_data.get('wr_video'):
@@ -2033,7 +2198,7 @@ def build_bcpage_wp(
     bcpage += '</div>\n'
     
     # PHP lines 289-292: Spacer and "Additional Resources" header
-    bcpage += f'<div class="{css_prefix}-spacer"></div><div class="{css_prefix}-tag-container" style="border-bottom:0px solid black; border-top:0px solid black;height:10px;"></div>\n'
+    bcpage += '<div class="ngodkrbsitr-spacer"></div><div class="seo-automation-tag-container" style="border-bottom:0px solid black; border-top:0px solid black;height:10px;"></div>\n'
     bcpage += '<h3 style="text-align:left;font-size:18px;font-weight:bold;">Additional Resources:</h3>\n'
     
     # Additional Resources section (keyword links) - PHP lines 297-1337
@@ -2106,9 +2271,9 @@ def build_bcpage_wp(
                 bcdomain = link['domain_name'].split('.')
                 bcvardomain = bcdomain[0] if bcdomain else ''
                 
-                bcpage += f'<div class="{css_prefix}-container">\n'
+                bcpage += '<div class="ngodkrbsitr-container">\n'
                 # PHP line 894: Add spacer right after opening container (before H2)
-                bcpage += f'<div class="{css_prefix}-spacer"></div>\n'
+                bcpage += '<div class="ngodkrbsitr-spacer"></div>\n'
                 
                 # Determine link URL
                 haslinks_sql = "SELECT count(id) FROM bwp_link_placement WHERE deleted != 1 AND showondomainid = %s AND showonpgid = %s"
@@ -2614,7 +2779,7 @@ def build_bcpage_wp(
                         bcpage += '</div>\n'
                 
                 # PHP line 1336: Close container and add spacer
-                bcpage += f'</div><div class="{css_prefix}-spacer"></div>\n'
+                bcpage += '</div><div class="ngodkrbsitr-spacer"></div>\n'
     
     # Drip content links section
     linksdc_sql = """
@@ -2663,9 +2828,9 @@ def build_bcpage_wp(
             bcdomain = linkdc['domain_name'].split('.')
             bcvardomain = bcdomain[0] if bcdomain else ''
             
-            bcpage += f'<div class="{css_prefix}-container">\n'
+            bcpage += '<div class="ngodkrbsitr-container">\n'
             # PHP line 399: Add spacer right after opening container (before H2)
-            bcpage += f'<div class="{css_prefix}-spacer"></div>\n'
+            bcpage += '<div class="ngodkrbsitr-spacer"></div>\n'
             
             # Build link URL - match PHP logic exactly
             # PHP line 895-927: Complex conditional logic for drip content link URL
@@ -2838,7 +3003,7 @@ def build_bcpage_wp(
                 bcpage += '</div>\n'
             
             # PHP line 775: Close container and add spacer
-            bcpage += f'</div><div class="{css_prefix}-spacer"></div>\n'
+            bcpage += '</div><div class="ngodkrbsitr-spacer"></div>\n'
     
     # Add ArticleLinks (PHP line 1680: echo ArticleLinks($res['id']))
     # Get domain_category for ArticleLinks (it's the same as domain_data in this context)
@@ -2853,17 +3018,12 @@ def build_bcpage_wp(
     bcpage += article_links_html
     
     # Closing HTML
-    bcpage += f'<div class="{css_prefix}-spacer"></div>\n'
-    bcpage += f'<div class="{css_prefix}-tag-container" style="border-bottom:1px solid black; border-top:1px solid black;"></div>\n'
+    bcpage += '<div class="seo-automation-spacer"></div>\n'
+    bcpage += '<div class="seo-automation-tag-container" style="border-bottom:1px solid black; border-top:1px solid black;"></div>\n'
     bcpage += '<link rel="stylesheet" id="SEO_Automation_premium_0_X-css" href="https://public.imagehosting.space/external_files/premiumstyles.css" type="text/css" media="all" />\n'
-    bcpage += f'<div class="{css_prefix}-spacer"></div>\n'
+    bcpage += '<div class="seo-automation-spacer"></div>\n'
     bcpage += '</div>\n'
     bcpage += '''<style>
-.wr-fulltext img {height: auto !important;min-width:100%;}
-@media (min-width: 992px){.wr-fulltext img {min-width:0;}}
-img {padding:10px;}
-h1:after, h2:after, h3:after, h4:after, h5:after, h6:after {display: none !important;clear: none !important;}
-h1, h2, h3, h4, h5, h6 {clear: none !important;}
 .ngodkrbsitr-spacer{clear:both;}
 .citation_map_container iframe {
 	width:130px !important;
@@ -2919,12 +3079,9 @@ def build_bubba_page_wp(
     if not res:
         return ""
     
-    # Get CSS class prefix based on wp_plugin
-    css_prefix = get_css_class_prefix(domain_data.get('wp_plugin'))
-    
     # Build basic page HTML (placeholder - needs full implementation)
     import html
-    wpage = f'<div class="{css_prefix}-main-table">'
+    wpage = '<div class="seo-automation-main-table">'
     wpage += f'<h1>{clean_title(seo_filter_text_custom(res.get("bubbatitle", "")))}</h1>'
     
     if res.get('resfulltext'):
