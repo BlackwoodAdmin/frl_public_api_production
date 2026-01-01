@@ -2131,9 +2131,18 @@ def build_bcpage_wp(
     script_version_num = get_script_version_num(domain_data.get('script_version'))
     
     if domain_status_str in ['2', '10']:
-        # PHP: if($rd == 1 && $domain_category['script_version'] >= 3 && $domain_category['wp_plugin'] != 1 && $domain_category['iswin'] != 1 && $domain_category['usepurl'] != 0)
-        # For now, use CodeURL equivalent (simplified)
-        resurl = code_url(domainid, domain_data, domain_settings) + "?Action=1&amp;k=" + seo_slug(seo_filter_text_custom(res.get('restitle', ''))) + '&amp;PageID=' + str(res.get('id', ''))
+        # For WordPress plugins, always use WordPress URL structure (/slug-id/)
+        if domain_data.get('wp_plugin') == 1:
+            slug_text = seo_text_custom(res.get('restitle', ''))
+            slug_text = html.unescape(slug_text)
+            slug_text = to_ascii(slug_text)
+            slug_text = slug_text.lower()
+            slug_text = slug_text.replace(' ', '-')
+            resurl = dl + '/' + slug_text + '-' + str(res.get('id', '')) + '/'
+        else:
+            # PHP: if($rd == 1 && $domain_category['script_version'] >= 3 && $domain_category['wp_plugin'] != 1 && $domain_category['iswin'] != 1 && $domain_category['usepurl'] != 0)
+            # For now, use CodeURL equivalent (simplified)
+            resurl = code_url(domainid, domain_data, domain_settings) + "?Action=1&amp;k=" + seo_slug(seo_filter_text_custom(res.get('restitle', ''))) + '&amp;PageID=' + str(res.get('id', ''))
     else:
         resurl = dl
     
@@ -2155,7 +2164,16 @@ def build_bcpage_wp(
         if supportkwords:
             for support in supportkwords:
                 # PHP line 249-252: Build resurl1 for support keyword
-                if script_version_num >= 3 and domain_data.get('wp_plugin') != 1 and domain_data.get('iswin') != 1 and domain_data.get('usepurl') != 0:
+                # For WordPress plugins, always use WordPress URL structure (/slug-id/)
+                if domain_data.get('wp_plugin') == 1:
+                    # WordPress URL structure: /slug-id/
+                    slug_text = seo_text_custom(support['restitle'])
+                    slug_text = html.unescape(slug_text)
+                    slug_text = to_ascii(slug_text)
+                    slug_text = slug_text.lower()
+                    slug_text = slug_text.replace(' ', '-')
+                    resurl1 = dl + '/' + slug_text + '-' + str(support['id']) + '/'
+                elif script_version_num >= 3 and domain_data.get('wp_plugin') != 1 and domain_data.get('iswin') != 1 and domain_data.get('usepurl') != 0:
                     # Use vardomain format
                     cdomain = domain_data['domain_name'].split('.')
                     vardomain = cdomain[0] if cdomain else ''
