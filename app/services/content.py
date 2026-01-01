@@ -1189,12 +1189,16 @@ def link_keywords_in_content(
     append_unfound: bool = True
 ) -> str:
     """
-    Check if keywords are found in content, and append only unfound keywords as links at the end.
-    Keywords found in content are already linked by seo_automation_add_text_link_new.
-    Only keywords NOT found in content are appended at the end, separated by <br>.
+    Link keywords in content and append unfound keywords at the end.
+    This function replaces seo_automation_add_text_link_new for keyword linking.
+    
+    For each keyword:
+    - If found in content (outside of <a> tags and HTML tags), wrap it with <a> tag (max 2 per keyword)
+    - If not found, add to unfound list
+    - At the end, append all unfound keywords as links, separated by <br>
     
     Args:
-        content: HTML content (may already contain keyword links from seo_automation_add_text_link_new)
+        content: HTML content to process
         main_keyword: Main keyword text
         main_keyword_url: URL for main keyword (homepage)
         supporting_keywords: List of supporting keyword texts (max 2)
@@ -1202,7 +1206,7 @@ def link_keywords_in_content(
         append_unfound: If True, append unfound keywords as links at the end (only used for resfulltext)
     
     Returns:
-        Content with unfound keyword links appended at the end, separated by <br>
+        Content with keywords linked in-content and unfound keywords appended at the end
     """
     import html
     import re
@@ -1216,13 +1220,7 @@ def link_keywords_in_content(
     }, "A")
     # #endregion
     
-    if not content or not append_unfound:
-        # #region agent log
-        _debug_log("content.py:link_keywords_in_content", "Early return", {
-            "has_content": bool(content),
-            "append_unfound": append_unfound
-        }, "A")
-        # #endregion
+    if not content:
         return content
     
     # Limit supporting keywords to 2
@@ -1233,122 +1231,177 @@ def link_keywords_in_content(
     while len(supporting_keyword_urls) < len(supporting_keywords):
         supporting_keyword_urls.append('')
     
-    # Build list of keywords to check (main keyword first, then supporting)
-    keywords_to_check = []
+    # Build list of keywords to process (main keyword first, then supporting)
+    keywords_to_process = []
     if main_keyword and main_keyword_url:
-        keywords_to_check.append({
+        keywords_to_process.append({
             'text': main_keyword,
-            'url': main_keyword_url
+            'url': main_keyword_url,
+            'is_main': True
         })
     
     for i, supp_kw in enumerate(supporting_keywords):
         if supp_kw and i < len(supporting_keyword_urls) and supporting_keyword_urls[i]:
-            keywords_to_check.append({
+            keywords_to_process.append({
                 'text': supp_kw,
-                'url': supporting_keyword_urls[i]
+                'url': supporting_keyword_urls[i],
+                'is_main': False
             })
     
     # #region agent log
-    _debug_log("content.py:link_keywords_in_content", "Keywords to check", {
-        "keywords_to_check": [kw.get('text') for kw in keywords_to_check],
-        "keywords_count": len(keywords_to_check)
+    _debug_log("content.py:link_keywords_in_content", "Keywords to process", {
+        "keywords_to_process": [kw.get('text') for kw in keywords_to_process],
+        "keywords_count": len(keywords_to_process)
     }, "A")
     # #endregion
     
-    if not keywords_to_check:
+    if not keywords_to_process:
         return content
     
-    # Remove <a> tags and their content before searching for keywords
-    # This ensures we don't count keywords that are already inside links
-    content_without_links = re.sub(r'<a\b[^>]*>.*?</a>', '', content, flags=re.IGNORECASE | re.DOTALL)
+    # Process content: link keywords found in content (max 2 per keyword)
+    result = content
     
-    # Strip remaining HTML tags for case-insensitive keyword search
-    # We'll search in the plain text content (excluding text inside <a> tags)
-    content_text = re.sub(r'<[^>]+>', '', content_without_links)
-    
-    # #region agent log
-    _debug_log("content.py:link_keywords_in_content", "Content text (stripped HTML and links)", {
-        "content_text_length": len(content_text),
-        "content_text_preview": content_text[:200] if content_text else "",
-        "original_content_length": len(content),
-        "content_without_links_length": len(content_without_links)
-    }, "A")
-    # #endregion
-    
-    # Check which keywords are NOT found in the content (case-insensitive)
-    unfound_keywords = []
-    for kw_data in keywords_to_check:
-        kw_text = kw_data['text']
-        if not kw_text:
-            continue
-        
-        # Case-insensitive search for the keyword in plain text content
-        # Use word boundaries to avoid partial matches
-        pattern = re.escape(kw_text)
-        # Search case-insensitively
-        found = bool(re.search(pattern, content_text, re.IGNORECASE))
-        
-        # #region agent log
-        _debug_log("content.py:link_keywords_in_content", "Keyword search result", {
-            "keyword": kw_text,
-            "found": found,
-            "pattern": pattern
-        }, "A")
-        # #endregion
-        
-        if not found:
-            unfound_keywords.append(kw_data)
-    
-    # #region agent log
-    _debug_log("content.py:link_keywords_in_content", "Unfound keywords", {
-        "unfound_keywords": [kw.get('text') for kw in unfound_keywords],
-        "unfound_count": len(unfound_keywords)
-    }, "A")
-    # #endregion
-    
-    # Build links for unfound keywords only
-    if not unfound_keywords:
-        # #region agent log
-        _debug_log("content.py:link_keywords_in_content", "No unfound keywords, returning original content", {}, "A")
-        # #endregion
-        return content
-    
-    keyword_links = []
-    for kw_data in unfound_keywords:
+    # For main keyword: skip first 4000 characters (like seo_automation_add_text_link_new)
+    # For supporting keywords: process entire content
+    for kw_data in keywords_to_process:
         kw_text = kw_data['text']
         kw_url = kw_data['url']
+        is_main = kw_data.get('is_main', False)
         
         if not kw_text or not kw_url:
             continue
         
-        title_attr = html.escape(kw_text)
-        url_attr = html.escape(kw_url)
-        link_html = f'<a title="{title_attr}" href="{url_attr}">{kw_text}</a>'
-        keyword_links.append(link_html)
+        kw_clean = clean_title(kw_text)
+        escaped_kword = re.escape(kw_clean)
         
-        # #region agent log
-        _debug_log("content.py:link_keywords_in_content", "Built keyword link", {
-            "keyword": kw_text,
-            "link_html": link_html
-        }, "A")
-        # #endregion
+        if is_main:
+            # Skip first 4000 characters for main keyword
+            initial_text = result[:4000]
+            text_to_process = result[4000:]
+        else:
+            initial_text = ''
+            text_to_process = result
+        
+        # Find all HTML tags and existing <a> tags to build forbidden ranges
+        # This prevents linking keywords inside tags or existing links
+        forbidden_ranges = []
+        
+        # Find all <a> tags (including nested content)
+        for match in re.finditer(r'<a\b[^>]*>.*?</a>', text_to_process, re.IGNORECASE | re.DOTALL):
+            forbidden_ranges.append((match.start(), match.end()))
+        
+        # Find all HTML tags (opening, closing, self-closing)
+        for match in re.finditer(r'<[^>]+>', text_to_process):
+            forbidden_ranges.append((match.start(), match.end()))
+        
+        # Find all keyword matches (case-insensitive)
+        links_created = 0
+        max_links_per_keyword = 2
+        
+        def replace_callback(match):
+            nonlocal links_created
+            if links_created >= max_links_per_keyword:
+                return match.group(0)
+            
+            match_start = match.start()
+            match_end = match.end()
+            
+            # Check if this match is in a forbidden range
+            for forbidden_start, forbidden_end in forbidden_ranges:
+                if match_start >= forbidden_start and match_end <= forbidden_end:
+                    return match.group(0)  # Skip this match
+            
+            # This is a valid match - wrap it with <a> tag
+            links_created += 1
+            title_attr = html.escape(kw_clean)
+            url_attr = html.escape(kw_url)
+            return f' <a title="{title_attr}" href="{url_attr}">{match.group(0)}</a>'
+        
+        # Pattern to match keyword (word boundaries, case-insensitive)
+        pattern = rf'\b{escaped_kword}\b'
+        processed_text = re.sub(pattern, replace_callback, text_to_process, flags=re.IGNORECASE)
+        
+        if is_main:
+            result = initial_text + processed_text
+        else:
+            result = processed_text
     
-    # Append unfound keyword links at the end, separated by <br>
-    if keyword_links:
-        # Join links with <br> separator
-        links_html = '<br>'.join(keyword_links)
-        result = content + '<br><br>' + links_html
+    # Now check for unfound keywords (only if append_unfound is True)
+    if append_unfound:
+        # Remove <a> tags and their content before searching for unfound keywords
+        content_without_links = re.sub(r'<a\b[^>]*>.*?</a>', '', result, flags=re.IGNORECASE | re.DOTALL)
+        
+        # Strip remaining HTML tags for case-insensitive keyword search
+        content_text = re.sub(r'<[^>]+>', '', content_without_links)
         
         # #region agent log
-        _debug_log("content.py:link_keywords_in_content", "Appended links", {
-            "links_html": links_html,
-            "links_count": len(keyword_links),
-            "result_length": len(result),
-            "result_suffix": result[-200:] if len(result) > 200 else result
+        _debug_log("content.py:link_keywords_in_content", "Content text (stripped HTML and links) for unfound check", {
+            "content_text_length": len(content_text),
+            "content_text_preview": content_text[:200] if content_text else ""
         }, "A")
         # #endregion
-    else:
-        result = content
+        
+        # Check which keywords are NOT found in the content (case-insensitive)
+        unfound_keywords = []
+        for kw_data in keywords_to_process:
+            kw_text = kw_data['text']
+            if not kw_text:
+                continue
+            
+            # Case-insensitive search for the keyword in plain text content
+            pattern = re.escape(kw_text)
+            found = bool(re.search(pattern, content_text, re.IGNORECASE))
+            
+            # #region agent log
+            _debug_log("content.py:link_keywords_in_content", "Keyword search result for unfound check", {
+                "keyword": kw_text,
+                "found": found
+            }, "A")
+            # #endregion
+            
+            if not found:
+                unfound_keywords.append(kw_data)
+        
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Unfound keywords", {
+            "unfound_keywords": [kw.get('text') for kw in unfound_keywords],
+            "unfound_count": len(unfound_keywords)
+        }, "A")
+        # #endregion
+        
+        # Append unfound keyword links at the end, separated by <br>
+        if unfound_keywords:
+            keyword_links = []
+            for kw_data in unfound_keywords:
+                kw_text = kw_data['text']
+                kw_url = kw_data['url']
+                
+                if not kw_text or not kw_url:
+                    continue
+                
+                title_attr = html.escape(kw_text)
+                url_attr = html.escape(kw_url)
+                link_html = f'<a title="{title_attr}" href="{url_attr}">{kw_text}</a>'
+                keyword_links.append(link_html)
+            
+            if keyword_links:
+                # Join links with <br> separator
+                links_html = '<br>'.join(keyword_links)
+                result = result + '<br><br>' + links_html
+                
+                # #region agent log
+                _debug_log("content.py:link_keywords_in_content", "Appended unfound links", {
+                    "links_html": links_html,
+                    "links_count": len(keyword_links),
+                    "result_length": len(result)
+                }, "A")
+                # #endregion
+    
+    # #region agent log
+    _debug_log("content.py:link_keywords_in_content", "Function exit", {
+        "final_content_length": len(result)
+    }, "A")
+    # #endregion
     
     return result
 
@@ -2026,12 +2079,7 @@ def build_page_wp(
         else:
             theurl = res.get('linkouturl', '').replace('&amp;', '&')
         
-        # Add main keyword link (PHP line 487)
-        moneynofollow = ''
-        linkedtexted = seo_automation_add_text_link_new(linkedtexted, res.get('restitle', ''), theurl, moneynofollow)
-        
-        # Add support keyword links for SEOM/BRON (PHP lines 488-532)
-        # Also collect supporting keywords for content linking
+        # Collect supporting keywords for content linking
         supporting_keywords = []
         supporting_keyword_urls = []
         
@@ -2045,7 +2093,6 @@ def build_page_wp(
             for thesupport in thesupports:
                 # Build offsupportselfurl (simplified)
                 offsupportselfurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(thesupport['restitle'])) + '-' + str(thesupport['id']) + '/'
-                linkedtexted = seo_automation_add_text_link_new(linkedtexted, thesupport['restitle'], offsupportselfurl, moneynofollow)
                 # Collect for content linking (max 2)
                 if len(supporting_keywords) < 2:
                     supporting_keywords.append(thesupport['restitle'])
@@ -2059,7 +2106,6 @@ def build_page_wp(
             thesupports = db.fetch_all(support_sql, (bubbleid, domainid))
             for thesupport in thesupports:
                 thesupporturl = linkdomain + '/' + seo_slug(seo_filter_text_custom(thesupport['restitle'])) + '-' + str(thesupport['id']) + '/'
-                linkedtexted = seo_automation_add_text_link_new(linkedtexted, thesupport['restitle'], thesupporturl, moneynofollow)
                 # Collect for content linking (max 2)
                 if len(supporting_keywords) < 2:
                     supporting_keywords.append(thesupport['restitle'])
@@ -2073,7 +2119,6 @@ def build_page_wp(
                     mainkwurl = mainkw['linkouturl']
                 else:
                     mainkwurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(mainkw['restitle'])) + '-' + str(mainkw['id']) + '/'
-                linkedtexted = seo_automation_add_text_link_new(linkedtexted, mainkw['restitle'], mainkwurl.replace('&amp;', '&'), moneynofollow)
                 # Collect for content linking (max 2)
                 if len(supporting_keywords) < 2:
                     supporting_keywords.append(mainkw['restitle'])
@@ -2087,18 +2132,59 @@ def build_page_wp(
                 osupkw = db.fetch_row(osupkw_sql, (res.get('bubblefeedid', res.get('id', '')), res.get('restitle', '')))
                 if osupkw:
                     osupkwurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(osupkw['restitle'])) + '-' + str(osupkw['id']) + '/'
-                    linkedtexted = seo_automation_add_text_link_new(linkedtexted, osupkw['restitle'], osupkwurl.replace('&amp;', '&'), moneynofollow)
                     # Collect for content linking (max 2)
                     if len(supporting_keywords) < 2:
                         supporting_keywords.append(osupkw['restitle'])
                         supporting_keyword_urls.append(osupkwurl.replace('&amp;', '&'))
         
-        # Link keywords in content: main keyword → homepage, supporting keywords → their pages
-        main_keyword = res.get('restitle', '')
-        main_keyword_url = linkdomain + '/'  # Homepage
+        # Link keywords in content: the keyword matching the current page → homepage, others → their content pages
+        # link_keywords_in_content now handles both in-content linking and appending unfound keywords
+        current_page_keyword = res.get('restitle', '')
+        
+        # Determine the actual main keyword (not necessarily the current page)
+        # If we're on a supporting keyword page (support == 1), get main keyword from bubblefeedid
+        # Otherwise, the current page is the main keyword
+        if support == 1 and res.get('bubblefeedid'):
+            # We're on a supporting keyword page, get the main keyword
+            mainkw_sql = "SELECT restitle, id FROM bwp_bubblefeed WHERE id = %s"
+            mainkw = db.fetch_row(mainkw_sql, (res.get('bubblefeedid'),))
+            if mainkw:
+                actual_main_keyword = mainkw['restitle']
+                main_keyword_id = mainkw['id']
+            else:
+                actual_main_keyword = res.get('restitle', '')
+                main_keyword_id = bubbleid
+        else:
+            # We're on the main keyword page
+            actual_main_keyword = res.get('restitle', '')
+            main_keyword_id = bubbleid
+        
+        # Check if current page keyword matches a supporting keyword
+        current_is_supporting = False
+        supporting_keyword_index = -1
+        for i, supp_kw in enumerate(supporting_keywords):
+            if supp_kw and supp_kw.lower() == current_page_keyword.lower():
+                current_is_supporting = True
+                supporting_keyword_index = i
+                break
+        
+        # Determine URLs: keyword matching current page → homepage, others → their content pages
+        if current_is_supporting:
+            # Current page is a supporting keyword: that supporting keyword → homepage
+            supporting_keyword_urls[supporting_keyword_index] = linkdomain + '/'
+            # Main keyword → main keyword page
+            main_keyword_url = linkdomain + '/' + seo_slug(seo_filter_text_custom(actual_main_keyword)) + '-' + str(main_keyword_id) + '/'
+        elif current_page_keyword.lower() == actual_main_keyword.lower():
+            # Current page is the main keyword: main keyword → homepage
+            main_keyword_url = linkdomain + '/'  # Homepage
+            # Supporting keywords → their respective pages (already set correctly)
+        else:
+            # Fallback: main keyword → homepage
+            main_keyword_url = linkdomain + '/'
+        
         linkedtexted = link_keywords_in_content(
             content=linkedtexted,
-            main_keyword=main_keyword,
+            main_keyword=actual_main_keyword,
             main_keyword_url=main_keyword_url,
             supporting_keywords=supporting_keywords,
             supporting_keyword_urls=supporting_keyword_urls,
@@ -2125,8 +2211,6 @@ def build_page_wp(
         else:
             theurl = res.get('linkouturl', '').replace('&amp;', '&')
         
-        linkedtexted = seo_automation_add_text_link_new(linkedtexted, res.get('restitle', ''), theurl, moneynofollow)
-        
         # Get supporting keywords for content linking
         supporting_keywords = []
         supporting_keyword_urls = []
@@ -2142,12 +2226,37 @@ def build_page_wp(
                 supporting_keywords.append(thesupport['restitle'])
                 supporting_keyword_urls.append(thesupporturl)
         
-        # Link keywords in content: main keyword → homepage, supporting keywords → their pages
-        main_keyword = res.get('restitle', '')
-        main_keyword_url = linkdomain + '/'  # Homepage
+        # Link keywords in content: the keyword matching the current page → homepage, others → their content pages
+        # link_keywords_in_content now handles both in-content linking and appending unfound keywords
+        current_page_keyword = res.get('restitle', '')
+        
+        # For resshorttext, we're always on the main keyword page (not supporting)
+        actual_main_keyword = res.get('restitle', '')
+        main_keyword_id = bubbleid
+        
+        # Check if current page keyword matches a supporting keyword
+        current_is_supporting = False
+        supporting_keyword_index = -1
+        for i, supp_kw in enumerate(supporting_keywords):
+            if supp_kw and supp_kw.lower() == current_page_keyword.lower():
+                current_is_supporting = True
+                supporting_keyword_index = i
+                break
+        
+        # Determine URLs: keyword matching current page → homepage, others → their content pages
+        if current_is_supporting:
+            # Current page is a supporting keyword: that supporting keyword → homepage
+            supporting_keyword_urls[supporting_keyword_index] = linkdomain + '/'
+            # Main keyword → main keyword page
+            main_keyword_url = linkdomain + '/' + seo_slug(seo_filter_text_custom(actual_main_keyword)) + '-' + str(main_keyword_id) + '/'
+        else:
+            # Current page is the main keyword: main keyword → homepage
+            main_keyword_url = linkdomain + '/'  # Homepage
+            # Supporting keywords → their respective pages (already set correctly)
+        
         linkedtexted = link_keywords_in_content(
             content=linkedtexted,
-            main_keyword=main_keyword,
+            main_keyword=actual_main_keyword,
             main_keyword_url=main_keyword_url,
             supporting_keywords=supporting_keywords,
             supporting_keyword_urls=supporting_keyword_urls,
