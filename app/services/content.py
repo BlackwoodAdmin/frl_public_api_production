@@ -2134,16 +2134,16 @@ def build_bcpage_wp(
     
     if domain_status_str in ['2', '10']:
         # For WordPress plugins, always use WordPress URL structure
-        # Action=2 (feed pages) should be /slug-idbc/ (with bc suffix)
-        # Action=1 (main pages) should be /slug-id/ (no bc suffix)
+        # resurl is used for H1 link which should point to Action=1 (main page) - /slug-id/ (no bc suffix)
+        # Action=2 (feed pages) URLs with 'bc' suffix are built separately when linking TO feed pages
         if domain_data.get('wp_plugin') == 1:
             slug_text = seo_text_custom(res.get('restitle', ''))
             slug_text = html.unescape(slug_text)
             slug_text = to_ascii(slug_text)
             slug_text = slug_text.lower()
             slug_text = slug_text.replace(' ', '-')
-            # Action=2 pages need 'bc' suffix before trailing slash
-            resurl = dl + '/' + slug_text + '-' + str(res.get('id', '')) + 'bc/'
+            # H1 link points to main page (Action=1) - no 'bc' suffix
+            resurl = dl + '/' + slug_text + '-' + str(res.get('id', '')) + '/'
         else:
             # PHP: if($rd == 1 && $domain_category['script_version'] >= 3 && $domain_category['wp_plugin'] != 1 && $domain_category['iswin'] != 1 && $domain_category['usepurl'] != 0)
             # For now, use CodeURL equivalent (simplified)
