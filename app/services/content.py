@@ -318,7 +318,7 @@ def build_metaheader(
         metaKeywords = (metaKeywords + ' ' + city).strip()
     elif state:
         metaDesc = (state + ' - ' + st + ': ' + metaDesc).strip()
-        metaTitle = (state + ' - ' + metaTitle).strip().title() + ' - ' + domain_data.get('domain_name', '')
+        metaTitle = clean_title((state + ' - ' + metaTitle).strip()) + ' - ' + domain_data.get('domain_name', '')
         metaKeywords = (metaKeywords + ' ' + state + ', ' + metaKeywords + ' ' + st).strip()
     
     # Build metaheader HTML (PHP lines 1269-1288)
@@ -1040,23 +1040,44 @@ def seo_slug(text: str) -> str:
     return text
 
 
+def _has_capitalization(text: str) -> bool:
+    """
+    Check if a string already contains any uppercase letters.
+    Returns True if the string has any uppercase letters, False otherwise.
+    """
+    if not text:
+        return False
+    return any(c.isupper() for c in text)
+
+
 def clean_title(text: str) -> str:
     """Clean title for display (simplified version of seo_automation_clean_title)."""
     if text is None:
         return ''
     text = str(text)
-    text_lower = text.lower()
-    if text.strip() == text_lower.strip():
+    text_stripped = text.strip()
+    
+    # Check if text already has capitalization - if so, return as-is
+    if _has_capitalization(text_stripped):
+        return text_stripped
+    
+    text_lower = text_stripped.lower()
+    if text_stripped == text_lower:
         # Title case
-        return text.strip().title()
+        return text_stripped.title()
     else:
-        return text.strip()
+        return text_stripped
 
 
 def custom_ucfirst_words(text: str) -> str:
     """Capitalize first letter of each word (PHP customUcfirstWords)."""
     if not text:
         return ''
+    
+    # Check if text already has capitalization - if so, return as-is
+    if _has_capitalization(text):
+        return text
+    
     words = text.split()
     return ' '.join(word.capitalize() for word in words)
 
