@@ -1285,18 +1285,82 @@ def link_keywords_in_content(
         # #endregion
         
         # Filter out matches that are inside HTML tags or existing links
-        # Strategy: Find all HTML tags and their positions, then check if match is inside any tag
+        # Strategy: Find all <a> tags first, then check if match is inside any <a> tag's content
+        # Also find all other HTML tags and check if match is inside them
         valid_matches = []
         
-        # Find all HTML tags (opening and closing) with their positions
-        # Pattern matches: <tag>, </tag>, <tag attr="value">, etc.
-        tag_pattern = r'<[^>]+>'
-        all_tags = list(re.finditer(tag_pattern, result))
+        # Find all <a> tags with their positions (both opening and closing)
+        # Pattern matches: <a ...> and </a>
+        a_tag_pattern = r'<a\b[^>]*>|</a>'
+        a_tags = list(re.finditer(a_tag_pattern, result, re.IGNORECASE))
+        
+        # Build list of <a> tag ranges (start, end) where content is inside the link
+        a_tag_ranges = []
+        i = 0
+        while i < len(a_tags):
+            tag_match = a_tags[i]
+            tag_content = result[tag_match.start():tag_match.end()]
+            
+            if tag_content.lower().startswith('<a'):
+                # Opening <a> tag - find the corresponding </a>
+                a_start = tag_match.end()  # Content starts after the >
+                # Look for closing </a> after this opening tag
+                j = i + 1
+                while j < len(a_tags):
+                    next_tag = a_tags[j]
+                    next_tag_content = result[next_tag.start():next_tag.end()]
+                    if next_tag_content.lower() == '</a>':
+                        a_end = next_tag.start()  # Content ends before the </a>
+                        a_tag_ranges.append((a_start, a_end))
+                        i = j  # Skip to after the closing tag
+                        break
+                    j += 1
+            i += 1
+        
+        # Find all other HTML tags (not <a>) - these are self-closing or have content we should skip
+        # Pattern matches: <tag>, </tag>, <tag attr="value">, etc., but not <a> tags
+        other_tag_pattern = r'<(?!a\b|/a\b)[^>]+>'
+        other_tags = list(re.finditer(other_tag_pattern, result, re.IGNORECASE))
+        
+        # Build list of other tag ranges
+        other_tag_ranges = []
+        for tag_match in other_tags:
+            tag_start = tag_match.start()
+            tag_end = tag_match.end()
+            tag_content = result[tag_start:tag_end]
+            
+            # Check if it's a closing tag
+            if tag_content.startswith('</'):
+                # Closing tag - just mark the tag itself
+                other_tag_ranges.append((tag_start, tag_end))
+            else:
+                # Opening tag - check if it's self-closing or has a closing tag
+                tag_name_match = re.match(r'<(\w+)', tag_content)
+                if tag_name_match:
+                    tag_name = tag_name_match.group(1).lower()
+                    
+                    # Check if it's a self-closing tag (ends with />)
+                    if tag_content.rstrip().endswith('/>'):
+                        # Self-closing - just mark the tag itself
+                        other_tag_ranges.append((tag_start, tag_end))
+                    else:
+                        # Find the closing tag
+                        closing_tag_pattern = rf'</{re.escape(tag_name)}\s*>'
+                        closing_tag_match = re.search(closing_tag_pattern, result[tag_end:], re.IGNORECASE)
+                        if closing_tag_match:
+                            closing_tag_start = tag_end + closing_tag_match.start()
+                            closing_tag_end = tag_end + closing_tag_match.end()
+                            # Mark the entire range from opening tag to closing tag
+                            other_tag_ranges.append((tag_start, closing_tag_end))
+                        else:
+                            # No closing tag found - just mark the opening tag
+                            other_tag_ranges.append((tag_start, tag_end))
         
         # #region agent log
         _debug_log("content.py:link_keywords_in_content", "Found HTML tags", {
             "keyword": kw_text,
-            "total_tags": len(all_tags)
+            "a_tag_ranges": len(a_tag_ranges),
+            "other_tag_ranges": len(other_tag_ranges)
         }, "A")
         # #endregion
         
@@ -1305,71 +1369,29 @@ def link_keywords_in_content(
             end_pos = match.end()
             is_inside_tag = False
             
-            # Check if this match is inside any HTML tag
-            for tag_match in all_tags:
-                tag_start = tag_match.start()
-                tag_end = tag_match.end()
-                tag_content = result[tag_start:tag_end]
-                
-                # Check if match is inside this tag's content area
-                # For opening tags like <title>, <h1>, <a>, etc., check if match is between > and </tag>
-                if tag_content.startswith('<') and not tag_content.startswith('</'):
-                    # Opening tag - find the closing > and check for closing tag
-                    tag_name_match = re.match(r'<(\w+)', tag_content)
-                    if tag_name_match:
-                        tag_name = tag_name_match.group(1).lower()
-                        
-                        # Find the closing > of this opening tag
-                        tag_close_pos = tag_end - 1  # tag_end is after the >
-                        
-                        # Find the corresponding closing tag </tagname>
-                        closing_tag_pattern = rf'</{re.escape(tag_name)}\s*>'
-                        closing_tag_match = re.search(closing_tag_pattern, result[tag_close_pos+1:], re.IGNORECASE)
-                        
-                        if closing_tag_match:
-                            closing_tag_start = tag_close_pos + 1 + closing_tag_match.start()
-                            closing_tag_end = tag_close_pos + 1 + closing_tag_match.end()
-                            
-                            # Check if our match is between the opening tag's > and the closing tag's <
-                            if tag_close_pos < start_pos < closing_tag_start:
-                                # Match is inside this tag's content
-                                is_inside_tag = True
-                                
-                                # #region agent log
-                                _debug_log("content.py:link_keywords_in_content", "Skipping match inside HTML tag", {
-                                    "keyword": kw_text,
-                                    "position": start_pos,
-                                    "tag_name": tag_name,
-                                    "tag_start": tag_start,
-                                    "tag_end": tag_end,
-                                    "closing_tag_start": closing_tag_start
-                                }, "A")
-                                # #endregion
-                                break
-                        else:
-                            # Self-closing tag or tag without closing tag (like <img>, <br>, etc.)
-                            # If match is inside the tag itself (between < and >), skip it
-                            if tag_start < start_pos < tag_end:
-                                is_inside_tag = True
-                                
-                                # #region agent log
-                                _debug_log("content.py:link_keywords_in_content", "Skipping match inside self-closing tag", {
-                                    "keyword": kw_text,
-                                    "position": start_pos,
-                                    "tag_content": tag_content
-                                }, "A")
-                                # #endregion
-                                break
-                elif tag_content.startswith('</'):
-                    # Closing tag - if match is inside the closing tag itself, skip
-                    if tag_start < start_pos < tag_end:
+            # Check if match is inside any <a> tag's content
+            for a_start, a_end in a_tag_ranges:
+                if a_start <= start_pos < a_end:
+                    is_inside_tag = True
+                    # #region agent log
+                    _debug_log("content.py:link_keywords_in_content", "Skipping match inside <a> tag", {
+                        "keyword": kw_text,
+                        "position": start_pos,
+                        "a_tag_range": (a_start, a_end)
+                    }, "A")
+                    # #endregion
+                    break
+            
+            # Check if match is inside any other HTML tag
+            if not is_inside_tag:
+                for tag_start, tag_end in other_tag_ranges:
+                    if tag_start <= start_pos < tag_end:
                         is_inside_tag = True
-                        
                         # #region agent log
-                        _debug_log("content.py:link_keywords_in_content", "Skipping match inside closing tag", {
+                        _debug_log("content.py:link_keywords_in_content", "Skipping match inside HTML tag", {
                             "keyword": kw_text,
                             "position": start_pos,
-                            "tag_content": tag_content
+                            "tag_range": (tag_start, tag_end)
                         }, "A")
                         # #endregion
                         break
