@@ -1624,22 +1624,43 @@ def build_page_wp(
         # #endregion
         logger.info(f"build_page_wp main query result: res_found={res is not None}, res_id={res.get('id') if res else None}")
         
-        # Diagnostic: Check if record exists at all (even if deleted)
+        # PHP Article.php lines 722-730: If not found in bwp_bubblefeed and domain is SEOM or BRON, check bwp_bubblefeedsupport
         if not res:
-            diag_sql = "SELECT id, domainid, deleted, restitle FROM bwp_bubblefeed WHERE id = %s"
-            diag_res = db.fetch_row(diag_sql, (bubbleid,))
-            logger.warning(f"build_page_wp diagnostic: Record with id={bubbleid} exists: {diag_res is not None}, if exists: domainid={diag_res.get('domainid') if diag_res else None}, deleted={diag_res.get('deleted') if diag_res else None}, restitle={diag_res.get('restitle') if diag_res else None}")
+            servicetype = domain_data.get('servicetype')
+            if is_seom(servicetype) or is_bron(servicetype):
+                support_sql = """
+                    SELECT b.id, b.restitle, b.title, b.resfulltext, b.resshorttext, b.linkouturl, b.resaddress, 
+                           b.resgooglemaps, b.resphone, b.resvideo, b.resname, b.bubblefeedid,
+                           b.resgoogle, b.resfb, b.resx, b.reslinkedin, b.resinstagram, b.restiktok, b.respinterest,
+                           IFNULL(c.id, '') AS categoryid, IFNULL(c.category, '') AS category
+                    FROM bwp_bubblefeedsupport b
+                    LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
+                    WHERE b.id = %s AND b.domainid = %s
+                """
+                logger.info(f"build_page_wp checking bwp_bubblefeedsupport: bubbleid={bubbleid}, domainid={domainid}, servicetype={servicetype}")
+                res = db.fetch_row(support_sql, (bubbleid, domainid))
+                if res:
+                    support = 1
+                    logger.info(f"build_page_wp found in bwp_bubblefeedsupport: id={res.get('id') if res else None}, restitle={res.get('restitle') if res else None}")
+                else:
+                    logger.warning(f"build_page_wp not found in bwp_bubblefeedsupport either")
             
-            # Check if keyword exists for this domain
-            if keyword:
-                keyword_sql = "SELECT id, restitle, deleted FROM bwp_bubblefeed WHERE restitle = %s AND domainid = %s"
-                keyword_res = db.fetch_row(keyword_sql, (keyword, domainid))
-                logger.warning(f"build_page_wp diagnostic: Record with restitle='{keyword}' and domainid={domainid} exists: {keyword_res is not None}, if exists: id={keyword_res.get('id') if keyword_res else None}, deleted={keyword_res.get('deleted') if keyword_res else None}")
-            
-            # Check if pageid might be in bwp_bubbafeed
-            bubba_sql = "SELECT id, domainid, deleted, bubbatitle FROM bwp_bubbafeed WHERE id = %s"
-            bubba_res = db.fetch_row(bubba_sql, (bubbleid,))
-            logger.warning(f"build_page_wp diagnostic: Record with id={bubbleid} in bwp_bubbafeed exists: {bubba_res is not None}, if exists: domainid={bubba_res.get('domainid') if bubba_res else None}, deleted={bubba_res.get('deleted') if bubba_res else None}, bubbatitle={bubba_res.get('bubbatitle') if bubba_res else None}")
+            # Diagnostic: Check if record exists at all (even if deleted)
+            if not res:
+                diag_sql = "SELECT id, domainid, deleted, restitle FROM bwp_bubblefeed WHERE id = %s"
+                diag_res = db.fetch_row(diag_sql, (bubbleid,))
+                logger.warning(f"build_page_wp diagnostic: Record with id={bubbleid} exists: {diag_res is not None}, if exists: domainid={diag_res.get('domainid') if diag_res else None}, deleted={diag_res.get('deleted') if diag_res else None}, restitle={diag_res.get('restitle') if diag_res else None}")
+                
+                # Check if keyword exists for this domain
+                if keyword:
+                    keyword_sql = "SELECT id, restitle, deleted FROM bwp_bubblefeed WHERE restitle = %s AND domainid = %s"
+                    keyword_res = db.fetch_row(keyword_sql, (keyword, domainid))
+                    logger.warning(f"build_page_wp diagnostic: Record with restitle='{keyword}' and domainid={domainid} exists: {keyword_res is not None}, if exists: id={keyword_res.get('id') if keyword_res else None}, deleted={keyword_res.get('deleted') if keyword_res else None}")
+                
+                # Check if pageid might be in bwp_bubbafeed
+                bubba_sql = "SELECT id, domainid, deleted, bubbatitle FROM bwp_bubbafeed WHERE id = %s"
+                bubba_res = db.fetch_row(bubba_sql, (bubbleid,))
+                logger.warning(f"build_page_wp diagnostic: Record with id={bubbleid} in bwp_bubbafeed exists: {bubba_res is not None}, if exists: domainid={bubba_res.get('domainid') if bubba_res else None}, deleted={bubba_res.get('deleted') if bubba_res else None}, bubbatitle={bubba_res.get('bubbatitle') if bubba_res else None}")
     
     # Fallback: try to find by keyword (PHP lines 97-108)
     if not res and keyword:
