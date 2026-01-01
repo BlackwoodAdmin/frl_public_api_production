@@ -1543,7 +1543,23 @@ def build_page_wp(
     from datetime import datetime, timedelta
     import random
     
+    # #region agent log
+    _debug_log("content.py:build_page_wp", "Function entry", {
+        "bubbleid": bubbleid,
+        "domainid": domainid,
+        "keyword": keyword,
+        "bubbleid_is_falsy": not bubbleid,
+        "domainid_is_falsy": not domainid
+    }, "A")
+    # #endregion
+    
     if not bubbleid or not domainid:
+        # #region agent log
+        _debug_log("content.py:build_page_wp", "Early return: bubbleid or domainid is falsy", {
+            "bubbleid": bubbleid,
+            "domainid": domainid
+        }, "A")
+        # #endregion
         return ""
     
     # Get bubblefeed data - handle multiple scenarios (PHP lines 52-108)
@@ -1587,12 +1603,21 @@ def build_page_wp(
                    b.categoryid AS bubblecategoryid, b.resphone, b.resvideo, b.resaddress, 
                    b.resgooglemaps, b.resname, b.resgoogle, b.resfb, b.resx, b.reslinkedin, 
                    b.resinstagram, b.restiktok, b.respinterest,
-                   IFNULL(c.id, '') AS categoryid, IFNULL(c.category, '') AS category, c.bubblefeedid
+                   IFNULL(c.id, '') AS categoryid, IFNULL(c.category, '') AS category, 
+                   IFNULL(c.bubblefeedid, '') AS bubblefeedid
             FROM bwp_bubblefeed b
             LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
             WHERE b.id = %s AND b.domainid = %s AND b.deleted != 1
         """
         res = db.fetch_row(sql, (bubbleid, domainid))
+        # #region agent log
+        _debug_log("content.py:build_page_wp", "Main query by bubbleid result", {
+            "bubbleid": bubbleid,
+            "domainid": domainid,
+            "res_found": res is not None,
+            "res_id": res.get('id') if res else None
+        }, "A")
+        # #endregion
     
     # Fallback: try to find by keyword (PHP lines 97-108)
     if not res and keyword:
@@ -1600,14 +1625,37 @@ def build_page_wp(
             SELECT b.id, b.restitle, b.title, b.resfulltext, b.resshorttext, b.linkouturl, 
                    b.resphone, b.resvideo, b.resaddress, b.resgooglemaps, b.resname, b.NoContent,
                    b.resgoogle, b.resfb, b.resx, b.reslinkedin, b.resinstagram, b.restiktok, b.respinterest,
-                   IFNULL(c.id, '') AS categoryid, IFNULL(c.category, '') AS category, c.bubblefeedid
+                   IFNULL(c.id, '') AS categoryid, IFNULL(c.category, '') AS category, 
+                   IFNULL(c.bubblefeedid, '') AS bubblefeedid
             FROM bwp_bubblefeed b
             LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
             WHERE b.restitle = %s AND b.domainid = %s AND b.deleted != 1
         """
         res = db.fetch_row(sql, (keyword, domainid))
+        # #region agent log
+        _debug_log("content.py:build_page_wp", "Keyword fallback query result", {
+            "keyword": keyword,
+            "res_found": res is not None,
+            "res_id": res.get('id') if res else None
+        }, "A")
+        # #endregion
+    
+    # #region agent log
+    _debug_log("content.py:build_page_wp", "After all database queries", {
+        "res_found": res is not None,
+        "res_id": res.get('id') if res else None,
+        "res_restitle": res.get('restitle') if res else None
+    }, "A")
+    # #endregion
     
     if not res:
+        # #region agent log
+        _debug_log("content.py:build_page_wp", "Early return: res not found", {
+            "bubbleid": bubbleid,
+            "keyword": keyword,
+            "domainid": domainid
+        }, "A")
+        # #endregion
         return ""
     
     # Build link domain (PHP lines 208-232)
@@ -1644,11 +1692,22 @@ def build_page_wp(
             resurl = '/'
     
     # Start building page (PHP line 136)
+    # #region agent log
+    _debug_log("content.py:build_page_wp", "Checking resourcesactive", {
+        "resourcesactive": domain_data.get('resourcesactive'),
+        "resourcesactive_is_1": domain_data.get('resourcesactive') == 1
+    }, "A")
+    # #endregion
     if domain_data.get('resourcesactive') != 1:
+        # #region agent log
+        _debug_log("content.py:build_page_wp", "Early return: resourcesactive != 1", {
+            "resourcesactive": domain_data.get('resourcesactive')
+        }, "A")
+        # #endregion
         return '<p>This feature is not available for your current package. Please upgrade your package. [ID-01]</p>'
     
     # #region agent log
-    _debug_log("content.py:build_page_wp", "Function entry", {"bubbleid": bubbleid, "domainid": domainid}, "A")
+    _debug_log("content.py:build_page_wp", "After resourcesactive check", {"proceeding": True}, "A")
     # #endregion
     
     # Get CSS class prefix based on wp_plugin
