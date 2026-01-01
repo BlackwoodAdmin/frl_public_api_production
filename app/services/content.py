@@ -1180,6 +1180,98 @@ def seo_automation_add_text_link_newbc(text: str = '', kword: str = '', iurl: st
         return text
 
 
+def link_keywords_in_content(
+    content: str,
+    main_keyword: str,
+    main_keyword_url: str,
+    supporting_keywords: list,
+    supporting_keyword_urls: list
+) -> str:
+    """
+    Search content for exact matches of main keyword and supporting keywords,
+    and wrap them in <a> tags pointing to their respective URLs.
+    
+    Args:
+        content: HTML content to search
+        main_keyword: Main keyword text to search for
+        main_keyword_url: URL for main keyword (homepage)
+        supporting_keywords: List of supporting keyword texts (max 2)
+        supporting_keyword_urls: List of URLs for supporting keywords
+    
+    Returns:
+        Content with keywords wrapped in <a> tags
+    """
+    import re
+    import html
+    
+    if not content or not main_keyword:
+        return content
+    
+    # Limit supporting keywords to 2
+    supporting_keywords = supporting_keywords[:2] if supporting_keywords else []
+    supporting_keyword_urls = supporting_keyword_urls[:2] if supporting_keyword_urls else []
+    
+    # Ensure we have URLs for all supporting keywords
+    while len(supporting_keyword_urls) < len(supporting_keywords):
+        supporting_keyword_urls.append('')
+    
+    # Build list of keywords to search for (main keyword first, then supporting)
+    keywords_to_link = []
+    if main_keyword:
+        keywords_to_link.append({
+            'text': main_keyword,
+            'url': main_keyword_url
+        })
+    
+    for i, supp_kw in enumerate(supporting_keywords):
+        if supp_kw and i < len(supporting_keyword_urls) and supporting_keyword_urls[i]:
+            keywords_to_link.append({
+                'text': supp_kw,
+                'url': supporting_keyword_urls[i]
+            })
+    
+    if not keywords_to_link:
+        return content
+    
+    # Process each keyword (in reverse order of length to avoid partial matches)
+    # Sort by length descending to process longer keywords first
+    keywords_to_link.sort(key=lambda x: len(x['text']), reverse=True)
+    
+    result = content
+    
+    for kw_data in keywords_to_link:
+        kw_text = kw_data['text']
+        kw_url = kw_data['url']
+        
+        if not kw_text or not kw_url:
+            continue
+        
+        # Escape the keyword for regex
+        escaped_kw = re.escape(kw_text)
+        
+        # Pattern to match keyword, but skip if inside <a> tags or other HTML tags
+        # This pattern matches:
+        # - <a> tags and their content (skip)
+        # - Other HTML tags (skip)
+        # - The keyword as a whole word (match)
+        pattern = rf'(?:<a\b[^>]*>.*?</a>|<[^>]+>|\b{escaped_kw}\b)'
+        
+        def replace_callback(match):
+            match_str = match.group(0)
+            # Check if this is the keyword (not an HTML tag) - exact case-sensitive match
+            if not match_str.startswith('<') and match_str == kw_text:
+                # Escape the keyword text for HTML attribute
+                title_attr = html.escape(kw_text)
+                url_attr = html.escape(kw_url)
+                return f'<a title="{title_attr}" href="{url_attr}">{match_str}</a>'
+            return match_str
+        
+        # Replace all occurrences (case-sensitive exact match)
+        result = re.sub(pattern, replace_callback, result)
+    
+    return result
+
+
 def insert_after_first_heading(html_string: str, string_to_insert: str) -> str:
     """
     Insert string after the second heading tag (PHP insertAfterFirstHeading).
@@ -1858,6 +1950,10 @@ def build_page_wp(
         linkedtexted = seo_automation_add_text_link_new(linkedtexted, res.get('restitle', ''), theurl, moneynofollow)
         
         # Add support keyword links for SEOM/BRON (PHP lines 488-532)
+        # Also collect supporting keywords for content linking
+        supporting_keywords = []
+        supporting_keyword_urls = []
+        
         if offdomainid != 0:
             # Support keywords for offsite (PHP lines 488-504)
             support_sql = """
@@ -1869,6 +1965,10 @@ def build_page_wp(
                 # Build offsupportselfurl (simplified)
                 offsupportselfurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(thesupport['restitle'])) + '-' + str(thesupport['id']) + '/'
                 linkedtexted = seo_automation_add_text_link_new(linkedtexted, thesupport['restitle'], offsupportselfurl, moneynofollow)
+                # Collect for content linking (max 2)
+                if len(supporting_keywords) < 2:
+                    supporting_keywords.append(thesupport['restitle'])
+                    supporting_keyword_urls.append(offsupportselfurl)
         elif support == 0 and is_seom(domain_data.get('servicetype')):
             # Support keywords for SEOM (PHP lines 505-512)
             support_sql = """
@@ -1879,6 +1979,10 @@ def build_page_wp(
             for thesupport in thesupports:
                 thesupporturl = linkdomain + '/' + seo_slug(seo_filter_text_custom(thesupport['restitle'])) + '-' + str(thesupport['id']) + '/'
                 linkedtexted = seo_automation_add_text_link_new(linkedtexted, thesupport['restitle'], thesupporturl, moneynofollow)
+                # Collect for content linking (max 2)
+                if len(supporting_keywords) < 2:
+                    supporting_keywords.append(thesupport['restitle'])
+                    supporting_keyword_urls.append(thesupporturl)
         elif support != 0 and (is_seom(domain_data.get('servicetype')) or is_bron(domain_data.get('servicetype'))):
             # Support keywords for support page (PHP lines 515-532)
             mainkw_sql = "SELECT restitle, linkouturl, id FROM bwp_bubblefeed WHERE id = %s"
@@ -1889,6 +1993,10 @@ def build_page_wp(
                 else:
                     mainkwurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(mainkw['restitle'])) + '-' + str(mainkw['id']) + '/'
                 linkedtexted = seo_automation_add_text_link_new(linkedtexted, mainkw['restitle'], mainkwurl.replace('&amp;', '&'), moneynofollow)
+                # Collect for content linking (max 2)
+                if len(supporting_keywords) < 2:
+                    supporting_keywords.append(mainkw['restitle'])
+                    supporting_keyword_urls.append(mainkwurl.replace('&amp;', '&'))
                 
                 # Get other support keyword
                 osupkw_sql = """
@@ -1899,6 +2007,21 @@ def build_page_wp(
                 if osupkw:
                     osupkwurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(osupkw['restitle'])) + '-' + str(osupkw['id']) + '/'
                     linkedtexted = seo_automation_add_text_link_new(linkedtexted, osupkw['restitle'], osupkwurl.replace('&amp;', '&'), moneynofollow)
+                    # Collect for content linking (max 2)
+                    if len(supporting_keywords) < 2:
+                        supporting_keywords.append(osupkw['restitle'])
+                        supporting_keyword_urls.append(osupkwurl.replace('&amp;', '&'))
+        
+        # Link keywords in content: main keyword → homepage, supporting keywords → their pages
+        main_keyword = res.get('restitle', '')
+        main_keyword_url = linkdomain + '/'  # Homepage
+        linkedtexted = link_keywords_in_content(
+            content=linkedtexted,
+            main_keyword=main_keyword,
+            main_keyword_url=main_keyword_url,
+            supporting_keywords=supporting_keywords,
+            supporting_keyword_urls=supporting_keyword_urls
+        )
         
         # Wrap content in wr-fulltext div to allow text wrapping around images
         wpage += '<div class="wr-fulltext">\n'
@@ -1921,6 +2044,33 @@ def build_page_wp(
             theurl = res.get('linkouturl', '').replace('&amp;', '&')
         
         linkedtexted = seo_automation_add_text_link_new(linkedtexted, res.get('restitle', ''), theurl, moneynofollow)
+        
+        # Get supporting keywords for content linking
+        supporting_keywords = []
+        supporting_keyword_urls = []
+        if support == 0 and is_seom(domain_data.get('servicetype')):
+            # Support keywords for SEOM
+            support_sql = """
+                SELECT id, restitle FROM bwp_bubblefeedsupport 
+                WHERE bubblefeedid = %s AND domainid = %s AND deleted != 1 AND LENGTH(resfulltext) > 300
+            """
+            thesupports = db.fetch_all(support_sql, (bubbleid, domainid))
+            for thesupport in thesupports[:2]:  # Limit to 2
+                thesupporturl = linkdomain + '/' + seo_slug(seo_filter_text_custom(thesupport['restitle'])) + '-' + str(thesupport['id']) + '/'
+                supporting_keywords.append(thesupport['restitle'])
+                supporting_keyword_urls.append(thesupporturl)
+        
+        # Link keywords in content: main keyword → homepage, supporting keywords → their pages
+        main_keyword = res.get('restitle', '')
+        main_keyword_url = linkdomain + '/'  # Homepage
+        linkedtexted = link_keywords_in_content(
+            content=linkedtexted,
+            main_keyword=main_keyword,
+            main_keyword_url=main_keyword_url,
+            supporting_keywords=supporting_keywords,
+            supporting_keyword_urls=supporting_keyword_urls
+        )
+        
         # Wrap content in wr-fulltext div to allow text wrapping around images
         wpage += '<div class="wr-fulltext">\n'
         wpage += linkedtexted
@@ -2287,6 +2437,8 @@ def build_bcpage_wp(
     isSEOM_val = is_seom(servicetype)
     isBRON_val = is_bron(servicetype)
     
+    # Initialize supportkwords for use in keyword linking later
+    supportkwords = []
     if isSEOM_val or isBRON_val:
         support_sql = """
             SELECT restitle, id FROM bwp_bubblefeedsupport 
@@ -2363,7 +2515,49 @@ def build_bcpage_wp(
     # PHP line 285: Output shorttext
     if shorttext:
         shorttext = html.unescape(str(shorttext))
-        bcpage += seo_filter_text_custom(shorttext) + '\n'
+        shorttext = seo_filter_text_custom(shorttext)
+        
+        # Link keywords in content: main keyword → homepage, supporting keywords → their pages
+        # Get supporting keywords (max 2) for content linking
+        supporting_keywords = []
+        supporting_keyword_urls = []
+        if (isSEOM_val or isBRON_val) and supportkwords:
+            for support in supportkwords[:2]:  # Limit to 2
+                # Build URL for supporting keyword (same logic as above)
+                if domain_data.get('wp_plugin') == 1:
+                    slug_text = seo_text_custom(support['restitle'])
+                    slug_text = html.unescape(slug_text)
+                    slug_text = to_ascii(slug_text)
+                    slug_text = slug_text.lower()
+                    slug_text = slug_text.replace(' ', '-')
+                    suppurl = dl + '/' + slug_text + '-' + str(support['id']) + '/'
+                elif script_version_num >= 3 and domain_data.get('wp_plugin') != 1 and domain_data.get('iswin') != 1 and domain_data.get('usepurl') != 0:
+                    # Use vardomain format
+                    cdomain = domain_data['domain_name'].split('.')
+                    vardomain = cdomain[0] if cdomain else ''
+                    slug_text = seo_text_custom(support['restitle'])
+                    slug_text = html.unescape(slug_text)
+                    slug_text = to_ascii(slug_text)
+                    slug_text = slug_text.lower()
+                    slug_text = slug_text.replace(' ', '-')
+                    suppurl = dl + '/' + vardomain + '/' + slug_text + '/' + str(support['id']) + '/'
+                else:
+                    # Use CodeURL
+                    suppurl = code_url(domainid, domain_data, domain_settings) + "?Action=1&k=" + seo_slug(seo_filter_text_custom(support['restitle'])) + '&PageID=' + str(support['id'])
+                supporting_keywords.append(support['restitle'])
+                supporting_keyword_urls.append(suppurl)
+        
+        main_keyword = res.get('restitle', '')
+        main_keyword_url = dl + '/'  # Homepage
+        shorttext = link_keywords_in_content(
+            content=shorttext,
+            main_keyword=main_keyword,
+            main_keyword_url=main_keyword_url,
+            supporting_keywords=supporting_keywords,
+            supporting_keyword_urls=supporting_keyword_urls
+        )
+        
+        bcpage += shorttext + '\n'
     
     # PHP line 286: Close ngodkrbsitr-top-container
     bcpage += '</div>\n'
