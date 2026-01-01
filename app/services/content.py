@@ -66,6 +66,18 @@ def get_script_version_num(script_version) -> float:
         return 0.0
 
 
+def get_css_class_prefix(wp_plugin: int) -> str:
+    """
+    Get CSS class prefix based on wp_plugin flag.
+    WordPress plugins (wp_plugin == 1) use 'seo-automation-*'
+    PHP plugins (wp_plugin != 1) use 'ngodkrbsitr-*'
+    """
+    if wp_plugin == 1:
+        return 'seo-automation'
+    else:
+        return 'ngodkrbsitr'
+
+
 def get_header_footer(domainid: int, domain_status: Any, keyword: str = '', category: str = '', alttemplate: Optional[int] = None) -> Dict[str, Any]:
     """
     Get header and footer HTML from database templates.
@@ -1639,8 +1651,11 @@ def build_page_wp(
     _debug_log("content.py:build_page_wp", "Function entry", {"bubbleid": bubbleid, "domainid": domainid}, "A")
     # #endregion
     
-    wpage = '<div class="seo-automation-main-table" style="margin-left:auto;margin-right:auto;display:block;">\n'
-    wpage += '<div class="seo-automation-spacer"></div>\n'
+    # Get CSS class prefix based on wp_plugin
+    css_prefix = get_css_class_prefix(domain_data.get('wp_plugin', 0))
+    
+    wpage = f'<div class="{css_prefix}-main-table" style="margin-left:auto;margin-right:auto;display:block;">\n'
+    wpage += f'<div class="{css_prefix}-spacer"></div>\n'
     
     # #region agent log
     div_counts = _count_divs(wpage)
@@ -1650,12 +1665,12 @@ def build_page_wp(
     # Check if resfulltext contains Bootstrap container classes and add Bootstrap CSS/JS if needed (PHP lines 266-275)
     resfulltext = res.get('resfulltext', '')
     if resfulltext and 'container justify-content-center' in resfulltext.lower():
-        wpage += '''
+        wpage += f'''
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
 
-<style>.wr-fulltext img {height: auto !important;min-width:100%;}@media (min-width: 992px){.wr-fulltext img {min-width:0;}}.container.justify-content-center {max-width:100%;margin-bottom:15px;}.ngodkrbsitr-spacer{clear:both;}.seo-automation-main-table h1:after, .seo-automation-main-table h2:after, .seo-automation-main-table h3:after, .seo-automation-main-table h4:after, .seo-automation-main-table h5:after, .seo-automation-main-table h6:after {display: none !important;clear: none !important;} .seo-automation-main-table h1, .seo-automation-main-table h2, .seo-automation-main-table h3, .seo-automation-main-table h4, .seo-automation-main-table h5, .seo-automation-main-table h6 {clear: none !important;}.seo-automation-main-table .row .col-md-6 {	/* display:list-item; */ } </style>
+<style>.wr-fulltext img {{height: auto !important;min-width:100%;}}@media (min-width: 992px){{.wr-fulltext img {{min-width:0;}}}}.container.justify-content-center {{max-width:100%;margin-bottom:15px;}}.{css_prefix}-spacer{{clear:both;}}.{css_prefix}-main-table h1:after, .{css_prefix}-main-table h2:after, .{css_prefix}-main-table h3:after, .{css_prefix}-main-table h4:after, .{css_prefix}-main-table h5:after, .{css_prefix}-main-table h6:after {{display: none !important;clear: none !important;}} .{css_prefix}-main-table h1, .{css_prefix}-main-table h2, .{css_prefix}-main-table h3, .{css_prefix}-main-table h4, .{css_prefix}-main-table h5, .{css_prefix}-main-table h6 {{clear: none !important;}}.{css_prefix}-main-table .row .col-md-6 {{	/* display:list-item; */ }} </style>
 '''
     
     # Handle YouTube video embedding (PHP lines 282-465)
@@ -1671,7 +1686,7 @@ def build_page_wp(
     if video_id:
         title_attr = clean_title(seo_filter_text_custom(res.get("restitle", "")))
         wpage += f'<div class="vid-container dddd"><iframe title="{title_attr}" style="max-width:100%;margin-bottom:20px;" src="//www.youtube.com/embed/{video_id}" width="900" height="480"></iframe></div>'
-        wpage += '<div class="seo-automation-spacer"></div>\n'
+        wpage += f'<div class="{css_prefix}-spacer"></div>\n'
     
     # Handle snapshot/image insertion (PHP lines 327-463)
     if domain_data.get('showsnapshot') == 1 and check_image_src_gpt(html.unescape(seo_filter_text_custom(res.get('resfulltext', '')))) == 1:
@@ -1794,8 +1809,8 @@ def build_page_wp(
         resbubba = db.fetch_all(bubba_sql, (res['id'],))
         
         if resbubba:
-            wpage += '<div class="seo-automation-spacer"></div>\n'
-            wpage += '<div class="seo-automation-container-wr-full">\n'
+            wpage += f'<div class="{css_prefix}-spacer"></div>\n'
+            wpage += f'<div class="{css_prefix}-container-wr-full">\n'
             
             for bubba in resbubba:
                 title = clean_title(seo_filter_text_custom(bubba.get('bubbatitle', '')))
@@ -1803,7 +1818,7 @@ def build_page_wp(
                 titlelink = to_ascii(html.unescape(titlelink))
                 resurl_bubba = linkdomain + '/' + seo_text_custom(titlelink) + '-' + str(bubba['id']) + 'dc'
                 
-                wpage += '<div class="seo-automation-containerwr moinfomation">\n'
+                wpage += f'<div class="{css_prefix}-containerwr moinfomation">\n'
                 wpage += f'<h2 class="h2"><a target="_top" title="{title}" href="{resurl_bubba}">{title}</a></h2>\n'
                 
                 bubbatext = strip_html(html.unescape(seo_filter_text_custom(bubba.get('resfulltext', ''))))
@@ -1811,7 +1826,7 @@ def build_page_wp(
                 bubbatext = bubbatext.replace('//gallery.imagehosting.space/gallery/', '//gallery.imagehosting.space/thumbs/')
                 wpage += bubbatext
                 wpage += '</div>\n'
-                wpage += '<div class="seo-automation-spacer"></div>\n'
+                wpage += f'<div class="{css_prefix}-spacer"></div>\n'
             
             wpage += '</div>\n'
     
@@ -1830,17 +1845,17 @@ def build_page_wp(
         
         if resrelated:
             wpage += '<h2 class="h1">Related Posts</h2>\n'
-            wpage += '<div class="seo-automation-spacer"></div>\n'
-            wpage += '<div class="seo-automation-container-wr-full">\n'
+            wpage += f'<div class="{css_prefix}-spacer"></div>\n'
+            wpage += f'<div class="{css_prefix}-container-wr-full">\n'
             
             for rel in resrelated:
                 resfulltext_rel = html.unescape(seo_filter_text_custom(rel.get('resfulltext', '')))
                 if len(resfulltext_rel) > 50:
-                    wpage += '<div class="seo-automation-containerwr">\n'
+                    wpage += f'<div class="{css_prefix}-containerwr">\n'
                     titledecoded = seo_filter_text_custom(rel.get('restitle', ''))
                     wpage += f'<h2 class="h2"><a target="_top" title="{titledecoded}" href="/">{titledecoded}</a></h2>\n'
                     wpage += resfulltext_rel
-                    wpage += '<div class="seo-automation-spacer"></div>\n'
+                    wpage += f'<div class="{css_prefix}-spacer"></div>\n'
                     
                     # Get bubbafeed for related article (PHP lines 977-1016)
                     bubba_rel_sql = """
@@ -1908,7 +1923,7 @@ def build_page_wp(
                         map_val = 1
             
             if map_val == 1:
-                wpage += '<div class="seo-automation-spacer"></div>\n'
+                wpage += f'<div class="{css_prefix}-spacer"></div>\n'
                 wpage += '<div class="google-map">\n'
                 mpadd = ''
                 
@@ -2017,8 +2032,8 @@ def build_page_wp(
     wpage += article_links_html
     
     # Add premiumstyles.css and closing styles (matching build_bcpage_wp)
-    wpage += '<div class="seo-automation-spacer"></div>\n'
-    wpage += '<div class="seo-automation-tag-container" style="border-bottom:1px solid black; border-top:1px solid black;"></div>\n'
+    wpage += f'<div class="{css_prefix}-spacer"></div>\n'
+    wpage += f'<div class="{css_prefix}-tag-container" style="border-bottom:1px solid black; border-top:1px solid black;"></div>\n'
     wpage += '<link rel="stylesheet" id="SEO_Automation_premium_0_X-css" href="https://public.imagehosting.space/external_files/premiumstyles.css" type="text/css" media="all" />\n'
     wpage += '<div class="seo-automation-spacer"></div>\n'
     
@@ -2100,9 +2115,12 @@ def build_bcpage_wp(
     else:
         resurl = dl + '/' + seo_slug(seo_filter_text_custom(res['restitle'])) + '-' + str(res['id']) + '/'
     
+    # Get CSS class prefix based on wp_plugin
+    css_prefix = get_css_class_prefix(domain_data.get('wp_plugin', 0))
+    
     # Start building page (PHP lines 239-240)
-    bcpage = '<div class="ngodkrbsitr-main-table"><div class="seo-automation-spacer"></div>\n'
-    bcpage += '<div class="ngodkrbsitr-top-container">\n'
+    bcpage = f'<div class="{css_prefix}-main-table"><div class="{css_prefix}-spacer"></div>\n'
+    bcpage += f'<div class="{css_prefix}-top-container">\n'
     
     # Build resurl for main keyword link (PHP lines 125-135)
     # PHP: if ($domain['status'] == 2 || $domain['status'] == 10)
@@ -2156,7 +2174,7 @@ def build_bcpage_wp(
     # Note: showgoogleplusone is not in domain_data, so we'll skip for now
     
     # PHP line 262: Spacer
-    bcpage += '<div class="ngodkrbsitr-spacer"></div>\n'
+    bcpage += f'<div class="{css_prefix}-spacer"></div>\n'
     
     # PHP lines 264-283: Video or image
     if not domain_data.get('wr_video'):
@@ -2198,7 +2216,7 @@ def build_bcpage_wp(
     bcpage += '</div>\n'
     
     # PHP lines 289-292: Spacer and "Additional Resources" header
-    bcpage += '<div class="ngodkrbsitr-spacer"></div><div class="seo-automation-tag-container" style="border-bottom:0px solid black; border-top:0px solid black;height:10px;"></div>\n'
+    bcpage += f'<div class="{css_prefix}-spacer"></div><div class="{css_prefix}-tag-container" style="border-bottom:0px solid black; border-top:0px solid black;height:10px;"></div>\n'
     bcpage += '<h3 style="text-align:left;font-size:18px;font-weight:bold;">Additional Resources:</h3>\n'
     
     # Additional Resources section (keyword links) - PHP lines 297-1337
@@ -2271,9 +2289,9 @@ def build_bcpage_wp(
                 bcdomain = link['domain_name'].split('.')
                 bcvardomain = bcdomain[0] if bcdomain else ''
                 
-                bcpage += '<div class="ngodkrbsitr-container">\n'
+                bcpage += f'<div class="{css_prefix}-container">\n'
                 # PHP line 894: Add spacer right after opening container (before H2)
-                bcpage += '<div class="ngodkrbsitr-spacer"></div>\n'
+                bcpage += f'<div class="{css_prefix}-spacer"></div>\n'
                 
                 # Determine link URL
                 haslinks_sql = "SELECT count(id) FROM bwp_link_placement WHERE deleted != 1 AND showondomainid = %s AND showonpgid = %s"
@@ -2779,7 +2797,7 @@ def build_bcpage_wp(
                         bcpage += '</div>\n'
                 
                 # PHP line 1336: Close container and add spacer
-                bcpage += '</div><div class="ngodkrbsitr-spacer"></div>\n'
+                bcpage += f'</div><div class="{css_prefix}-spacer"></div>\n'
     
     # Drip content links section
     linksdc_sql = """
@@ -2828,9 +2846,9 @@ def build_bcpage_wp(
             bcdomain = linkdc['domain_name'].split('.')
             bcvardomain = bcdomain[0] if bcdomain else ''
             
-            bcpage += '<div class="ngodkrbsitr-container">\n'
+            bcpage += f'<div class="{css_prefix}-container">\n'
             # PHP line 399: Add spacer right after opening container (before H2)
-            bcpage += '<div class="ngodkrbsitr-spacer"></div>\n'
+            bcpage += f'<div class="{css_prefix}-spacer"></div>\n'
             
             # Build link URL - match PHP logic exactly
             # PHP line 895-927: Complex conditional logic for drip content link URL
@@ -3003,7 +3021,7 @@ def build_bcpage_wp(
                 bcpage += '</div>\n'
             
             # PHP line 775: Close container and add spacer
-            bcpage += '</div><div class="ngodkrbsitr-spacer"></div>\n'
+            bcpage += f'</div><div class="{css_prefix}-spacer"></div>\n'
     
     # Add ArticleLinks (PHP line 1680: echo ArticleLinks($res['id']))
     # Get domain_category for ArticleLinks (it's the same as domain_data in this context)
@@ -3018,8 +3036,8 @@ def build_bcpage_wp(
     bcpage += article_links_html
     
     # Closing HTML
-    bcpage += '<div class="seo-automation-spacer"></div>\n'
-    bcpage += '<div class="seo-automation-tag-container" style="border-bottom:1px solid black; border-top:1px solid black;"></div>\n'
+    bcpage += f'<div class="{css_prefix}-spacer"></div>\n'
+    bcpage += f'<div class="{css_prefix}-tag-container" style="border-bottom:1px solid black; border-top:1px solid black;"></div>\n'
     bcpage += '<link rel="stylesheet" id="SEO_Automation_premium_0_X-css" href="https://public.imagehosting.space/external_files/premiumstyles.css" type="text/css" media="all" />\n'
     bcpage += '<div class="seo-automation-spacer"></div>\n'
     bcpage += '</div>\n'
@@ -3079,9 +3097,12 @@ def build_bubba_page_wp(
     if not res:
         return ""
     
+    # Get CSS class prefix based on wp_plugin
+    css_prefix = get_css_class_prefix(domain_data.get('wp_plugin', 0))
+    
     # Build basic page HTML (placeholder - needs full implementation)
     import html
-    wpage = '<div class="seo-automation-main-table">'
+    wpage = f'<div class="{css_prefix}-main-table">'
     wpage += f'<h1>{clean_title(seo_filter_text_custom(res.get("bubbatitle", "")))}</h1>'
     
     if res.get('resfulltext'):
