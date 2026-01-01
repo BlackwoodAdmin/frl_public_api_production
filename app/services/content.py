@@ -1207,7 +1207,22 @@ def link_keywords_in_content(
     import html
     import re
     
+    # #region agent log
+    _debug_log("content.py:link_keywords_in_content", "Function entry", {
+        "main_keyword": main_keyword,
+        "supporting_keywords_count": len(supporting_keywords) if supporting_keywords else 0,
+        "append_unfound": append_unfound,
+        "content_length": len(content) if content else 0
+    }, "A")
+    # #endregion
+    
     if not content or not append_unfound:
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Early return", {
+            "has_content": bool(content),
+            "append_unfound": append_unfound
+        }, "A")
+        # #endregion
         return content
     
     # Limit supporting keywords to 2
@@ -1233,12 +1248,26 @@ def link_keywords_in_content(
                 'url': supporting_keyword_urls[i]
             })
     
+    # #region agent log
+    _debug_log("content.py:link_keywords_in_content", "Keywords to check", {
+        "keywords_to_check": [kw.get('text') for kw in keywords_to_check],
+        "keywords_count": len(keywords_to_check)
+    }, "A")
+    # #endregion
+    
     if not keywords_to_check:
         return content
     
     # Strip HTML tags for case-insensitive keyword search (ignore HTML structure)
     # We'll search in the plain text content
     content_text = re.sub(r'<[^>]+>', '', content)
+    
+    # #region agent log
+    _debug_log("content.py:link_keywords_in_content", "Content text (stripped HTML)", {
+        "content_text_length": len(content_text),
+        "content_text_preview": content_text[:200] if content_text else ""
+    }, "A")
+    # #endregion
     
     # Check which keywords are NOT found in the content (case-insensitive)
     unfound_keywords = []
@@ -1251,11 +1280,31 @@ def link_keywords_in_content(
         # Use word boundaries to avoid partial matches
         pattern = re.escape(kw_text)
         # Search case-insensitively
-        if not re.search(pattern, content_text, re.IGNORECASE):
+        found = bool(re.search(pattern, content_text, re.IGNORECASE))
+        
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Keyword search result", {
+            "keyword": kw_text,
+            "found": found,
+            "pattern": pattern
+        }, "A")
+        # #endregion
+        
+        if not found:
             unfound_keywords.append(kw_data)
+    
+    # #region agent log
+    _debug_log("content.py:link_keywords_in_content", "Unfound keywords", {
+        "unfound_keywords": [kw.get('text') for kw in unfound_keywords],
+        "unfound_count": len(unfound_keywords)
+    }, "A")
+    # #endregion
     
     # Build links for unfound keywords only
     if not unfound_keywords:
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "No unfound keywords, returning original content", {}, "A")
+        # #endregion
         return content
     
     keyword_links = []
@@ -1268,11 +1317,30 @@ def link_keywords_in_content(
         
         title_attr = html.escape(kw_text)
         url_attr = html.escape(kw_url)
-        keyword_links.append(f'<a title="{title_attr}" href="{url_attr}">{kw_text}</a>')
+        link_html = f'<a title="{title_attr}" href="{url_attr}">{kw_text}</a>'
+        keyword_links.append(link_html)
+        
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Built keyword link", {
+            "keyword": kw_text,
+            "link_html": link_html
+        }, "A")
+        # #endregion
     
     # Append unfound keyword links at the end, separated by <br>
     if keyword_links:
-        result = content + '<br><br>' + '<br>'.join(keyword_links)
+        # Join links with <br> separator
+        links_html = '<br>'.join(keyword_links)
+        result = content + '<br><br>' + links_html
+        
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Appended links", {
+            "links_html": links_html,
+            "links_count": len(keyword_links),
+            "result_length": len(result),
+            "result_suffix": result[-200:] if len(result) > 200 else result
+        }, "A")
+        # #endregion
     else:
         result = content
     
