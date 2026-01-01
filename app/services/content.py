@@ -1552,6 +1552,7 @@ def build_page_wp(
         "domainid_is_falsy": not domainid
     }, "A")
     # #endregion
+    logger.info(f"build_page_wp entry: bubbleid={bubbleid}, domainid={domainid}, keyword={keyword}")
     
     if not bubbleid or not domainid:
         # #region agent log
@@ -1560,6 +1561,7 @@ def build_page_wp(
             "domainid": domainid
         }, "A")
         # #endregion
+        logger.warning(f"build_page_wp early return: bubbleid={bubbleid}, domainid={domainid}")
         return ""
     
     # Get bubblefeed data - handle multiple scenarios (PHP lines 52-108)
@@ -1647,6 +1649,7 @@ def build_page_wp(
         "res_restitle": res.get('restitle') if res else None
     }, "A")
     # #endregion
+    logger.info(f"build_page_wp after queries: res_found={res is not None}, res_id={res.get('id') if res else None}")
     
     if not res:
         # #region agent log
@@ -1656,6 +1659,7 @@ def build_page_wp(
             "domainid": domainid
         }, "A")
         # #endregion
+        logger.warning(f"build_page_wp early return: res not found, bubbleid={bubbleid}, keyword={keyword}, domainid={domainid}")
         return ""
     
     # Build link domain (PHP lines 208-232)
@@ -1698,12 +1702,15 @@ def build_page_wp(
         "resourcesactive_is_1": domain_data.get('resourcesactive') == 1
     }, "A")
     # #endregion
-    if domain_data.get('resourcesactive') != 1:
+    resourcesactive_val = domain_data.get('resourcesactive')
+    logger.info(f"build_page_wp resourcesactive check: resourcesactive={resourcesactive_val}, is_1={resourcesactive_val == 1}")
+    if resourcesactive_val != 1:
         # #region agent log
         _debug_log("content.py:build_page_wp", "Early return: resourcesactive != 1", {
-            "resourcesactive": domain_data.get('resourcesactive')
+            "resourcesactive": resourcesactive_val
         }, "A")
         # #endregion
+        logger.warning(f"build_page_wp early return: resourcesactive != 1, value={resourcesactive_val}")
         return '<p>This feature is not available for your current package. Please upgrade your package. [ID-01]</p>'
     
     # #region agent log

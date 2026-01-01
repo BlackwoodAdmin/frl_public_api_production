@@ -317,6 +317,18 @@ async def article_endpoint(
         script_version = 0.0
     
     wp_plugin = domain_category.get('wp_plugin') or 0
+    # #region agent log
+    from app.services.content import _debug_log
+    _debug_log("article.py:article_endpoint", "Before wp_plugin check", {
+        "wp_plugin": wp_plugin,
+        "script_version": script_version,
+        "script_version_float": script_version,
+        "wp_plugin_check": wp_plugin == 1,
+        "script_version_check": script_version >= 5,
+        "both_conditions": wp_plugin == 1 and script_version >= 5,
+        "Action": Action
+    }, "A")
+    # #endregion
     if wp_plugin == 1 and script_version >= 5:
         # Extract pageid from slug if needed
         pageid_param = pageid or ''
@@ -335,10 +347,28 @@ async def article_endpoint(
                     bubbleid = int(pageid_param.replace('dc', ''))
                 else:
                     bubbleid = int(pageid_param)
+        # #region agent log
+        _debug_log("article.py:article_endpoint", "After parsing pageid", {
+            "pageid_param": pageid_param,
+            "bubbleid": bubbleid,
+            "keyword_param": keyword_param
+        }, "A")
+        # #endregion
         
         if Action == '1':
             # Website Reference page
-            from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
+            from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer, _debug_log
+            # #region agent log
+            _debug_log("article.py:article_endpoint", "Before build_page_wp call", {
+                "bubbleid": bubbleid,
+                "domainid": domainid,
+                "keyword_param": keyword_param,
+                "pageid_param": pageid_param,
+                "wp_plugin": wp_plugin,
+                "script_version": script_version
+            }, "A")
+            # #endregion
+            logger.info(f"WP Plugin Action=1: bubbleid={bubbleid}, domainid={domainid}, keyword={keyword_param}")
             wpage = build_page_wp(
                 bubbleid=bubbleid,
                 domainid=domainid,
@@ -348,6 +378,13 @@ async def article_endpoint(
                 domain_data=domain_category,
                 domain_settings=domain_settings
             )
+            # #region agent log
+            _debug_log("article.py:article_endpoint", "After build_page_wp call", {
+                "wpage_length": len(wpage) if wpage else 0,
+                "wpage_empty": not wpage or len(wpage) == 0
+            }, "A")
+            # #endregion
+            logger.info(f"WP Plugin Action=1: wpage length={len(wpage) if wpage else 0}, empty={not wpage or len(wpage) == 0}")
             
             # For WordPress plugin, don't add header/footer (WordPress handles it)
             if wp_plugin == 1:
@@ -484,6 +521,13 @@ async def article_endpoint(
             return HTMLResponse(content=wpage)
     
     # Handle other actions (non-WP plugin)
+    # #region agent log
+    _debug_log("article.py:article_endpoint", "Non-WP plugin handler", {
+        "Action": Action,
+        "wp_plugin": wp_plugin,
+        "script_version": script_version
+    }, "A")
+    # #endregion
     if Action == '1':
         # Website Reference (non-WP) - use same function as WP but it handles wp_plugin internally
         from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
@@ -498,6 +542,13 @@ async def article_endpoint(
                 bubbleid = int(pageid_param)
             except ValueError:
                 bubbleid = None
+        # #region agent log
+        _debug_log("article.py:article_endpoint", "Non-WP: Before build_page_wp", {
+            "pageid_param": pageid_param,
+            "bubbleid": bubbleid,
+            "keyword_param": keyword_param
+        }, "A")
+        # #endregion
         
         wpage = build_page_wp(
             bubbleid=bubbleid,
@@ -830,10 +881,10 @@ async def handle_apifeedwp30(
             )
         else:
             # Return as JSON string (default)
-            return Response(
-                content=json.dumps(escaped_html),
-                media_type="application/json"
-            )
+        return Response(
+            content=json.dumps(escaped_html),
+            media_type="application/json"
+        )
     
     elif feededit == '1':
         # Handle feededit=1 (pages array)
