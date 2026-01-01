@@ -1260,38 +1260,140 @@ def link_keywords_in_content(
         if not kw_text or not kw_url:
             continue
         
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Processing keyword", {
+            "keyword": kw_text,
+            "url": kw_url,
+            "content_length": len(result)
+        }, "A")
+        # #endregion
+        
         # Escape the keyword for regex
         escaped_kw = re.escape(kw_text)
         
-        # Pattern to match keyword, but skip if inside <a> tags or other HTML tags
-        # This pattern matches:
-        # - <a> tags and their content (skip)
-        # - Other HTML tags (skip)
-        # - The keyword as a whole word (match, case-insensitive)
-        pattern = rf'(?:<a\b[^>]*>.*?</a>|<[^>]+>|\b{escaped_kw}\b)'
+        # Find all positions where the keyword appears (case-insensitive)
+        # We need to find matches that are NOT inside <a> tags
+        # Strategy: Find all matches, then filter out those inside <a> tags
+        pattern = rf'\b{escaped_kw}\b'
+        matches = list(re.finditer(pattern, result, flags=re.IGNORECASE))
         
-        link_count = [0]  # Use list to allow modification in nested function
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Found matches", {
+            "keyword": kw_text,
+            "total_matches": len(matches)
+        }, "A")
+        # #endregion
         
-        # Create a closure that captures the current keyword and URL
-        def make_replace_callback(kw, url, count_ref):
-            def replace_callback(match):
-                match_str = match.group(0)
-                # Check if this is the keyword (not an HTML tag) - case-insensitive match
-                if not match_str.startswith('<') and match_str.lower() == kw.lower():
-                    # Only link if we haven't reached the limit of 2
-                    if count_ref[0] < 2:
-                        count_ref[0] += 1
-                        # Escape the keyword text for HTML attribute
-                        title_attr = html.escape(kw)
-                        url_attr = html.escape(url)
-                        return f'<a title="{title_attr}" href="{url_attr}">{match_str}</a>'
-                return match_str
-            return replace_callback
+        # Filter out matches that are inside <a> tags or other HTML tags
+        valid_matches = []
+        for match in matches:
+            start_pos = match.start()
+            end_pos = match.end()
+            
+            # Check if this match is inside an <a> tag
+            # Find all <a> tags and their positions
+            text_before = result[:start_pos]
+            text_after = result[end_pos:]
+            
+            # Find the last <a> tag before this position
+            last_a_open = text_before.rfind('<a')
+            if last_a_open != -1:
+                # Find the closing > of this <a> tag
+                a_tag_end = text_before.find('>', last_a_open)
+                if a_tag_end != -1:
+                    # Check if there's a closing </a> between the <a> tag and our match
+                    text_between = result[a_tag_end+1:start_pos]
+                    if '</a>' not in text_between:
+                        # We're inside an <a> tag, skip this match
+                        # #region agent log
+                        _debug_log("content.py:link_keywords_in_content", "Skipping match inside <a> tag", {
+                            "keyword": kw_text,
+                            "position": start_pos,
+                            "last_a_open": last_a_open,
+                            "a_tag_end": a_tag_end
+                        }, "A")
+                        # #endregion
+                        continue
+            
+            # Check if we're inside any other HTML tag (not <a>)
+            # Find the last < before this position
+            last_tag_open = text_before.rfind('<')
+            if last_tag_open != -1:
+                # Check if it's not an <a> tag
+                if text_before[last_tag_open:last_tag_open+2].lower() != '<a':
+                    tag_close = text_before.find('>', last_tag_open)
+                    if tag_close == -1:
+                        # Tag is not closed before our match, might be inside it
+                        # Check if there's a > after our match
+                        next_tag_close = text_after.find('>')
+                        if next_tag_close != -1:
+                            # We might be inside a tag, skip
+                            # #region agent log
+                            _debug_log("content.py:link_keywords_in_content", "Skipping match inside HTML tag", {
+                                "keyword": kw_text,
+                                "position": start_pos,
+                                "last_tag_open": last_tag_open
+                            }, "A")
+                            # #endregion
+                            continue
+            
+            valid_matches.append(match)
+            
+            # #region agent log
+            _debug_log("content.py:link_keywords_in_content", "Added valid match", {
+                "keyword": kw_text,
+                "position": start_pos,
+                "match_text": result[start_pos:end_pos]
+            }, "A")
+            # #endregion
         
-        replace_callback = make_replace_callback(kw_text, kw_url, link_count)
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Valid matches after filtering", {
+            "keyword": kw_text,
+            "valid_matches": len(valid_matches)
+        }, "A")
+        # #endregion
         
-        # Replace all occurrences (case-insensitive match)
-        result = re.sub(pattern, replace_callback, result, flags=re.IGNORECASE)
+        # Limit to first 2 matches
+        valid_matches = valid_matches[:2]
+        
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Final valid matches to link", {
+            "keyword": kw_text,
+            "matches_to_link": len(valid_matches)
+        }, "A")
+        # #endregion
+        
+        # Replace matches in reverse order (from end to start) to preserve positions
+        links_created = 0
+        for match in reversed(valid_matches):
+            start_pos = match.start()
+            end_pos = match.end()
+            match_text = result[start_pos:end_pos]
+            
+            # Escape the keyword text for HTML attribute
+            title_attr = html.escape(kw_text)
+            url_attr = html.escape(kw_url)
+            replacement = f'<a title="{title_attr}" href="{url_attr}">{match_text}</a>'
+            
+            # #region agent log
+            _debug_log("content.py:link_keywords_in_content", "Replacing match", {
+                "keyword": kw_text,
+                "position": start_pos,
+                "match_text": match_text,
+                "replacement_length": len(replacement)
+            }, "A")
+            # #endregion
+            
+            result = result[:start_pos] + replacement + result[end_pos:]
+            links_created += 1
+        
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Links created for keyword", {
+            "keyword": kw_text,
+            "links_created": links_created
+        }, "A")
+        # #endregion
     
     # Append unfound keywords as links at the end of the content (only if append_unfound is True)
     if append_unfound:
