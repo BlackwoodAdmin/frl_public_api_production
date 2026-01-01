@@ -800,9 +800,9 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                 if resourcesactive == '1' or resourcesactive == 1:
                     # Resources active - show main article link (resfulltext) + Resources link (resfeedtext)
                     if (item.get('NoContent') == 0 or is_bron_val) and len(item.get('linkouturl', '').strip()) > 5:
-                        # External link
-                        foot += '<li><a style="padding-right: 0px !important;" href="' + item['linkouturl'] + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
-                    else:
+                            # External link
+                            foot += '<li><a style="padding-right: 0px !important;" href="' + item['linkouturl'] + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
+                        else:
                         # Internal link to main content page (resfulltext) - use toAscii(html_entity_decode(seo_text_custom(...))) for slug
                         slug_text = seo_text_custom(item['restitle'])  # seo_text_custom
                         slug_text = html.unescape(slug_text)  # html_entity_decode
@@ -811,7 +811,7 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                         slug_text = slug_text.replace(' ', '-')  # str_replace(' ', '-', ...)
                         main_link = linkdomain + '/' + slug_text + '-' + str(item['id']) + '/'
                         foot += '<li><a style="padding-right: 0px !important;" href="' + main_link + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
-                else:
+                    else:
                     # Resources not active - show only Business Collective link (resfeedtext)
                     if not bclink:
                         # Build bclink if not already built
@@ -1295,6 +1295,7 @@ def link_keywords_in_content(
         a_tags = list(re.finditer(a_tag_pattern, result, re.IGNORECASE))
         
         # Build list of <a> tag ranges (start, end) where content is inside the link
+        # Include both the opening tag itself (for attributes) and the content between tags
         a_tag_ranges = []
         i = 0
         while i < len(a_tags):
@@ -1302,16 +1303,19 @@ def link_keywords_in_content(
             tag_content = result[tag_match.start():tag_match.end()]
             
             if tag_content.lower().startswith('<a'):
-                # Opening <a> tag - find the corresponding </a>
-                a_start = tag_match.end()  # Content starts after the >
+                # Opening <a> tag - include the tag itself (for attributes like title="...")
+                a_tag_start = tag_match.start()  # Start of the opening <a> tag
+                a_tag_end = tag_match.end()  # End of the opening <a> tag (after >)
+                
                 # Look for closing </a> after this opening tag
                 j = i + 1
                 while j < len(a_tags):
                     next_tag = a_tags[j]
                     next_tag_content = result[next_tag.start():next_tag.end()]
                     if next_tag_content.lower() == '</a>':
-                        a_end = next_tag.start()  # Content ends before the </a>
-                        a_tag_ranges.append((a_start, a_end))
+                        a_content_end = next_tag.start()  # Content ends before the </a>
+                        # Include the entire range from opening tag to closing tag
+                        a_tag_ranges.append((a_tag_start, a_content_end))
                         i = j  # Skip to after the closing tag
                         break
                     j += 1
@@ -1323,6 +1327,7 @@ def link_keywords_in_content(
         other_tags = list(re.finditer(other_tag_pattern, result, re.IGNORECASE))
         
         # Build list of other tag ranges
+        # Include both the opening tag itself (for attributes) and the content between tags
         other_tag_ranges = []
         for tag_match in other_tags:
             tag_start = tag_match.start()
@@ -1334,7 +1339,8 @@ def link_keywords_in_content(
                 # Closing tag - just mark the tag itself
                 other_tag_ranges.append((tag_start, tag_end))
             else:
-                # Opening tag - check if it's self-closing or has a closing tag
+                # Opening tag - include the tag itself (for attributes)
+                # Check if it's self-closing or has a closing tag
                 tag_name_match = re.match(r'<(\w+)', tag_content)
                 if tag_name_match:
                     tag_name = tag_name_match.group(1).lower()
@@ -1350,8 +1356,8 @@ def link_keywords_in_content(
                         if closing_tag_match:
                             closing_tag_start = tag_end + closing_tag_match.start()
                             closing_tag_end = tag_end + closing_tag_match.end()
-                            # Mark the entire range from opening tag to closing tag
-                            other_tag_ranges.append((tag_start, closing_tag_end))
+                            # Mark the entire range from opening tag to closing tag (including the opening tag itself)
+                            other_tag_ranges.append((tag_start, closing_tag_start))
                         else:
                             # No closing tag found - just mark the opening tag
                             other_tag_ranges.append((tag_start, tag_end))
