@@ -2828,7 +2828,7 @@ def build_bcpage_wp(
                 elif link.get('skipfeedchecker') == 1:
                     # PHP line 337-340
                     linkurl = linkdomainalone
-                elif not link.get('bubblecat') and link.get('wp_plugin') == 1 and (len(link.get('resfulltext', '')) >= 50 or len(link.get('resshorttext', '')) >= 50) and link.get('status') in ['2', '10']:
+                elif not link.get('bubblecat') and link.get('wp_plugin') == 1 and (len(link.get('resfulltext') or '') >= 50 or len(link.get('resshorttext') or '') >= 50) and link.get('status') in ['2', '10']:
                     # PHP line 342-344: WP plugin without bubblecat
                     import html
                     slug_text = seo_text_custom(link.get('restitle', ''))
@@ -2837,7 +2837,7 @@ def build_bcpage_wp(
                     slug_text = slug_text.lower()
                     slug_text = slug_text.replace(' ', '-')
                     linkurl = linkdomain + '/' + slug_text + '-' + str(link.get('bubblefeedid', '')) + '/'
-                elif link.get('wp_plugin') == 1 and (len(link.get('resfulltext', '')) >= 50 or len(link.get('resshorttext', '')) >= 50) and link.get('status') in ['2', '10']:
+                elif link.get('wp_plugin') == 1 and (len(link.get('resfulltext') or '') >= 50 or len(link.get('resshorttext') or '') >= 50) and link.get('status') in ['2', '10']:
                     # PHP line 346-348: WP plugin with bubblecat
                     import html
                     slug_text = seo_text_custom(link.get('bubblecat', ''))
@@ -2846,7 +2846,7 @@ def build_bcpage_wp(
                     slug_text = slug_text.lower()
                     slug_text = slug_text.replace(' ', '-')
                     linkurl = linkdomain + '/' + slug_text + '-' + str(link.get('bubblecatid', '')) + '/'
-                elif not link.get('bubblecat') and link.get('wp_plugin') != 1 and (len(link.get('resfulltext', '')) >= 50 or len(link.get('resshorttext', '')) >= 50) and link.get('status') in ['2', '10']:
+                elif not link.get('bubblecat') and link.get('wp_plugin') != 1 and (len(link.get('resfulltext') or '') >= 50 or len(link.get('resshorttext') or '') >= 50) and link.get('status') in ['2', '10']:
                     # PHP line 350-355: Non-WP plugin without bubblecat
                     script_version_num = get_script_version_num(link.get('script_version'))
                     if script_version_num >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
@@ -3354,7 +3354,7 @@ def build_bcpage_wp(
             elif linkdc.get('skipfeedchecker') == 1 and linkdc.get('linkskipfeedchecker') != 1:
                 # PHP line 899-902
                 linkurl = linkdomainalone
-            elif linkdc.get('wp_plugin') == 1 and len(linkdc.get('resfulltext', '')) >= 300:
+            elif linkdc.get('wp_plugin') == 1 and len(linkdc.get('resfulltext') or '') >= 300:
                 # PHP line 904-906: Use toAscii(html_entity_decode(seo_text_custom(...)))
                 import html
                 slug_text = seo_text_custom(linkdc.get('bubbatitle', ''))
@@ -3363,7 +3363,7 @@ def build_bcpage_wp(
                 slug_text = slug_text.lower()
                 slug_text = slug_text.replace(' ', '-')
                 linkurl = linkdomain + '/' + slug_text + '-' + str(linkdc.get('bubbafeedid', '')) + 'dc'
-            elif linkdc.get('wp_plugin') != 1 and len(linkdc.get('resfulltext', '')) >= 50 and linkdc.get('status') in ['2', '10']:
+            elif linkdc.get('wp_plugin') != 1 and len(linkdc.get('resfulltext') or '') >= 50 and linkdc.get('status') in ['2', '10']:
                 # PHP line 908-913: Non-WP plugin
                 script_version_num = get_script_version_num(linkdc.get('script_version'))
                 if script_version_num > 3.2 and linkdc.get('wp_plugin') != 1 and linkdc.get('iswin') != 1 and linkdc.get('usepurl') != 0:
