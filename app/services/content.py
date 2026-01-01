@@ -1479,7 +1479,7 @@ def link_keywords_in_content(
         
         # Append unfound keywords at the end
         if unfound_links:
-            result += ' ' + ' '.join(unfound_links)
+            result += '<br><br>' + ' '.join(unfound_links)
     
     return result
 
