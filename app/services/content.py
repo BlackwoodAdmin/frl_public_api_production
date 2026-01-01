@@ -2112,9 +2112,11 @@ def build_bcpage_wp(
             dl += domain_data['domain_name']
     
     # Build resurl
+    # For Action=2 (feed pages), WordPress plugins should use /slug-idbc/ format
     if len(res.get('linkouturl', '')) > 5:
         resurl = res['linkouturl'].strip()
     else:
+        # Initial build - will be overridden below for WordPress plugins with proper format
         resurl = dl + '/' + seo_slug(seo_filter_text_custom(res['restitle'])) + '-' + str(res['id']) + '/'
     
     # Get CSS class prefix based on wp_plugin
@@ -2131,14 +2133,17 @@ def build_bcpage_wp(
     script_version_num = get_script_version_num(domain_data.get('script_version'))
     
     if domain_status_str in ['2', '10']:
-        # For WordPress plugins, always use WordPress URL structure (/slug-id/)
+        # For WordPress plugins, always use WordPress URL structure
+        # Action=2 (feed pages) should be /slug-idbc/ (with bc suffix)
+        # Action=1 (main pages) should be /slug-id/ (no bc suffix)
         if domain_data.get('wp_plugin') == 1:
             slug_text = seo_text_custom(res.get('restitle', ''))
             slug_text = html.unescape(slug_text)
             slug_text = to_ascii(slug_text)
             slug_text = slug_text.lower()
             slug_text = slug_text.replace(' ', '-')
-            resurl = dl + '/' + slug_text + '-' + str(res.get('id', '')) + '/'
+            # Action=2 pages need 'bc' suffix before trailing slash
+            resurl = dl + '/' + slug_text + '-' + str(res.get('id', '')) + 'bc/'
         else:
             # PHP: if($rd == 1 && $domain_category['script_version'] >= 3 && $domain_category['wp_plugin'] != 1 && $domain_category['iswin'] != 1 && $domain_category['usepurl'] != 0)
             # For now, use CodeURL equivalent (simplified)
