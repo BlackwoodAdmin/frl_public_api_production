@@ -1258,14 +1258,20 @@ def link_keywords_in_content(
     if not keywords_to_check:
         return content
     
-    # Strip HTML tags for case-insensitive keyword search (ignore HTML structure)
-    # We'll search in the plain text content
-    content_text = re.sub(r'<[^>]+>', '', content)
+    # Remove <a> tags and their content before searching for keywords
+    # This ensures we don't count keywords that are already inside links
+    content_without_links = re.sub(r'<a\b[^>]*>.*?</a>', '', content, flags=re.IGNORECASE | re.DOTALL)
+    
+    # Strip remaining HTML tags for case-insensitive keyword search
+    # We'll search in the plain text content (excluding text inside <a> tags)
+    content_text = re.sub(r'<[^>]+>', '', content_without_links)
     
     # #region agent log
-    _debug_log("content.py:link_keywords_in_content", "Content text (stripped HTML)", {
+    _debug_log("content.py:link_keywords_in_content", "Content text (stripped HTML and links)", {
         "content_text_length": len(content_text),
-        "content_text_preview": content_text[:200] if content_text else ""
+        "content_text_preview": content_text[:200] if content_text else "",
+        "original_content_length": len(content),
+        "content_without_links_length": len(content_without_links)
     }, "A")
     # #endregion
     
