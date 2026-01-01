@@ -1185,11 +1185,13 @@ def link_keywords_in_content(
     main_keyword: str,
     main_keyword_url: str,
     supporting_keywords: list,
-    supporting_keyword_urls: list
+    supporting_keyword_urls: list,
+    append_unfound: bool = True
 ) -> str:
     """
-    Search content for exact matches of main keyword and supporting keywords,
+    Search content for case-insensitive matches of main keyword and supporting keywords,
     and wrap them in <a> tags pointing to their respective URLs.
+    Limits to 2 links per keyword. Appends unfound keywords as links at the end.
     
     Args:
         content: HTML content to search
@@ -1199,7 +1201,7 @@ def link_keywords_in_content(
         supporting_keyword_urls: List of URLs for supporting keywords
     
     Returns:
-        Content with keywords wrapped in <a> tags
+        Content with keywords wrapped in <a> tags, plus unfound keywords appended at end
     """
     import re
     import html
@@ -1238,7 +1240,19 @@ def link_keywords_in_content(
     keywords_to_link.sort(key=lambda x: len(x['text']), reverse=True)
     
     result = content
+    keywords_found = {}  # Track which keywords were found in the content
     
+    # First, check if keywords exist in content (case-insensitive, ignoring HTML tags)
+    # Strip HTML tags to check for keyword existence
+    content_text_only = re.sub(r'<[^>]+>', '', content)
+    
+    for kw_data in keywords_to_link:
+        kw_text = kw_data['text']
+        if kw_text:
+            # Check if keyword exists in content (case-insensitive)
+            keywords_found[kw_text] = kw_text.lower() in content_text_only.lower()
+    
+    # Now process each keyword to add links (max 2 per keyword)
     for kw_data in keywords_to_link:
         kw_text = kw_data['text']
         kw_url = kw_data['url']
@@ -1253,21 +1267,51 @@ def link_keywords_in_content(
         # This pattern matches:
         # - <a> tags and their content (skip)
         # - Other HTML tags (skip)
-        # - The keyword as a whole word (match)
+        # - The keyword as a whole word (match, case-insensitive)
         pattern = rf'(?:<a\b[^>]*>.*?</a>|<[^>]+>|\b{escaped_kw}\b)'
         
-        def replace_callback(match):
-            match_str = match.group(0)
-            # Check if this is the keyword (not an HTML tag) - exact case-sensitive match
-            if not match_str.startswith('<') and match_str == kw_text:
-                # Escape the keyword text for HTML attribute
+        link_count = [0]  # Use list to allow modification in nested function
+        
+        # Create a closure that captures the current keyword and URL
+        def make_replace_callback(kw, url, count_ref):
+            def replace_callback(match):
+                match_str = match.group(0)
+                # Check if this is the keyword (not an HTML tag) - case-insensitive match
+                if not match_str.startswith('<') and match_str.lower() == kw.lower():
+                    # Only link if we haven't reached the limit of 2
+                    if count_ref[0] < 2:
+                        count_ref[0] += 1
+                        # Escape the keyword text for HTML attribute
+                        title_attr = html.escape(kw)
+                        url_attr = html.escape(url)
+                        return f'<a title="{title_attr}" href="{url_attr}">{match_str}</a>'
+                return match_str
+            return replace_callback
+        
+        replace_callback = make_replace_callback(kw_text, kw_url, link_count)
+        
+        # Replace all occurrences (case-insensitive match)
+        result = re.sub(pattern, replace_callback, result, flags=re.IGNORECASE)
+    
+    # Append unfound keywords as links at the end of the content (only if append_unfound is True)
+    if append_unfound:
+        unfound_links = []
+        for kw_data in keywords_to_link:
+            kw_text = kw_data['text']
+            kw_url = kw_data['url']
+            
+            if not kw_text or not kw_url:
+                continue
+            
+            if not keywords_found.get(kw_text, False):
+                # Keyword was not found, add it as a link at the end
                 title_attr = html.escape(kw_text)
                 url_attr = html.escape(kw_url)
-                return f'<a title="{title_attr}" href="{url_attr}">{match_str}</a>'
-            return match_str
+                unfound_links.append(f'<a title="{title_attr}" href="{url_attr}">{kw_text}</a>')
         
-        # Replace all occurrences (case-sensitive exact match)
-        result = re.sub(pattern, replace_callback, result)
+        # Append unfound keywords at the end
+        if unfound_links:
+            result += ' ' + ' '.join(unfound_links)
     
     return result
 
@@ -2020,7 +2064,8 @@ def build_page_wp(
             main_keyword=main_keyword,
             main_keyword_url=main_keyword_url,
             supporting_keywords=supporting_keywords,
-            supporting_keyword_urls=supporting_keyword_urls
+            supporting_keyword_urls=supporting_keyword_urls,
+            append_unfound=True  # Append unfound keywords for resfulltext
         )
         
         # Wrap content in wr-fulltext div to allow text wrapping around images
@@ -2068,7 +2113,8 @@ def build_page_wp(
             main_keyword=main_keyword,
             main_keyword_url=main_keyword_url,
             supporting_keywords=supporting_keywords,
-            supporting_keyword_urls=supporting_keyword_urls
+            supporting_keyword_urls=supporting_keyword_urls,
+            append_unfound=False  # Don't append unfound keywords for resshorttext
         )
         
         # Wrap content in wr-fulltext div to allow text wrapping around images
@@ -2554,7 +2600,8 @@ def build_bcpage_wp(
             main_keyword=main_keyword,
             main_keyword_url=main_keyword_url,
             supporting_keywords=supporting_keywords,
-            supporting_keyword_urls=supporting_keyword_urls
+            supporting_keyword_urls=supporting_keyword_urls,
+            append_unfound=True  # Append unfound keywords for resfeedtext (similar to resfulltext)
         )
         
         bcpage += shorttext + '\n'
