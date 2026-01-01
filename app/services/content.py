@@ -1189,27 +1189,24 @@ def link_keywords_in_content(
     append_unfound: bool = True
 ) -> str:
     """
-    Append keyword links at the end of resfulltext content.
-    All keywords (main and supporting) are added as links at the end, separated by <br>.
+    Search content for case-insensitive matches of main keyword and supporting keywords,
+    and wrap them in <a> tags pointing to their respective URLs.
+    Limits to 2 links per keyword. Appends unfound keywords as links at the end.
     
     Args:
-        content: HTML content
-        main_keyword: Main keyword text
+        content: HTML content to search
+        main_keyword: Main keyword text to search for
         main_keyword_url: URL for main keyword (homepage)
         supporting_keywords: List of supporting keyword texts (max 2)
         supporting_keyword_urls: List of URLs for supporting keywords
-        append_unfound: If True, append keywords as links at the end (only used for resfulltext)
     
     Returns:
-        Content with keyword links appended at the end, separated by <br>
+        Content with keywords wrapped in <a> tags, plus unfound keywords appended at end
     """
+    import re
     import html
     
     if not content or not main_keyword:
-        return content
-    
-    # Only append links if append_unfound is True (for resfulltext)
-    if not append_unfound:
         return content
     
     # Limit supporting keywords to 2
@@ -1220,9 +1217,9 @@ def link_keywords_in_content(
     while len(supporting_keyword_urls) < len(supporting_keywords):
         supporting_keyword_urls.append('')
     
-    # Build list of all keywords to link (main keyword first, then supporting)
+    # Build list of keywords to search for (main keyword first, then supporting)
     keywords_to_link = []
-    if main_keyword and main_keyword_url:
+    if main_keyword:
         keywords_to_link.append({
             'text': main_keyword,
             'url': main_keyword_url
@@ -1238,8 +1235,24 @@ def link_keywords_in_content(
     if not keywords_to_link:
         return content
     
-    # Build all keyword links
-    keyword_links = []
+    # Process each keyword (in reverse order of length to avoid partial matches)
+    # Sort by length descending to process longer keywords first
+    keywords_to_link.sort(key=lambda x: len(x['text']), reverse=True)
+    
+    result = content
+    keywords_found = {}  # Track which keywords were found in the content
+    
+    # First, check if keywords exist in content (case-insensitive, ignoring HTML tags)
+    # Strip HTML tags to check for keyword existence
+    content_text_only = re.sub(r'<[^>]+>', '', content)
+    
+    for kw_data in keywords_to_link:
+        kw_text = kw_data['text']
+        if kw_text:
+            # Check if keyword exists in content (case-insensitive)
+            keywords_found[kw_text] = kw_text.lower() in content_text_only.lower()
+    
+    # Now process each keyword to add links (max 2 per keyword)
     for kw_data in keywords_to_link:
         kw_text = kw_data['text']
         kw_url = kw_data['url']
@@ -1247,15 +1260,226 @@ def link_keywords_in_content(
         if not kw_text or not kw_url:
             continue
         
-        title_attr = html.escape(kw_text)
-        url_attr = html.escape(kw_url)
-        keyword_links.append(f'<a title="{title_attr}" href="{url_attr}">{kw_text}</a>')
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Processing keyword", {
+            "keyword": kw_text,
+            "url": kw_url,
+            "content_length": len(result)
+        }, "A")
+        # #endregion
+        
+        # Escape the keyword for regex
+        escaped_kw = re.escape(kw_text)
+        
+        # Find all positions where the keyword appears (case-insensitive)
+        # We need to find matches that are NOT inside <a> tags
+        # Strategy: Find all matches, then filter out those inside <a> tags
+        pattern = rf'\b{escaped_kw}\b'
+        matches = list(re.finditer(pattern, result, flags=re.IGNORECASE))
+        
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Found matches", {
+            "keyword": kw_text,
+            "total_matches": len(matches)
+        }, "A")
+        # #endregion
+        
+        # Filter out matches that are inside HTML tags or existing links
+        # Strategy: Find all <a> tags first, then check if match is inside any <a> tag's content
+        # Also find all other HTML tags and check if match is inside them
+        valid_matches = []
+        
+        # Find all <a> tags with their positions (both opening and closing)
+        # Pattern matches: <a ...> and </a>
+        a_tag_pattern = r'<a\b[^>]*>|</a>'
+        a_tags = list(re.finditer(a_tag_pattern, result, re.IGNORECASE))
+        
+        # Build list of <a> tag ranges (start, end) where content is inside the link
+        # Include both the opening tag itself (for attributes) and the content between tags
+        a_tag_ranges = []
+        i = 0
+        while i < len(a_tags):
+            tag_match = a_tags[i]
+            tag_content = result[tag_match.start():tag_match.end()]
+            
+            if tag_content.lower().startswith('<a'):
+                # Opening <a> tag - include the tag itself (for attributes like title="...")
+                a_tag_start = tag_match.start()  # Start of the opening <a> tag
+                a_tag_end = tag_match.end()  # End of the opening <a> tag (after >)
+                
+                # Look for closing </a> after this opening tag
+                j = i + 1
+                while j < len(a_tags):
+                    next_tag = a_tags[j]
+                    next_tag_content = result[next_tag.start():next_tag.end()]
+                    if next_tag_content.lower() == '</a>':
+                        a_content_end = next_tag.start()  # Content ends before the </a>
+                        # Include the entire range from opening tag to closing tag
+                        a_tag_ranges.append((a_tag_start, a_content_end))
+                        i = j  # Skip to after the closing tag
+                        break
+                    j += 1
+            i += 1
+        
+        # Find all other HTML tags (not <a>) - these are self-closing or have content we should skip
+        # Pattern matches: <tag>, </tag>, <tag attr="value">, etc., but not <a> tags
+        other_tag_pattern = r'<(?!a\b|/a\b)[^>]+>'
+        other_tags = list(re.finditer(other_tag_pattern, result, re.IGNORECASE))
+        
+        # Build list of other tag ranges
+        # Include both the opening tag itself (for attributes) and the content between tags
+        other_tag_ranges = []
+        for tag_match in other_tags:
+            tag_start = tag_match.start()
+            tag_end = tag_match.end()
+            tag_content = result[tag_start:tag_end]
+            
+            # Check if it's a closing tag
+            if tag_content.startswith('</'):
+                # Closing tag - just mark the tag itself
+                other_tag_ranges.append((tag_start, tag_end))
+            else:
+                # Opening tag - include the tag itself (for attributes)
+                # Check if it's self-closing or has a closing tag
+                tag_name_match = re.match(r'<(\w+)', tag_content)
+                if tag_name_match:
+                    tag_name = tag_name_match.group(1).lower()
+                    
+                    # Check if it's a self-closing tag (ends with />)
+                    if tag_content.rstrip().endswith('/>'):
+                        # Self-closing - just mark the tag itself
+                        other_tag_ranges.append((tag_start, tag_end))
+                    else:
+                        # Find the closing tag
+                        closing_tag_pattern = rf'</{re.escape(tag_name)}\s*>'
+                        closing_tag_match = re.search(closing_tag_pattern, result[tag_end:], re.IGNORECASE)
+                        if closing_tag_match:
+                            closing_tag_start = tag_end + closing_tag_match.start()
+                            closing_tag_end = tag_end + closing_tag_match.end()
+                            # Mark the entire range from opening tag to closing tag (including the opening tag itself)
+                            other_tag_ranges.append((tag_start, closing_tag_start))
+                        else:
+                            # No closing tag found - just mark the opening tag
+                            other_tag_ranges.append((tag_start, tag_end))
+        
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Found HTML tags", {
+            "keyword": kw_text,
+            "a_tag_ranges": len(a_tag_ranges),
+            "other_tag_ranges": len(other_tag_ranges)
+        }, "A")
+        # #endregion
+        
+        for match in matches:
+            start_pos = match.start()
+            end_pos = match.end()
+            is_inside_tag = False
+            
+            # Check if match is inside any <a> tag's content
+            for a_start, a_end in a_tag_ranges:
+                if a_start <= start_pos < a_end:
+                    is_inside_tag = True
+                    # #region agent log
+                    _debug_log("content.py:link_keywords_in_content", "Skipping match inside <a> tag", {
+                        "keyword": kw_text,
+                        "position": start_pos,
+                        "a_tag_range": (a_start, a_end)
+                    }, "A")
+                    # #endregion
+                    break
+            
+            # Check if match is inside any other HTML tag
+            if not is_inside_tag:
+                for tag_start, tag_end in other_tag_ranges:
+                    if tag_start <= start_pos < tag_end:
+                        is_inside_tag = True
+                        # #region agent log
+                        _debug_log("content.py:link_keywords_in_content", "Skipping match inside HTML tag", {
+                            "keyword": kw_text,
+                            "position": start_pos,
+                            "tag_range": (tag_start, tag_end)
+                        }, "A")
+                        # #endregion
+                        break
+            
+            if not is_inside_tag:
+                valid_matches.append(match)
+                
+                # #region agent log
+                _debug_log("content.py:link_keywords_in_content", "Added valid match", {
+                    "keyword": kw_text,
+                    "position": start_pos,
+                    "match_text": result[start_pos:end_pos]
+                }, "A")
+                # #endregion
+        
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Valid matches after filtering", {
+            "keyword": kw_text,
+            "valid_matches": len(valid_matches)
+        }, "A")
+        # #endregion
+        
+        # Limit to first 2 matches
+        valid_matches = valid_matches[:2]
+        
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Final valid matches to link", {
+            "keyword": kw_text,
+            "matches_to_link": len(valid_matches)
+        }, "A")
+        # #endregion
+        
+        # Replace matches in reverse order (from end to start) to preserve positions
+        links_created = 0
+        for match in reversed(valid_matches):
+            start_pos = match.start()
+            end_pos = match.end()
+            match_text = result[start_pos:end_pos]
+            
+            # Escape the keyword text for HTML attribute
+            title_attr = html.escape(kw_text)
+            url_attr = html.escape(kw_url)
+            replacement = f'<a title="{title_attr}" href="{url_attr}">{match_text}</a>'
+            
+            # #region agent log
+            _debug_log("content.py:link_keywords_in_content", "Replacing match", {
+                "keyword": kw_text,
+                "position": start_pos,
+                "match_text": match_text,
+                "replacement_length": len(replacement)
+            }, "A")
+            # #endregion
+            
+            result = result[:start_pos] + replacement + result[end_pos:]
+            links_created += 1
+        
+        # #region agent log
+        _debug_log("content.py:link_keywords_in_content", "Links created for keyword", {
+            "keyword": kw_text,
+            "links_created": links_created
+        }, "A")
+        # #endregion
     
-    # Append all keyword links at the end, separated by <br>
-    if keyword_links:
-        result = content + '<br><br>' + '<br>'.join(keyword_links)
-    else:
-        result = content
+    # Append unfound keywords as links at the end of the content (only if append_unfound is True)
+    if append_unfound:
+        unfound_links = []
+        for kw_data in keywords_to_link:
+            kw_text = kw_data['text']
+            kw_url = kw_data['url']
+            
+            if not kw_text or not kw_url:
+                continue
+            
+            if not keywords_found.get(kw_text, False):
+                # Keyword was not found, add it as a link at the end
+                title_attr = html.escape(kw_text)
+                url_attr = html.escape(kw_url)
+                unfound_links.append(f'<a title="{title_attr}" href="{url_attr}">{kw_text}</a>')
+        
+        # Append unfound keywords at the end
+        if unfound_links:
+            result += '<br><br>' + ' '.join(unfound_links)
     
     return result
 
