@@ -2020,16 +2020,18 @@ def build_page_wp(
             wpage += f'<a href="{res["respinterest"]}" title="{res.get("restitle", "")} - Follow us on Penterest" target="_blank"><img style="padding:0px;max-width:16px;height:auto;" src="//www.pinterest.com/favicon.ico" border="0" width="16" alt="{res.get("restitle", "")}"></a>'
     
     # Add ArticleLinks (PHP line 1560: echocr(ArticleLinks($pageid)))
-    # Get domain_category for ArticleLinks (it's the same as domain_data in this context)
-    domain_category = domain_data
-    article_links_html = build_article_links(
-        pageid=bubbleid or 0,
-        domainid=domainid,
-        domain_data=domain_data,
-        domain_settings=domain_settings,
-        domain_category=domain_category
-    )
-    wpage += article_links_html
+    # Only add ArticleLinks for non-WordPress plugin calls (PHP plugin calls)
+    if domain_data.get('wp_plugin') != 1:
+        # Get domain_category for ArticleLinks (it's the same as domain_data in this context)
+        domain_category = domain_data
+        article_links_html = build_article_links(
+            pageid=bubbleid or 0,
+            domainid=domainid,
+            domain_data=domain_data,
+            domain_settings=domain_settings,
+            domain_category=domain_category
+        )
+        wpage += article_links_html
     
     # Add premiumstyles.css and closing styles (matching build_bcpage_wp)
     wpage += f'<div class="{css_prefix}-spacer"></div>\n'
@@ -3024,16 +3026,18 @@ def build_bcpage_wp(
             bcpage += f'</div><div class="{css_prefix}-spacer"></div>\n'
     
     # Add ArticleLinks (PHP line 1680: echo ArticleLinks($res['id']))
-    # Get domain_category for ArticleLinks (it's the same as domain_data in this context)
-    domain_category = domain_data
-    article_links_html = build_article_links(
-        pageid=bubbleid or 0,
-        domainid=domainid,
-        domain_data=domain_data,
-        domain_settings=domain_settings,
-        domain_category=domain_category
-    )
-    bcpage += article_links_html
+    # Only add ArticleLinks for non-WordPress plugin calls (PHP plugin calls)
+    if domain_data.get('wp_plugin') != 1:
+        # Get domain_category for ArticleLinks (it's the same as domain_data in this context)
+        domain_category = domain_data
+        article_links_html = build_article_links(
+            pageid=bubbleid or 0,
+            domainid=domainid,
+            domain_data=domain_data,
+            domain_settings=domain_settings,
+            domain_category=domain_category
+        )
+        bcpage += article_links_html
     
     # Closing HTML
     bcpage += f'<div class="{css_prefix}-spacer"></div>\n'
