@@ -1600,6 +1600,7 @@ def build_page_wp(
         """
         res = db.fetch_row(sql, (artpageid, artdomainid))
     else:
+        # Match PHP websitereference-wp.php line 88-89: No deleted check in first query
         sql = """
             SELECT b.id, b.restitle, b.title, b.resfulltext, b.resshorttext, b.linkouturl, 
                    b.categoryid AS bubblecategoryid, b.resphone, b.resvideo, b.resaddress, 
@@ -1609,7 +1610,7 @@ def build_page_wp(
                    IFNULL(c.bubblefeedid, '') AS bubblefeedid
             FROM bwp_bubblefeed b
             LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
-            WHERE b.id = %s AND b.domainid = %s AND b.deleted != 1
+            WHERE b.id = %s AND b.domainid = %s
         """
         logger.info(f"build_page_wp executing SQL: {sql[:200]}... with params: bubbleid={bubbleid}, domainid={domainid}")
         res = db.fetch_row(sql, (bubbleid, domainid))
@@ -1628,6 +1629,17 @@ def build_page_wp(
             diag_sql = "SELECT id, domainid, deleted, restitle FROM bwp_bubblefeed WHERE id = %s"
             diag_res = db.fetch_row(diag_sql, (bubbleid,))
             logger.warning(f"build_page_wp diagnostic: Record with id={bubbleid} exists: {diag_res is not None}, if exists: domainid={diag_res.get('domainid') if diag_res else None}, deleted={diag_res.get('deleted') if diag_res else None}, restitle={diag_res.get('restitle') if diag_res else None}")
+            
+            # Check if keyword exists for this domain
+            if keyword:
+                keyword_sql = "SELECT id, restitle, deleted FROM bwp_bubblefeed WHERE restitle = %s AND domainid = %s"
+                keyword_res = db.fetch_row(keyword_sql, (keyword, domainid))
+                logger.warning(f"build_page_wp diagnostic: Record with restitle='{keyword}' and domainid={domainid} exists: {keyword_res is not None}, if exists: id={keyword_res.get('id') if keyword_res else None}, deleted={keyword_res.get('deleted') if keyword_res else None}")
+            
+            # Check if pageid might be in bwp_bubbafeed
+            bubba_sql = "SELECT id, domainid, deleted, bubbatitle FROM bwp_bubbafeed WHERE id = %s"
+            bubba_res = db.fetch_row(bubba_sql, (bubbleid,))
+            logger.warning(f"build_page_wp diagnostic: Record with id={bubbleid} in bwp_bubbafeed exists: {bubba_res is not None}, if exists: domainid={bubba_res.get('domainid') if bubba_res else None}, deleted={bubba_res.get('deleted') if bubba_res else None}, bubbatitle={bubba_res.get('bubbatitle') if bubba_res else None}")
     
     # Fallback: try to find by keyword (PHP lines 97-108)
     if not res and keyword:
