@@ -3142,7 +3142,7 @@ def build_bcpage_wp(
                     if address and map_val == 1:
                         bcpage += '</div>\n'
                     
-                    # Social media icons
+                    # Social media icons - MUST be inside LocalBusiness div
                     if (link.get('wr_googleplus') or link.get('wr_facebook') or link.get('wr_twitter') or 
                         link.get('wr_linkedin') or link.get('wr_yelp') or link.get('wr_bing') or link.get('wr_yahoo')):
                         bcpage += '<div class="seo-automation-space"></div>\n'
@@ -3204,12 +3204,15 @@ def build_bcpage_wp(
                         
                         bcpage += '</div>\n'
                     
+                    # Blog/FAQ links - MUST be inside LocalBusiness div
                     if link_settings.get('blogUrl') and len(link_settings['blogUrl']) > 10:
                         bcpage += f' <a target="_blank" href="{link_settings["blogUrl"]}">Blog</a>  '
                     if link_settings.get('faqUrl') and len(link_settings['faqUrl']) > 10:
                         bcpage += f' <a target="_blank" href="{link_settings["faqUrl"]}">FAQ</a> '
                     
+                    # Close LocalBusiness div AFTER social media and Blog/FAQ links
                     bcpage += '</div>\n'
+                    # Close bwp_citation_conatainer div
                     bcpage += '</div>\n'
                 else:
                     # No address - just image
