@@ -357,7 +357,7 @@ async def article_endpoint(
         
         if Action == '1':
             # Website Reference page
-            from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer, _debug_log
+            from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer, _debug_log, is_bron
             # #region agent log
             _debug_log("article.py:article_endpoint", "Before build_page_wp call", {
                 "bubbleid": bubbleid,
@@ -368,6 +368,32 @@ async def article_endpoint(
                 "script_version": script_version
             }, "A")
             # #endregion
+            
+            # BRON domains: Skip main keyword pages, but allow supporting keyword pages
+            if is_bron(domain_category.get('servicetype')):
+                # Check if this is a supporting keyword (exists in bwp_bubblefeedsupport)
+                if bubbleid:
+                    support_check_sql = """
+                        SELECT id FROM bwp_bubblefeedsupport 
+                        WHERE id = %s AND domainid = %s AND deleted != 1
+                    """
+                    is_supporting = db.fetch_row(support_check_sql, (bubbleid, domainid))
+                    if not is_supporting:
+                        # This is a main keyword for BRON - skip page creation
+                        logger.info(f"BRON domain: Skipping main keyword page (bubbleid={bubbleid})")
+                        return HTMLResponse(content="", status_code=404)
+                elif keyword_param:
+                    # Try to find by keyword - check if it's a supporting keyword
+                    support_check_sql = """
+                        SELECT id FROM bwp_bubblefeedsupport 
+                        WHERE restitle = %s AND domainid = %s AND deleted != 1
+                    """
+                    is_supporting = db.fetch_row(support_check_sql, (keyword_param, domainid))
+                    if not is_supporting:
+                        # This is a main keyword for BRON - skip page creation
+                        logger.info(f"BRON domain: Skipping main keyword page (keyword={keyword_param})")
+                        return HTMLResponse(content="", status_code=404)
+            
             logger.info(f"WP Plugin Action=1: bubbleid={bubbleid}, domainid={domainid}, keyword={keyword_param}")
             wpage = build_page_wp(
                 bubbleid=bubbleid,
@@ -530,7 +556,7 @@ async def article_endpoint(
     # #endregion
     if Action == '1':
         # Website Reference (non-WP) - use same function as WP but it handles wp_plugin internally
-        from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
+        from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer, is_bron
         # Extract pageid and keyword
         pageid_param = pageid or ''
         keyword_param = k or key or ''
@@ -549,6 +575,31 @@ async def article_endpoint(
             "keyword_param": keyword_param
         }, "A")
         # #endregion
+        
+        # BRON domains: Skip main keyword pages, but allow supporting keyword pages
+        if is_bron(domain_category.get('servicetype')):
+            # Check if this is a supporting keyword (exists in bwp_bubblefeedsupport)
+            if bubbleid:
+                support_check_sql = """
+                    SELECT id FROM bwp_bubblefeedsupport 
+                    WHERE id = %s AND domainid = %s AND deleted != 1
+                """
+                is_supporting = db.fetch_row(support_check_sql, (bubbleid, domainid))
+                if not is_supporting:
+                    # This is a main keyword for BRON - skip page creation
+                    logger.info(f"BRON domain: Skipping main keyword page (bubbleid={bubbleid})")
+                    return HTMLResponse(content="", status_code=404)
+            elif keyword_param:
+                # Try to find by keyword - check if it's a supporting keyword
+                support_check_sql = """
+                    SELECT id FROM bwp_bubblefeedsupport 
+                    WHERE restitle = %s AND domainid = %s AND deleted != 1
+                """
+                is_supporting = db.fetch_row(support_check_sql, (keyword_param, domainid))
+                if not is_supporting:
+                    # This is a main keyword for BRON - skip page creation
+                    logger.info(f"BRON domain: Skipping main keyword page (keyword={keyword_param})")
+                    return HTMLResponse(content="", status_code=404)
         
         wpage = build_page_wp(
             bubbleid=bubbleid,
