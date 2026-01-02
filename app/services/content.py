@@ -806,6 +806,14 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                         # Internal link to main content page (resfulltext)
                         # Check if WordPress plugin or PHP plugin to use correct URL structure
                         wp_plugin = domain_data.get('wp_plugin', 0)
+                        # #region agent log
+                        _debug_log("content.py:build_footer_wp", "Building keyword link", {
+                            "wp_plugin": wp_plugin,
+                            "wp_plugin_type": type(wp_plugin).__name__,
+                            "restitle": item.get('restitle', ''),
+                            "item_id": item.get('id', '')
+                        }, "A")
+                        # #endregion
                         if wp_plugin == 1:
                             # WordPress plugin: use /slug-id/ format
                             slug_text = seo_text_custom(item['restitle'])  # seo_text_custom
@@ -818,6 +826,12 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                             # PHP plugin: use ?Action=1&k=keyword&PageID=id format
                             keyword_slug = seo_filter_text_custom(item['restitle']).lower().replace(' ', '-')
                             main_link = linkdomain + '/?Action=1&k=' + keyword_slug + '&PageID=' + str(item['id'])
+                        # #region agent log
+                        _debug_log("content.py:build_footer_wp", "Generated keyword link", {
+                            "main_link": main_link,
+                            "wp_plugin": wp_plugin
+                        }, "A")
+                        # #endregion
                         foot += '<li><a style="padding-right: 0px !important;" href="' + main_link + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
                 else:
                     # Resources not active - show only Business Collective link (resfeedtext)

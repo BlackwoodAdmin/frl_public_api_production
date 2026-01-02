@@ -827,7 +827,8 @@ async def handle_apifeedwp30(
         SELECT d.id as domainid, d.domain_name, d.servicetype, d.writerlock, d.domainip, 
                d.showsnapshot, d.wr_address, d.userid, d.status, d.wr_video, d.wr_facebook, 
                d.wr_googleplus, d.wr_twitter, d.wr_yelp, d.wr_bing, d.wr_name, d.wr_phone, 
-               d.linkexchange, d.resourcesactive, d.template_file, r.email as owneremail, s.price
+               d.linkexchange, d.resourcesactive, d.template_file, d.wp_plugin, 
+               r.email as owneremail, s.price
         FROM bwp_domains d
         LEFT JOIN bwp_register r ON d.userid = r.id
         LEFT JOIN bwp_services s ON d.servicetype = s.id
