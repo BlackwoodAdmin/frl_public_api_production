@@ -223,8 +223,11 @@ async def article_endpoint(
     
     # WordPress plugin feed routing (kkyy-based)
     if apiid and apikey and kkyy:
+        # Strip whitespace and quotes from kkyy for comparison (handle URL encoding issues)
+        kkyy_clean = kkyy.strip().strip("'\"")
+        logger.debug(f"WordPress plugin routing - kkyy: {repr(kkyy)}, kkyy_clean: {repr(kkyy_clean)}, apiid: {apiid}, apikey: {apikey}, feededit: {feedit}")
         # Route to WordPress plugin feeds based on kkyy value
-        if kkyy == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
+        if kkyy_clean == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy_clean == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
             # Route to apifeedwp30 handler
             # Get feededit from query params, form data, or JSON (PHP $_REQUEST gets both)
             feededit_param = feededit or request.query_params.get('feedit')
