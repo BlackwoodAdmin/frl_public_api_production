@@ -51,8 +51,10 @@ async def article_endpoint(
     
     # For POST requests, also check form data and JSON body (PHP $_REQUEST includes both GET and POST)
     # Note: POST requests can have parameters in query string OR body
+    # Initialize these variables for both GET and POST requests
     form_data = None
     json_data = None
+    
     if request.method == "POST":
         # First, check query params (POST requests can have params in URL too)
         # PHP $_REQUEST merges $_GET and $_POST, so we check both
@@ -226,12 +228,16 @@ async def article_endpoint(
         # Strip whitespace and quotes from kkyy for comparison (handle URL encoding issues)
         kkyy_clean = kkyy.strip().strip("'\"")
         # Get feededit from query params, form data, or JSON (PHP $_REQUEST gets both)
+        # Initialize feededit_param to ensure it's always defined
         feededit_param = feededit or request.query_params.get('feedit')
         if not feededit_param:
             if form_data:
                 feededit_param = form_data.get('feedit')
             elif json_data:
                 feededit_param = json_data.get('feedit')
+        # Ensure feededit_param is not None (default to None if not found)
+        if feededit_param is None:
+            feededit_param = None
         logger.debug(f"WordPress plugin routing - kkyy: {repr(kkyy)}, kkyy_clean: {repr(kkyy_clean)}, apiid: {apiid}, apikey: {apikey}, feededit: {feedit_param}")
         # Route to WordPress plugin feeds based on kkyy value
         if kkyy_clean == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy_clean == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
