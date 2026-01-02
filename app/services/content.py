@@ -2210,7 +2210,7 @@ def build_page_wp(
             main_keyword_url=main_keyword_url,
             supporting_keywords=supporting_keywords,
             supporting_keyword_urls=supporting_keyword_urls,
-            append_unfound=False  # Don't append unfound keywords - only link if found in content
+            append_unfound=True  # Append unfound keywords for resfulltext
         )
         
         # Wrap content in wr-fulltext div to allow text wrapping around images
