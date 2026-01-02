@@ -231,14 +231,18 @@ async def article_endpoint(
         kkyy_clean = kkyy.strip().strip("'\"")
         # Get feededit from query params, form data, or JSON (PHP $_REQUEST gets both)
         # feededit_param was initialized earlier (line 58), now update it with actual value
-        feededit_param = feededit or request.query_params.get('feedit')
-        if not feededit_param:
-            if form_data:
-                feededit_param = form_data.get('feedit')
-            elif json_data:
-                feededit_param = json_data.get('feedit')
-        # Debug log - use feededit directly to avoid any scoping issues
-        logger.debug(f"WordPress plugin routing - kkyy: {repr(kkyy)}, kkyy_clean: {repr(kkyy_clean)}, apiid: {apiid}, apikey: {apikey}, feededit: {feedit}, feededit_param: {feedit_param}")
+        # Get feededit from function parameter first, then query params, then form/json data
+        feededit_param = None
+        if feededit:
+            feededit_param = feededit
+        elif request.query_params.get('feedit'):
+            feededit_param = request.query_params.get('feedit')
+        elif form_data and form_data.get('feedit'):
+            feededit_param = form_data.get('feedit')
+        elif json_data and json_data.get('feedit'):
+            feededit_param = json_data.get('feedit')
+        # Debug log - feededit_param should always be defined (initialized above)
+        logger.debug(f"WordPress plugin routing - kkyy: {repr(kkyy)}, kkyy_clean: {repr(kkyy_clean)}, apiid: {apiid}, apikey: {apikey}, feededit_param: {feedit_param}")
         # Route to WordPress plugin feeds based on kkyy value
         if kkyy_clean == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy_clean == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
             # Route to apifeedwp30 handler
