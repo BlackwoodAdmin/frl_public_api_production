@@ -32,7 +32,6 @@ async def articles_endpoint(
     cty: Optional[str] = Query(None),
     state: Optional[str] = Query(None),
     st: Optional[str] = Query(None),
-    debug: Optional[str] = Query("0"),
     nocache: Optional[str] = Query("0"),
 ):
     """
@@ -63,7 +62,6 @@ async def articles_endpoint(
         cty = cty or query_params.get("cty")
         state = state or query_params.get("state")
         st = st or query_params.get("st")
-        debug = debug or query_params.get("debug", "0")
         nocache = nocache or query_params.get("nocache", "0")
         
         # Try to parse body as form data or JSON
@@ -92,7 +90,6 @@ async def articles_endpoint(
                         cty = cty or json_data.get("cty")
                         state = state or json_data.get("state")
                         st = st or json_data.get("st")
-                        debug = debug or json_data.get("debug", "0")
                         nocache = nocache or json_data.get("nocache", "0")
                     except Exception:
                         pass
@@ -117,7 +114,6 @@ async def articles_endpoint(
                         cty = cty or form_data.get("cty")
                         state = state or form_data.get("state")
                         st = st or form_data.get("st")
-                        debug = debug or form_data.get("debug", "0")
                         nocache = nocache or form_data.get("nocache", "0")
                     except Exception:
                         # Fallback: try to parse as URL-encoded string
@@ -144,7 +140,6 @@ async def articles_endpoint(
                                 cty = cty or (parsed.get("cty", [None])[0])
                                 state = state or (parsed.get("state", [None])[0])
                                 st = st or (parsed.get("st", [None])[0])
-                                debug = debug or (parsed.get("debug", ["0"])[0])
                                 nocache = nocache or (parsed.get("nocache", ["0"])[0])
                         except Exception:
                             pass
@@ -229,7 +224,6 @@ async def articles_endpoint(
                     page_content = build_page_wp(
                         bubbleid=bubbleid,
                         domainid=domainid,
-                        debug=(debug == '1'),
                         agent=agent or '',
                         keyword=article.get('restitle', ''),
                         domain_data=domain_category,
@@ -239,7 +233,7 @@ async def articles_endpoint(
                     )
                     
                     # Get header and footer
-                    header_data = get_header_footer(domainid, domain_category, domain_settings, debug == '1')
+                    header_data = get_header_footer(domainid, domain_category.get('status'))
                     header = header_data['header']
                     footer = header_data['footer']
                     
@@ -276,15 +270,6 @@ async def articles_endpoint(
                         websitereferencesimple=False,
                         wp_plugin=domain_category.get('wp_plugin', 0)
                     )
-                    
-                    # #region agent log
-                    from app.services.content import _count_divs, _debug_log
-                    div_counts_final = _count_divs(full_page_html)
-                    _debug_log("articles.py:articles_endpoint", "After wrap_content_with_header_footer", {
-                        "full_page_html_length": len(full_page_html),
-                        "div_counts": div_counts_final
-                    }, "B")
-                    # #endregion
                     
                     # PHP Articles.php includes feed-home.css.php at lines 255 and 471
                     # Add feed-home.css.php CSS before </head> or at the end of <head>
@@ -359,16 +344,6 @@ img.align-left { max-width:100%!important;" }
     # PHP line 172: if($domains['script_version'] >= 3 && $domains['wp_plugin'] != 1 && $domains['iswin'] != 1 && $domains['usepurl'] != 0)
     if script_version >= 3 and wp_plugin != 1 and iswin != 1 and usepurl != 0:
         # Generate footer HTML (similar to Articles30.php seo_automation_build_footer30)
-        # #region agent log
-        from app.services.content import _debug_log
-        _debug_log("articles.py:articles_endpoint", "Calling build_footer_wp for PHP plugin", {
-            "wp_plugin": wp_plugin,
-            "wp_plugin_type": type(wp_plugin).__name__,
-            "script_version": script_version,
-            "iswin": iswin,
-            "usepurl": usepurl
-        }, "A")
-        # #endregion
         footer_html = build_footer_wp(domainid, domain_category, domain_settings)
         
         # TODO: Add social media icons if needed (PHP lines 176-253)

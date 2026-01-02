@@ -9,46 +9,6 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# #region agent log
-def _debug_log(location: str, message: str, data: dict, hypothesis_id: str = ""):
-    """Helper function to write debug logs in NDJSON format."""
-    log_path = r"d:\www\FRLPublic\.cursor\debug.log"
-    try:
-        log_entry = {
-            "sessionId": "debug-session",
-            "runId": "run1",
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(datetime.now().timestamp() * 1000)
-        }
-        with open(log_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(log_entry) + '\n')
-    except Exception:
-        pass  # Silently fail if logging fails
-
-def _count_divs(html: str) -> dict:
-    """Count opening and closing div tags, and find elementor elementor-3833."""
-    if not html:
-        return {"open": 0, "close": 0, "net": 0, "elementor_3833_open": 0, "elementor_3833_close": 0}
-    open_divs = len(re.findall(r'<div[^>]*>', html, re.IGNORECASE))
-    close_divs = len(re.findall(r'</div>', html, re.IGNORECASE))
-    elementor_3833_open = len(re.findall(r'class="[^"]*elementor[^"]*elementor-3833[^"]*"', html, re.IGNORECASE))
-    elementor_3833_close = 0
-    # Find closing divs that might close elementor-3833 (look for pattern before </article> or </main>)
-    matches = re.finditer(r'</div>\s*(?:</article>|</main>|<footer)', html, re.IGNORECASE)
-    elementor_3833_close = len(list(matches))
-    return {
-        "open": open_divs,
-        "close": close_divs,
-        "net": open_divs - close_divs,
-        "elementor_3833_open": elementor_3833_open,
-        "elementor_3833_close": elementor_3833_close
-    }
-# #endregion
-
-
 def get_script_version_num(script_version) -> float:
     """Convert script_version to float for comparison (handles '5.0', '5.0.x', etc.)."""
     if script_version is None:
@@ -151,17 +111,6 @@ def get_header_footer(domainid: int, domain_status: Any, keyword: str = '', cate
     # Decode header and footer
     header = html.unescape(header_footer.get('domain_header', '')) if header_footer else ''
     footer = html.unescape(header_footer.get('domain_footer', '')) if header_footer else ''
-    
-    # #region agent log
-    header_div_counts = _count_divs(header)
-    footer_div_counts = _count_divs(footer)
-    _debug_log("content.py:get_header_footer", "After header/footer decoded", {
-        "header_length": len(header),
-        "footer_length": len(footer),
-        "header_div_counts": header_div_counts,
-        "footer_div_counts": footer_div_counts
-    }, "C")
-    # #endregion
     
     # Add style tag if domain_smalltextcolor is set (PHP line 971-975)
     if header_footer and header_footer.get('domain_smalltextcolor'):
@@ -361,22 +310,6 @@ def wrap_content_with_header_footer(
         websitereferencesimple: If True, skip header/footer (for simple mode)
         wp_plugin: If 1, skip header/footer (WordPress handles it)
     """
-    # #region agent log
-    _debug_log("content.py:wrap_content_with_header_footer", "Function entry", {
-        "content_length": len(content) if content else 0,
-        "header_length": len(header) if header else 0,
-        "footer_length": len(footer) if footer else 0,
-        "wp_plugin": wp_plugin,
-        "websitereferencesimple": websitereferencesimple
-    }, "B")
-    content_div_counts = _count_divs(content) if content else {}
-    header_div_counts = _count_divs(header) if header else {}
-    _debug_log("content.py:wrap_content_with_header_footer", "Input div counts", {
-        "content_div_counts": content_div_counts,
-        "header_div_counts": header_div_counts
-    }, "B")
-    # #endregion
-    
     # WordPress plugin doesn't use header/footer (WordPress handles it)
     if wp_plugin == 1:
         return content
@@ -604,24 +537,8 @@ ul.mdubgwi-footer-nav {padding: 0px !important;overflow:visible !important}
             full_page += header
         # Note: feed.bodytop.php would be included here in PHP
     
-    # #region agent log
-    div_counts_after_header = _count_divs(full_page)
-    _debug_log("content.py:wrap_content_with_header_footer", "After header added", {
-        "full_page_length": len(full_page),
-        "div_counts": div_counts_after_header
-    }, "B")
-    # #endregion
-    
     # Add main content
     full_page += content
-    
-    # #region agent log
-    div_counts_after_content = _count_divs(full_page)
-    _debug_log("content.py:wrap_content_with_header_footer", "After content added", {
-        "full_page_length": len(full_page),
-        "div_counts": div_counts_after_content
-    }, "B")
-    # #endregion
     
     # Build footer section (PHP lines 1761-1785)
     isfoothtml = '</html>' in footer.lower() if footer else False
@@ -667,35 +584,13 @@ ul.mdubgwi-footer-nav {padding: 0px !important;overflow:visible !important}
                 # Insert footer before the last match (which should be the closing div for elementor elementor-3833)
                 last_match = matches[-1]
                 insert_pos = last_match.start()
-                # #region agent log
-                _debug_log("content.py:wrap_content_with_header_footer", "Before footer insertion", {
-                    "insert_pos": insert_pos,
-                    "matches_count": len(matches),
-                    "context_before": full_page[max(0, insert_pos-100):insert_pos],
-                    "context_after": full_page[insert_pos:min(len(full_page), insert_pos+100)]
-                }, "B")
-                # #endregion
                 full_page = full_page[:insert_pos] + footer + full_page[insert_pos:]
             else:
                 # Fallback: append footer after content
-                # #region agent log
-                _debug_log("content.py:wrap_content_with_header_footer", "Appending footer (no match found)", {}, "B")
-                # #endregion
                 full_page += footer
         else:
             # Footer doesn't contain contact section, append normally
-            # #region agent log
-            _debug_log("content.py:wrap_content_with_header_footer", "Appending footer (no contact section)", {}, "B")
-            # #endregion
             full_page += footer
-    
-    # #region agent log
-    div_counts_after_footer = _count_divs(full_page)
-    _debug_log("content.py:wrap_content_with_header_footer", "After footer added", {
-        "full_page_length": len(full_page),
-        "div_counts": div_counts_after_footer
-    }, "B")
-    # #endregion
     
     if not isfoothtml and not isfootbody:
         # Footer doesn't contain </html> or </body>
@@ -710,14 +605,6 @@ ul.mdubgwi-footer-nav {padding: 0px !important;overflow:visible !important}
         # Footer contains </body> (and possibly </html>)
         # Note: webtabs.inc.php and feed.footer.php would be included here in PHP
         pass
-    
-    # #region agent log
-    div_counts_final = _count_divs(full_page)
-    _debug_log("content.py:wrap_content_with_header_footer", "Function exit", {
-        "full_page_length": len(full_page),
-        "div_counts": div_counts_final
-    }, "B")
-    # #endregion
     
     return full_page
 
@@ -806,14 +693,6 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                         # Internal link to main content page (resfulltext)
                         # Check if WordPress plugin or PHP plugin to use correct URL structure
                         wp_plugin = domain_data.get('wp_plugin', 0)
-                        # #region agent log
-                        _debug_log("content.py:build_footer_wp", "Building keyword link", {
-                            "wp_plugin": wp_plugin,
-                            "wp_plugin_type": type(wp_plugin).__name__,
-                            "restitle": item.get('restitle', ''),
-                            "item_id": item.get('id', '')
-                        }, "A")
-                        # #endregion
                         if wp_plugin == 1:
                             # WordPress plugin: use /slug-id/ format
                             slug_text = seo_text_custom(item['restitle'])  # seo_text_custom
@@ -826,12 +705,6 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                             # PHP plugin: use ?Action=1&k=keyword&PageID=id format
                             keyword_slug = seo_filter_text_custom(item['restitle']).lower().replace(' ', '-')
                             main_link = linkdomain + '/?Action=1&k=' + keyword_slug + '&PageID=' + str(item['id'])
-                        # #region agent log
-                        _debug_log("content.py:build_footer_wp", "Generated keyword link", {
-                            "main_link": main_link,
-                            "wp_plugin": wp_plugin
-                        }, "A")
-                        # #endregion
                         foot += '<li><a style="padding-right: 0px !important;" href="' + main_link + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
                 else:
                     # Resources not active - show only Business Collective link (resfeedtext)
@@ -1233,15 +1106,6 @@ def link_keywords_in_content(
     import html
     import re
     
-    # #region agent log
-    _debug_log("content.py:link_keywords_in_content", "Function entry", {
-        "main_keyword": main_keyword,
-        "supporting_keywords_count": len(supporting_keywords) if supporting_keywords else 0,
-        "append_unfound": append_unfound,
-        "content_length": len(content) if content else 0
-    }, "A")
-    # #endregion
-    
     if not content:
         return content
     
@@ -1269,13 +1133,6 @@ def link_keywords_in_content(
                 'url': supporting_keyword_urls[i],
                 'is_main': False
             })
-    
-    # #region agent log
-    _debug_log("content.py:link_keywords_in_content", "Keywords to process", {
-        "keywords_to_process": [kw.get('text') for kw in keywords_to_process],
-        "keywords_count": len(keywords_to_process)
-    }, "A")
-    # #endregion
     
     if not keywords_to_process:
         return content
@@ -1356,13 +1213,6 @@ def link_keywords_in_content(
         # Strip remaining HTML tags for case-insensitive keyword search
         content_text = re.sub(r'<[^>]+>', '', content_without_links)
         
-        # #region agent log
-        _debug_log("content.py:link_keywords_in_content", "Content text (stripped HTML and links) for unfound check", {
-            "content_text_length": len(content_text),
-            "content_text_preview": content_text[:200] if content_text else ""
-        }, "A")
-        # #endregion
-        
         # Check which keywords are NOT found in the content (case-insensitive)
         unfound_keywords = []
         for kw_data in keywords_to_process:
@@ -1374,22 +1224,8 @@ def link_keywords_in_content(
             pattern = re.escape(kw_text)
             found = bool(re.search(pattern, content_text, re.IGNORECASE))
             
-            # #region agent log
-            _debug_log("content.py:link_keywords_in_content", "Keyword search result for unfound check", {
-                "keyword": kw_text,
-                "found": found
-            }, "A")
-            # #endregion
-            
             if not found:
                 unfound_keywords.append(kw_data)
-        
-        # #region agent log
-        _debug_log("content.py:link_keywords_in_content", "Unfound keywords", {
-            "unfound_keywords": [kw.get('text') for kw in unfound_keywords],
-            "unfound_count": len(unfound_keywords)
-        }, "A")
-        # #endregion
         
         # Append unfound keyword links at the end, separated by <br>
         if unfound_keywords:
@@ -1410,20 +1246,6 @@ def link_keywords_in_content(
                 # Join links with <br> separator
                 links_html = '<br>'.join(keyword_links)
                 result = result + '<br><br>' + links_html
-                
-                # #region agent log
-                _debug_log("content.py:link_keywords_in_content", "Appended unfound links", {
-                    "links_html": links_html,
-                    "links_count": len(keyword_links),
-                    "result_length": len(result)
-                }, "A")
-                # #endregion
-    
-    # #region agent log
-    _debug_log("content.py:link_keywords_in_content", "Function exit", {
-        "final_content_length": len(result)
-    }, "A")
-    # #endregion
     
     return result
 
@@ -1624,7 +1446,6 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
                     wpage = build_page_wp(
                         bubbleid=pageid,
                         domainid=domainid,
-                        debug=False,
                         agent=agent,
                         keyword=keyword,
                         domain_data=domain_data,
@@ -1707,7 +1528,6 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
                 wpage = build_page_wp(
                     bubbleid=pageid,
                     domainid=domainid,
-                    debug=False,
                     agent=agent,
                     keyword=keyword,
                     domain_data=domain_data,
@@ -1783,7 +1603,6 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
             wpage = build_bcpage_wp(
                 bubbleid=pageid,
                 domainid=domainid,
-                debug=False,
                 agent=agent,
                 domain_data=domain_data,
                 domain_settings=domain_settings
@@ -1848,7 +1667,6 @@ def extract_youtube_video_id(video_url: str) -> str:
 def build_page_wp(
     bubbleid: int,
     domainid: int,
-    debug: bool,
     agent: str,
     keyword: str,
     domain_data: Dict[str, Any],
@@ -1869,24 +1687,7 @@ def build_page_wp(
     from datetime import datetime, timedelta
     import random
     
-    # #region agent log
-    _debug_log("content.py:build_page_wp", "Function entry", {
-        "bubbleid": bubbleid,
-        "domainid": domainid,
-        "keyword": keyword,
-        "bubbleid_is_falsy": not bubbleid,
-        "domainid_is_falsy": not domainid
-    }, "A")
-    # #endregion
-    logger.info(f"build_page_wp entry: bubbleid={bubbleid}, domainid={domainid}, keyword={keyword}")
-    
     if not bubbleid or not domainid:
-        # #region agent log
-        _debug_log("content.py:build_page_wp", "Early return: bubbleid or domainid is falsy", {
-            "bubbleid": bubbleid,
-            "domainid": domainid
-        }, "A")
-        # #endregion
         logger.warning(f"build_page_wp early return: bubbleid={bubbleid}, domainid={domainid}")
         return ""
     
@@ -1938,17 +1739,7 @@ def build_page_wp(
             LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
             WHERE b.id = %s AND b.domainid = %s
         """
-        logger.info(f"build_page_wp executing SQL: {sql[:200]}... with params: bubbleid={bubbleid}, domainid={domainid}")
         res = db.fetch_row(sql, (bubbleid, domainid))
-        # #region agent log
-        _debug_log("content.py:build_page_wp", "Main query by bubbleid result", {
-            "bubbleid": bubbleid,
-            "domainid": domainid,
-            "res_found": res is not None,
-            "res_id": res.get('id') if res else None
-        }, "A")
-        # #endregion
-        logger.info(f"build_page_wp main query result: res_found={res is not None}, res_id={res.get('id') if res else None}")
         
         # PHP Article.php lines 722-730: If not found in bwp_bubblefeed and domain is SEOM or BRON, check bwp_bubblefeedsupport
         if not res:
@@ -1963,30 +1754,9 @@ def build_page_wp(
                     LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
                     WHERE b.id = %s AND b.domainid = %s
                 """
-                logger.info(f"build_page_wp checking bwp_bubblefeedsupport: bubbleid={bubbleid}, domainid={domainid}, servicetype={servicetype}")
                 res = db.fetch_row(support_sql, (bubbleid, domainid))
                 if res:
                     support = 1
-                    logger.info(f"build_page_wp found in bwp_bubblefeedsupport: id={res.get('id') if res else None}, restitle={res.get('restitle') if res else None}")
-                else:
-                    logger.warning(f"build_page_wp not found in bwp_bubblefeedsupport either")
-            
-            # Diagnostic: Check if record exists at all (even if deleted)
-            if not res:
-                diag_sql = "SELECT id, domainid, deleted, restitle FROM bwp_bubblefeed WHERE id = %s"
-                diag_res = db.fetch_row(diag_sql, (bubbleid,))
-                logger.warning(f"build_page_wp diagnostic: Record with id={bubbleid} exists: {diag_res is not None}, if exists: domainid={diag_res.get('domainid') if diag_res else None}, deleted={diag_res.get('deleted') if diag_res else None}, restitle={diag_res.get('restitle') if diag_res else None}")
-                
-                # Check if keyword exists for this domain
-                if keyword:
-                    keyword_sql = "SELECT id, restitle, deleted FROM bwp_bubblefeed WHERE restitle = %s AND domainid = %s"
-                    keyword_res = db.fetch_row(keyword_sql, (keyword, domainid))
-                    logger.warning(f"build_page_wp diagnostic: Record with restitle='{keyword}' and domainid={domainid} exists: {keyword_res is not None}, if exists: id={keyword_res.get('id') if keyword_res else None}, deleted={keyword_res.get('deleted') if keyword_res else None}")
-                
-                # Check if pageid might be in bwp_bubbafeed
-                bubba_sql = "SELECT id, domainid, deleted, bubbatitle FROM bwp_bubbafeed WHERE id = %s"
-                bubba_res = db.fetch_row(bubba_sql, (bubbleid,))
-                logger.warning(f"build_page_wp diagnostic: Record with id={bubbleid} in bwp_bubbafeed exists: {bubba_res is not None}, if exists: domainid={bubba_res.get('domainid') if bubba_res else None}, deleted={bubba_res.get('deleted') if bubba_res else None}, bubbatitle={bubba_res.get('bubbatitle') if bubba_res else None}")
     
     # Fallback: try to find by keyword (PHP lines 97-108)
     if not res and keyword:
@@ -2001,32 +1771,8 @@ def build_page_wp(
             WHERE b.restitle = %s AND b.domainid = %s AND b.deleted != 1
         """
         res = db.fetch_row(sql, (keyword, domainid))
-        # #region agent log
-        _debug_log("content.py:build_page_wp", "Keyword fallback query result", {
-            "keyword": keyword,
-            "res_found": res is not None,
-            "res_id": res.get('id') if res else None
-        }, "A")
-        # #endregion
-    
-    # #region agent log
-    _debug_log("content.py:build_page_wp", "After all database queries", {
-        "res_found": res is not None,
-        "res_id": res.get('id') if res else None,
-        "res_restitle": res.get('restitle') if res else None
-    }, "A")
-    # #endregion
-    logger.info(f"build_page_wp after queries: res_found={res is not None}, res_id={res.get('id') if res else None}")
     
     if not res:
-        # #region agent log
-        _debug_log("content.py:build_page_wp", "Early return: res not found", {
-            "bubbleid": bubbleid,
-            "keyword": keyword,
-            "domainid": domainid
-        }, "A")
-        # #endregion
-        logger.warning(f"build_page_wp early return: res not found, bubbleid={bubbleid}, keyword={keyword}, domainid={domainid}")
         return ""
     
     # Build link domain (PHP lines 208-232)
@@ -2063,37 +1809,15 @@ def build_page_wp(
             resurl = '/'
     
     # Start building page (PHP line 136)
-    # #region agent log
-    _debug_log("content.py:build_page_wp", "Checking resourcesactive", {
-        "resourcesactive": domain_data.get('resourcesactive'),
-        "resourcesactive_is_1": domain_data.get('resourcesactive') == 1
-    }, "A")
-    # #endregion
     resourcesactive_val = domain_data.get('resourcesactive')
-    logger.info(f"build_page_wp resourcesactive check: resourcesactive={resourcesactive_val}, is_1={resourcesactive_val == 1}")
     if resourcesactive_val != 1:
-        # #region agent log
-        _debug_log("content.py:build_page_wp", "Early return: resourcesactive != 1", {
-            "resourcesactive": resourcesactive_val
-        }, "A")
-        # #endregion
-        logger.warning(f"build_page_wp early return: resourcesactive != 1, value={resourcesactive_val}")
         return '<p>This feature is not available for your current package. Please upgrade your package. [ID-01]</p>'
-    
-    # #region agent log
-    _debug_log("content.py:build_page_wp", "After resourcesactive check", {"proceeding": True}, "A")
-    # #endregion
     
     # Get CSS class prefix based on wp_plugin
     css_prefix = get_css_class_prefix(domain_data.get('wp_plugin', 0))
     
     wpage = f'<div class="{css_prefix}-main-table" style="margin-left:auto;margin-right:auto;display:block;">\n'
     wpage += f'<div class="{css_prefix}-spacer"></div>\n'
-    
-    # #region agent log
-    div_counts = _count_divs(wpage)
-    _debug_log("content.py:build_page_wp", "After opening main div", {"wpage_length": len(wpage), "div_counts": div_counts}, "A")
-    # #endregion
     
     # Check if resfulltext contains Bootstrap container classes and add Bootstrap CSS/JS if needed (PHP lines 266-275)
     resfulltext = res.get('resfulltext', '')
@@ -2588,11 +2312,6 @@ def build_page_wp(
     wpage += '<link rel="stylesheet" id="SEO_Automation_premium_0_X-css" href="https://public.imagehosting.space/external_files/premiumstyles.css" type="text/css" media="all" />\n'
     wpage += '<div class="seo-automation-spacer"></div>\n'
     
-    # #region agent log
-    div_counts_before_close = _count_divs(wpage)
-    _debug_log("content.py:build_page_wp", "Before closing main div", {"wpage_length": len(wpage), "div_counts": div_counts_before_close}, "A")
-    # #endregion
-    
     wpage += '</div>\n'
     wpage += '''<style>
 .ngodkrbsitr-spacer{clear:both;}
@@ -2605,18 +2324,12 @@ def build_page_wp(
 </style>
 '''
     
-    # #region agent log
-    div_counts_final = _count_divs(wpage)
-    _debug_log("content.py:build_page_wp", "Function exit", {"wpage_length": len(wpage), "div_counts": div_counts_final}, "A")
-    # #endregion
-    
     return wpage
 
 
 def build_bcpage_wp(
     bubbleid: int,
     domainid: int,
-    debug: bool,
     agent: str,
     domain_data: Dict[str, Any],
     domain_settings: Dict[str, Any],
@@ -3037,15 +2750,9 @@ def build_bcpage_wp(
                 # PHP isset() returns true if key exists AND value is not NULL
                 has_bubblefeedid = 'bubblefeedid' in link and bubblefeedid_val is not None
                 
-                # Debug: Log values to diagnose issue
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.info(f"Support keywords check - restitle: {link.get('restitle')}, servicetype: {servicetype_val}, bubblefeedid: {bubblefeedid_val}, has_bubblefeedid: {has_bubblefeedid}")
+                # Check if the linked domain is SEOM or BRON
                 is_seom_result = is_seom(servicetype_val)
                 is_bron_result = is_bron(servicetype_val)
-                logger.info(f"is_seom({servicetype_val}): {is_seom_result}, is_bron({servicetype_val}): {is_bron_result}")
-                
-                # Check if the linked domain is SEOM or BRON
                 if (is_seom_result or is_bron_result) and has_bubblefeedid:
                     # PHP line 417: Query doesn't filter by deleted != 1
                     support_sql = """
@@ -3054,7 +2761,6 @@ def build_bcpage_wp(
                     """
                     # Query bwp_bubblefeedsupport where bubblefeedid matches the bwp_bubblefeed.id
                     supps = db.fetch_all(support_sql, (bubblefeedid_val,))
-                    logger.info(f"Found {len(supps) if supps else 0} supporting keywords for bubblefeedid {bubblefeedid_val}")
                     if supps:
                         tsups = ''
                         for supp in supps:
@@ -3086,8 +2792,6 @@ def build_bcpage_wp(
                                 supp_slug_text = supp_slug_text.replace(' ', '-')
                                 suppurl = linkdomain + '/' + supp_slug_text + '-' + str(supp['id']) + '/'
                             
-                            logger.info(f"Support keyword: {supp.get('restitle')}, wp_plugin: {link.get('wp_plugin')}, status: {link.get('status')}, suppurl: {suppurl}")
-                            
                             if suppurl:
                                 # PHP line 438: Use moneynofollow and custom_ucfirst_words(seo_text_custom(...)) for display
                                 supp_title = custom_ucfirst_words(seo_text_custom(supp['restitle']))
@@ -3095,13 +2799,9 @@ def build_bcpage_wp(
                         
                         # PHP line 443: ltrim($tsups, '-') - only remove leading dashes
                         tsups = tsups.lstrip('-')
-                        logger.info(f"After lstrip, tsups length: {len(tsups)}, tsups: {tsups[:100] if tsups else 'EMPTY'}")
                         # PHP line 444-447: if($tsups != '') output it
                         if tsups:
-                            logger.info(f"Outputting tsups to bcpage")
                             bcpage += tsups + '\n'
-                        else:
-                            logger.info(f"tsups is empty, not outputting")
                 
                 # Build image URL - match PHP logic exactly
                 # PHP line 386-405: Complex conditional logic for image URL
@@ -3708,7 +3408,6 @@ def build_bcpage_wp(
 def build_bubba_page_wp(
     bubbleid: int,
     domainid: int,
-    debug: bool,
     agent: str,
     keyword: str,
     domain_data: Dict[str, Any],
@@ -3955,14 +3654,6 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                             sssnav += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;k={slug}&amp;PageID={link.get("bubblefeedid", "")}"> {clean_title(seo_filter_text_custom(link.get("restitle", "")))} </a></li>\n'
                     
                     # Build main link (PHP lines 1700-1716)
-                    # #region agent log
-                    _debug_log("content.py:build_article_links", "Building main link for PHP plugin", {
-                        "resourcesactive": domain_category.get('resourcesactive'),
-                        "restitle": item.get('restitle', ''),
-                        "item_id": item_id,
-                        "linkouturl": item.get('linkouturl', '')
-                    }, "A")
-                    # #endregion
                     if domain_category.get('resourcesactive') == '1':
                         if item.get('NoContent') == 0 and len(item.get('linkouturl', '').strip()) > 5:
                             feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
@@ -3970,11 +3661,6 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                             linkurl = code_url(domainid, domain_data, domain_settings)
                             slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
                             main_link = f'{linkurl}?Action=1&amp;k={slug}&amp;PageID={item_id}'
-                            # #region agent log
-                            _debug_log("content.py:build_article_links", "Generated main link (resourcesactive=1)", {
-                                "main_link": main_link
-                            }, "A")
-                            # #endregion
                             feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
                     else:
                         # Keyword link should always point to Action=1 (resfulltext) - main content page
@@ -3982,11 +3668,6 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                         linkurl = code_url(domainid, domain_data, domain_settings)
                         slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
                         main_link = f'{linkurl}?Action=1&amp;k={slug}&amp;PageID={item_id}'
-                        # #region agent log
-                        _debug_log("content.py:build_article_links", "Generated main link (resourcesactive!=1) - keyword link to Action=1", {
-                            "main_link": main_link
-                        }, "A")
-                        # #endregion
                         feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
                     
                     num_lnks += 1
