@@ -57,6 +57,7 @@ async def article_endpoint(
         # First, check query params (POST requests can have params in URL too)
         # PHP $_REQUEST merges $_GET and $_POST, so we check both
         query_params = dict(request.query_params)
+        logger.debug(f"POST request - Query params: {query_params}")
         
         # Update parameters from query string (POST can have params in URL)
         # Use query params as base, then override with body if present
@@ -89,11 +90,14 @@ async def article_endpoint(
         
         # Then try to parse body as form data or JSON (PHP $_REQUEST includes both GET and POST)
         content_type = request.headers.get("content-type", "")
+        logger.info(f"POST request - Content-Type: {content_type}")
+        
         # Read raw body first to see what we're getting
         try:
             raw_body = await request.body()
+            logger.info(f"POST request - Raw body length: {len(raw_body)}, body: {raw_body.decode('utf-8', errors='ignore')[:500]}")
         except Exception as e:
-            logger.error(f"Could not read raw body: {e}")
+            logger.warning(f"Could not read raw body: {e}")
             raw_body = b""
         
         # Try to parse body - WordPress uses cURL with CURLOPT_POSTFIELDS (form-encoded)
@@ -104,6 +108,7 @@ async def article_endpoint(
                 # Only try JSON if explicitly JSON content type
                 try:
                     json_data = await request.json()
+                    logger.info(f"POST request - JSON data: {json_data}")
                     if json_data.get("domain"):
                         domain = json_data.get("domain")
                     if json_data.get("Action"):
@@ -133,13 +138,14 @@ async def article_endpoint(
                     if json_data.get("c"):
                         c = json_data.get("c")
                 except Exception as e2:
-                    pass  # JSON parsing failed, will try form data
+                    logger.warning(f"JSON parsing failed: {e2}")
             else:
                 # Try form data (default for WordPress cURL POST requests)
                 # This handles: application/x-www-form-urlencoded, multipart/form-data, or no content-type
                 try:
                     form_data = await request.form()
                     form_dict = dict(form_data)
+                    logger.info(f"POST request - Form data: {form_dict}")
                     # Override with form data if present (POST body takes precedence)
                     if form_data.get("domain"):
                         domain = form_data.get("domain")
@@ -170,7 +176,7 @@ async def article_endpoint(
                     if form_data.get("c"):
                         c = form_data.get("c")
                 except Exception as e:
-                    pass  # Form data parsing failed, will try raw body
+                    logger.warning(f"Form data parsing failed: {e}")
                     # If form parsing fails, try to parse raw body as URL-encoded string
                     if raw_body:
                         try:
@@ -178,6 +184,7 @@ async def article_endpoint(
                             body_str = raw_body.decode('utf-8')
                             # Parse URL-encoded string
                             parsed = parse_qs(body_str)
+                            logger.info(f"POST request - Parsed from raw body: {parsed}")
                             # Extract first value from each list (parse_qs returns lists)
                             if parsed.get("domain"):
                                 domain = parsed.get("domain")[0]
@@ -317,6 +324,18 @@ async def article_endpoint(
         script_version = 0.0
     
     wp_plugin = domain_category.get('wp_plugin') or 0
+    # #region agent log
+    from app.services.content import _debug_log
+    _debug_log("article.py:article_endpoint", "Before wp_plugin check", {
+        "wp_plugin": wp_plugin,
+        "script_version": script_version,
+        "script_version_float": script_version,
+        "wp_plugin_check": wp_plugin == 1,
+        "script_version_check": script_version >= 5,
+        "both_conditions": wp_plugin == 1 and script_version >= 5,
+        "Action": Action
+    }, "A")
+    # #endregion
     if wp_plugin == 1 and script_version >= 5:
         # Extract pageid from slug if needed
         pageid_param = pageid or ''
@@ -335,10 +354,28 @@ async def article_endpoint(
                     bubbleid = int(pageid_param.replace('dc', ''))
                 else:
                     bubbleid = int(pageid_param)
+        # #region agent log
+        _debug_log("article.py:article_endpoint", "After parsing pageid", {
+            "pageid_param": pageid_param,
+            "bubbleid": bubbleid,
+            "keyword_param": keyword_param
+        }, "A")
+        # #endregion
         
         if Action == '1':
             # Website Reference page
-            from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
+            from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer, _debug_log
+            # #region agent log
+            _debug_log("article.py:article_endpoint", "Before build_page_wp call", {
+                "bubbleid": bubbleid,
+                "domainid": domainid,
+                "keyword_param": keyword_param,
+                "pageid_param": pageid_param,
+                "wp_plugin": wp_plugin,
+                "script_version": script_version
+            }, "A")
+            # #endregion
+            logger.info(f"WP Plugin Action=1: bubbleid={bubbleid}, domainid={domainid}, keyword={keyword_param}")
             wpage = build_page_wp(
                 bubbleid=bubbleid,
                 domainid=domainid,
@@ -348,6 +385,13 @@ async def article_endpoint(
                 domain_data=domain_category,
                 domain_settings=domain_settings
             )
+            # #region agent log
+            _debug_log("article.py:article_endpoint", "After build_page_wp call", {
+                "wpage_length": len(wpage) if wpage else 0,
+                "wpage_empty": not wpage or len(wpage) == 0
+            }, "A")
+            # #endregion
+            logger.info(f"WP Plugin Action=1: wpage length={len(wpage) if wpage else 0}, empty={not wpage or len(wpage) == 0}")
             
             # For WordPress plugin, don't add header/footer (WordPress handles it)
             if wp_plugin == 1:
@@ -484,6 +528,13 @@ async def article_endpoint(
             return HTMLResponse(content=wpage)
     
     # Handle other actions (non-WP plugin)
+    # #region agent log
+    _debug_log("article.py:article_endpoint", "Non-WP plugin handler", {
+        "Action": Action,
+        "wp_plugin": wp_plugin,
+        "script_version": script_version
+    }, "A")
+    # #endregion
     if Action == '1':
         # Website Reference (non-WP) - use same function as WP but it handles wp_plugin internally
         from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
@@ -498,6 +549,13 @@ async def article_endpoint(
                 bubbleid = int(pageid_param)
             except ValueError:
                 bubbleid = None
+        # #region agent log
+        _debug_log("article.py:article_endpoint", "Non-WP: Before build_page_wp", {
+            "pageid_param": pageid_param,
+            "bubbleid": bubbleid,
+            "keyword_param": keyword_param
+        }, "A")
+        # #endregion
         
         wpage = build_page_wp(
             bubbleid=bubbleid,

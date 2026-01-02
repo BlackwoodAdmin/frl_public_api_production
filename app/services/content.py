@@ -9,6 +9,44 @@ import os
 
 logger = logging.getLogger(__name__)
 
+# #region agent log
+def _debug_log(location: str, message: str, data: dict, hypothesis_id: str = ""):
+    """Helper function to write debug logs in NDJSON format."""
+    log_path = r"d:\www\FRLPublic\.cursor\debug.log"
+    try:
+        log_entry = {
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(datetime.now().timestamp() * 1000)
+        }
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(log_entry) + '\n')
+    except Exception:
+        pass  # Silently fail if logging fails
+
+def _count_divs(html: str) -> dict:
+    """Count opening and closing div tags, and find elementor elementor-3833."""
+    if not html:
+        return {"open": 0, "close": 0, "net": 0, "elementor_3833_open": 0, "elementor_3833_close": 0}
+    open_divs = len(re.findall(r'<div[^>]*>', html, re.IGNORECASE))
+    close_divs = len(re.findall(r'</div>', html, re.IGNORECASE))
+    elementor_3833_open = len(re.findall(r'class="[^"]*elementor[^"]*elementor-3833[^"]*"', html, re.IGNORECASE))
+    elementor_3833_close = 0
+    # Find closing divs that might close elementor-3833 (look for pattern before </article> or </main>)
+    matches = re.finditer(r'</div>\s*(?:</article>|</main>|<footer)', html, re.IGNORECASE)
+    elementor_3833_close = len(list(matches))
+    return {
+        "open": open_divs,
+        "close": close_divs,
+        "net": open_divs - close_divs,
+        "elementor_3833_open": elementor_3833_open,
+        "elementor_3833_close": elementor_3833_close
+    }
+# #endregion
 
 
 def get_script_version_num(script_version) -> float:
@@ -113,6 +151,17 @@ def get_header_footer(domainid: int, domain_status: Any, keyword: str = '', cate
     # Decode header and footer
     header = html.unescape(header_footer.get('domain_header', '')) if header_footer else ''
     footer = html.unescape(header_footer.get('domain_footer', '')) if header_footer else ''
+    
+    # #region agent log
+    header_div_counts = _count_divs(header)
+    footer_div_counts = _count_divs(footer)
+    _debug_log("content.py:get_header_footer", "After header/footer decoded", {
+        "header_length": len(header),
+        "footer_length": len(footer),
+        "header_div_counts": header_div_counts,
+        "footer_div_counts": footer_div_counts
+    }, "C")
+    # #endregion
     
     # Add style tag if domain_smalltextcolor is set (PHP line 971-975)
     if header_footer and header_footer.get('domain_smalltextcolor'):
