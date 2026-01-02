@@ -3139,7 +3139,8 @@ def build_bcpage_wp(
                     
                     bcpage += f'<a style="font-size:12px;line-height:13px;" itemprop="url" href="{linkalone}">{link["domain_name"]}</a></span><br>\n'
                     
-                    if address and map_val == 1:
+                    # Close PostalAddress div if it was opened (only when address exists and map == 1)
+                    if address and map_val == 1 and stadd:
                         bcpage += '</div>\n'
                     
                     # Social media icons - MUST be inside LocalBusiness div
