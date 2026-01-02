@@ -3869,17 +3869,37 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                             sssnav += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;k={slug}&amp;PageID={link.get("bubblefeedid", "")}"> {clean_title(seo_filter_text_custom(link.get("restitle", "")))} </a></li>\n'
                     
                     # Build main link (PHP lines 1700-1716)
+                    # #region agent log
+                    _debug_log("content.py:build_article_links", "Building main link for PHP plugin", {
+                        "resourcesactive": domain_category.get('resourcesactive'),
+                        "restitle": item.get('restitle', ''),
+                        "item_id": item_id,
+                        "linkouturl": item.get('linkouturl', '')
+                    }, "A")
+                    # #endregion
                     if domain_category.get('resourcesactive') == '1':
                         if item.get('NoContent') == 0 and len(item.get('linkouturl', '').strip()) > 5:
                             feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
                         else:
                             linkurl = code_url(domainid, domain_data, domain_settings)
                             slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                            feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;k={slug}&amp;PageID={item_id}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
+                            main_link = f'{linkurl}?Action=1&amp;k={slug}&amp;PageID={item_id}'
+                            # #region agent log
+                            _debug_log("content.py:build_article_links", "Generated main link (resourcesactive=1)", {
+                                "main_link": main_link
+                            }, "A")
+                            # #endregion
+                            feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
                     else:
                         linkurl = code_url(domainid, domain_data, domain_settings)
                         slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=2&amp;k={slug}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
+                        main_link = f'{linkurl}?Action=2&amp;k={slug}'
+                        # #region agent log
+                        _debug_log("content.py:build_article_links", "Generated main link (resourcesactive!=1)", {
+                            "main_link": main_link
+                        }, "A")
+                        # #endregion
+                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
                     
                     num_lnks += 1
                 
