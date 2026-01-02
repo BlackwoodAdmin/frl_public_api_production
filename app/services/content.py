@@ -2899,7 +2899,13 @@ def build_bcpage_wp(
                         bcpage += f'<iframe width="130" height="110" style="width:130px;height:110px;border:0;overflow:hidden;" src="{mapurl}"></iframe>\n'
                         bcpage += f'<img itemprop="image" src="//imagehosting.space/feed/pageimage.php?domain={link["domain_name"]}" alt="{link["domain_name"]}" style="display:none !important;">\n'
                     else:
-                        bcpage += f'<a href="{imageurl}" target="_blank"{follow}><img itemprop="image" src="//imagehosting.space/feed/pageimage.php?domain={link["domain_name"]}" alt="{link["domain_name"]}" style="width:130px !important;height:110px;"></a>\n'
+                        # For sites without map: image link should point to feedtext page
+                        # Check linkouturl first (takes priority), then packageoverride, then use feedtext URL
+                        if link.get('linkouturl') and len(str(link.get('linkouturl', '')).strip()) > 5:
+                            image_link_url = str(link['linkouturl']).strip()
+                        else:
+                            image_link_url = build_feedtext_url(link, linkdomain, linkalone, bcvardomain, haslinkspg, link_settings)
+                        bcpage += f'<a href="{image_link_url}" target="_blank"{follow}><img itemprop="image" src="//imagehosting.space/feed/pageimage.php?domain={link["domain_name"]}" alt="{link["domain_name"]}" style="width:130px !important;height:110px;"></a>\n'
                     
                     bcpage += '</div>\n'
                     
@@ -3037,8 +3043,14 @@ def build_bcpage_wp(
                 addrndfeed = 0
                 if map_val == 1:
                     # PHP line 714-715: map == 1
+                    # For sites with map: shorttext link should point to feedtext page
+                    # Check linkouturl first (takes priority), then packageoverride, then use feedtext URL
+                    if link.get('linkouturl') and len(str(link.get('linkouturl', '')).strip()) > 5:
+                        shorttext_link_url = str(link['linkouturl']).strip()
+                    else:
+                        shorttext_link_url = build_feedtext_url(link, linkdomain, linkalone, bcvardomain, haslinkspg, link_settings)
                     # Use seo_automation_add_text_link_newbc equivalent
-                    restext = seo_automation_add_text_link_newbc(restext, restextkw, imageurl, follow)
+                    restext = seo_automation_add_text_link_newbc(restext, restextkw, shorttext_link_url, follow)
                 elif preml == 1:
                     # PHP line 716-717: preml == 1
                     restext = seo_automation_add_text_link_newbc(restext, restextkw, '', follow)
@@ -3499,6 +3511,69 @@ def code_url(domainid: int, domain_data: Dict[str, Any], domain_settings: Dict[s
     url += '.php'
     
     return url
+
+
+def build_feedtext_url(
+    link: Dict[str, Any],
+    linkdomain: str,
+    linkalone: str,
+    bcvardomain: str,
+    haslinkspg: Dict[str, Any],
+    link_settings: Dict[str, Any]
+) -> str:
+    """
+    Build feedtext page URL (Action=2 format) for a listing.
+    If packageoverride is true, returns homepage (linkalone) instead.
+    
+    Note: Caller should check linkouturl before calling this function,
+    as linkouturl takes priority over packageoverride.
+    
+    Args:
+        link: Link data dictionary containing domain and listing info
+        linkdomain: Base domain URL (e.g., 'https://www.example.com')
+        linkalone: Homepage URL (e.g., 'https://www.example.com/')
+        bcvardomain: Domain prefix for vardomain format (e.g., 'example')
+        haslinkspg: Dictionary with 'restitle', 'showonpgid', 'bubblefeedid' keys
+        link_settings: Domain settings dictionary
+    
+    Returns:
+        Feedtext URL (Action=2) or homepage if packageoverride is true
+    """
+    # Check packageoverride - if true, return homepage
+    packageoverride_val = link.get('packageoverride')
+    if packageoverride_val in [1, True, '1'] or (isinstance(packageoverride_val, str) and packageoverride_val.lower() == 'true'):
+        return linkalone
+    
+    # Build feedtext URL (Action=2) - similar to imageurl logic but always Action=2
+    # PHP line 390-402: Logic for building feedtext URLs
+    if link.get('skipfeedchecker') == 1 and link.get('linkskipfeedchecker') != 1:
+        # PHP line 386-388: skipfeedchecker
+        return linkalone
+    elif haslinkspg and len(haslinkspg) > 0 and link.get('wp_plugin') != 1 and link.get('status') in ['2', '10', '8']:
+        # PHP line 390-395: Non-WP plugin with haslinkspg
+        script_version_num = get_script_version_num(link.get('script_version'))
+        if script_version_num >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
+            # Use vardomain format with 'bc' suffix
+            return linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', ''))) + '/' + str(haslinkspg.get('bubblefeedid', '')) + 'bc/'
+        else:
+            # CodeURL equivalent - simplified Action=2 format
+            return linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', '')))
+    elif (haslinkspg and len(haslinkspg) > 0 or is_bron(link.get('servicetype'))) and link.get('status') in ['2', '10', '8']:
+        # PHP line 397-402: haslinkspg > 0 OR isBRON
+        if is_bron(link.get('servicetype')):
+            return linkdomain + '/' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
+        else:
+            # WordPress plugin format with 'bc' suffix
+            import html
+            slug_text = seo_text_custom(haslinkspg.get('restitle', ''))
+            slug_text = html.unescape(slug_text)
+            slug_text = to_ascii(slug_text)
+            slug_text = slug_text.lower()
+            slug_text = slug_text.replace(' ', '-')
+            return linkdomain + '/' + slug_text + '-' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
+    else:
+        # Default fallback: return homepage
+        return linkalone
 
 
 def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any], domain_settings: Dict[str, Any], domain_category: Dict[str, Any]) -> str:
