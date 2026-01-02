@@ -231,12 +231,15 @@ async def article_endpoint(
         kkyy_clean = kkyy.strip().strip("'\"")
         # Get feededit from query params, form data, or JSON (PHP $_REQUEST gets both)
         # feededit_param was initialized earlier, now update it with actual value
-        feededit_param = feededit or request.query_params.get('feedit')
+        feededit_param = feededit or request.query_params.get('feedit') or feededit_param
         if not feededit_param:
             if form_data:
                 feededit_param = form_data.get('feedit')
             elif json_data:
                 feededit_param = json_data.get('feedit')
+        # Ensure feededit_param is defined (should always be, but safety check)
+        if 'feedit_param' not in locals():
+            feededit_param = None
         logger.debug(f"WordPress plugin routing - kkyy: {repr(kkyy)}, kkyy_clean: {repr(kkyy_clean)}, apiid: {apiid}, apikey: {apikey}, feededit: {feedit_param}")
         # Route to WordPress plugin feeds based on kkyy value
         if kkyy_clean == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy_clean == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
