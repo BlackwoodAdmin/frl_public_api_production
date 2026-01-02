@@ -1553,13 +1553,15 @@ def build_excerpt(text: str, max_words: int = 20) -> str:
     return ' '.join(words) + '... ' if words else ''
 
 
-def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_settings: Dict[str, Any], template_file: Optional[str] = None) -> list:
+def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_settings: Dict[str, Any], template_file: Optional[str] = None, serveup: bool = False, agent: str = '') -> list:
     """
     Build pages array for WordPress plugin (feedit=1).
     Returns array of page objects matching PHP format.
+    If serveup=True, generates post_content using build_page_wp or build_bcpage_wp.
     """
     pagesarray = []
     servicetype = domain_data.get('servicetype')
+    import html
     
     # 1. Get bubblefeed entries (main pages)
     if domain_data.get('resourcesactive'):
@@ -1609,7 +1611,27 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
                     sorttext = build_excerpt(page.get('resfulltext', ''))
                 
                 sorttext = strip_html(seo_filter_text_custom(sorttext))
-                slug = seo_slug(keyword) + '-' + str(pageid) + '/'
+                # PHP line 274: slug uses seo_filter_text_custom2(toAscii($keyword))
+                slug_text = seo_filter_text_custom(keyword)  # seo_filter_text_custom2 is same as seo_filter_text_custom
+                slug_text = to_ascii(slug_text)
+                slug_text = html.unescape(slug_text)
+                slug_text = slug_text.lower().replace(' ', '-')
+                slug = slug_text + '-' + str(pageid) + '/'
+                
+                # Generate post_content if serveup=1 (PHP line 271-272)
+                wpage = ''
+                if serveup:
+                    wpage = build_page_wp(
+                        bubbleid=pageid,
+                        domainid=domainid,
+                        debug=False,
+                        agent=agent,
+                        keyword=keyword,
+                        domain_data=domain_data,
+                        domain_settings=domain_settings
+                    )
+                    # HTML escape like PHP htmlentities (ENT_IGNORE flag)
+                    wpage = html.escape(wpage)
                 
                 # Convert datetime to string if needed
                 post_date = page.get('createdDate', '')
@@ -1623,7 +1645,7 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
                     'post_title': keyword,
                     'canonical': '',
                     'post_type': 'page',
-                    'post_content': '',
+                    'post_content': wpage,
                     'comment_status': 'closed',
                     'ping_status': 'closed',
                     'post_date': str(post_date),
@@ -1672,7 +1694,28 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
                 sorttext = build_excerpt(page.get('resfulltext', ''))
             
             sorttext = strip_html(seo_filter_text_custom(sorttext))
-            slug = seo_slug(keyword) + '-' + str(pageid) + '/'
+            # PHP line 345: slug uses seo_filter_text_custom2(toAscii($keyword))
+            slug_text = seo_filter_text_custom(keyword)  # seo_filter_text_custom2 is same as seo_filter_text_custom
+            slug_text = to_ascii(slug_text)
+            slug_text = html.unescape(slug_text)
+            slug_text = slug_text.lower().replace(' ', '-')
+            slug = slug_text + '-' + str(pageid) + '/'
+            
+            # Generate post_content if serveup=1 (PHP line 343-344)
+            wpage = ''
+            if serveup:
+                wpage = build_page_wp(
+                    bubbleid=pageid,
+                    domainid=domainid,
+                    debug=False,
+                    agent=agent,
+                    keyword=keyword,
+                    domain_data=domain_data,
+                    domain_settings=domain_settings,
+                    support=1  # This is a supporting keyword page
+                )
+                # HTML escape like PHP htmlentities (ENT_IGNORE flag)
+                wpage = html.escape(wpage)
             
             # Convert datetime to string if needed
             post_date = page.get('createdDate', '')
@@ -1686,7 +1729,7 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
                 'canonical': '',
                 'post_title': keyword,
                 'post_type': 'page',
-                'post_content': '',
+                'post_content': wpage,
                 'comment_status': 'closed',
                 'ping_status': 'closed',
                 'post_date': str(post_date),
@@ -1734,6 +1777,20 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
         if len(domain_data.get('wr_phone', '')) > 9 and domain_settings.get('phoneintitle') == 1:
             metaTitle = domain_data['wr_phone'] + ' - ' + metaTitle
         
+        # Generate post_content if serveup=1 (PHP line 683-684)
+        wpage = ''
+        if serveup:
+            wpage = build_bcpage_wp(
+                bubbleid=pageid,
+                domainid=domainid,
+                debug=False,
+                agent=agent,
+                domain_data=domain_data,
+                domain_settings=domain_settings
+            )
+            # HTML escape like PHP htmlentities (ENT_IGNORE flag)
+            wpage = html.escape(wpage)
+        
         # Convert datetime to string if needed
         post_date = bcpage.get('createdDate', '')
         if post_date and hasattr(post_date, 'strftime'):
@@ -1745,7 +1802,7 @@ def build_pages_array(domainid: int, domain_data: Dict[str, Any], domain_setting
             'pageid': str(pageid) + 'bc',
             'post_title': keyword.lower() + ' - Resources',
             'post_type': 'page',
-            'post_content': '',
+            'post_content': wpage,
             'comment_status': 'closed',
             'ping_status': 'closed',
             'post_date': str(post_date),

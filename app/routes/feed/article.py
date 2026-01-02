@@ -223,8 +223,12 @@ async def article_endpoint(
     
     # WordPress plugin feed routing (kkyy-based)
     if apiid and apikey and kkyy:
+        # Normalize kkyy - handle URL encoding (e.g., %27 for ')
+        from urllib.parse import unquote
+        kkyy_normalized = unquote(str(kkyy)).strip("'\"")
+        
         # Route to WordPress plugin feeds based on kkyy value
-        if kkyy == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
+        if kkyy_normalized == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy_normalized == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
             # Route to apifeedwp30 handler
             # Get feededit from query params, form data, or JSON (PHP $_REQUEST gets both)
             feededit_param = feededit or request.query_params.get('feedit')
@@ -242,7 +246,10 @@ async def article_endpoint(
                 domain=domain,
                 apiid=apiid,
                 apikey=apikey,
-                kkyy=kkyy,
+                kkyy=kkyy_normalized,  # Use normalized kkyy
+                request=request,
+                form_data=form_data,
+                json_data=json_data,
                 feededit=feededit_param,
                 debug=debug,
                 serveup=serveup_param
@@ -802,13 +809,16 @@ async def article_endpoint(
 
 
 async def handle_apifeedwp30(
+    request: Request,
     domain: Optional[str],
     apiid: str,
     apikey: str,
     kkyy: str,
     feededit: Optional[str],
     debug: str,
-    serveup: Optional[str] = None
+    serveup: Optional[str] = None,
+    form_data: Optional[dict] = None,
+    json_data: Optional[dict] = None
 ):
     """
     Handle apifeedwp30.php requests (WordPress 3.0+ plugin feed).
@@ -889,7 +899,28 @@ async def handle_apifeedwp30(
     
     elif feededit == '1':
         # Handle feededit=1 (pages array)
-        pagesarray = build_pages_array(domainid, domain_data, domain_settings, domain_data.get('template_file'))
+        # Get agent parameter for content generation
+        agent_param = request.query_params.get('agent', '')
+        if form_data:
+            agent_param = form_data.get('agent', agent_param)
+        elif json_data:
+            agent_param = json_data.get('agent', agent_param)
+        
+        # Check serveup parameter - if 1, generate post_content
+        serveup_val = serveup if serveup else '0'
+        if form_data:
+            serveup_val = form_data.get('serveup', serveup_val)
+        elif json_data:
+            serveup_val = json_data.get('serveup', serveup_val)
+        
+        pagesarray = build_pages_array(
+            domainid=domainid,
+            domain_data=domain_data,
+            domain_settings=domain_settings,
+            template_file=domain_data.get('template_file'),
+            serveup=(serveup_val == '1'),
+            agent=agent_param
+        )
         return JSONResponse(content=pagesarray)
     
     elif feededit == 'add':
@@ -914,16 +945,26 @@ async def handle_apifeedwp30(
         if is_seom(domain_data.get('servicetype')) or is_bron(domain_data.get('servicetype')):
             keywords = keywords * 3
         
-        # Build response
+        # Build response - match PHP structure exactly (all domain fields + cade object)
         rdomains = [{
-            'domainid': domain_data['domainid'],
-            'status': domain_data['status'],
+            'domainid': str(domain_data['domainid']),
+            'servicetype': str(domain_data.get('servicetype', '')),
+            'domainip': domain_data.get('domainip', ''),
+            'showsnapshot': str(domain_data.get('showsnapshot', '0')),
+            'wr_address': domain_data.get('wr_address', ''),
+            'userid': str(domain_data.get('userid', '')),
+            'status': str(domain_data.get('status', '')),
+            'wr_video': domain_data.get('wr_video', ''),
+            'wr_facebook': domain_data.get('wr_facebook', ''),
+            'wr_googleplus': domain_data.get('wr_googleplus', ''),
+            'wr_twitter': domain_data.get('wr_twitter', ''),
+            'wr_linkedin': domain_data.get('wr_linkedin', ''),
             'wr_name': domain_data.get('wr_name', ''),
             'owneremail': domain_data.get('owneremail', ''),
-            'servicetype': domain_data.get('servicetype'),
+            'price': str(domain_data.get('price', '')),
             'cade': {
-                'level': cade_level,
-                'keywords': keywords,
+                'level': int(cade_level),
+                'keywords': int(keywords),
                 'servicetype': servicetypename
             }
         }]
