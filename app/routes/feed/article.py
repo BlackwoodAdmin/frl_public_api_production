@@ -236,11 +236,7 @@ async def article_endpoint(
         # Route to WordPress plugin feeds based on kkyy value
         if kkyy_clean == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy_clean == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
             # Route to apifeedwp30 handler
-            if not feededit_param:
-                if form_data:
-                    feededit_param = form_data.get('feedit')
-                elif json_data:
-                    feededit_param = json_data.get('feedit')
+            # feededit_param already extracted above
             serveup_param = request.query_params.get('serveup', '0')
             if form_data:
                 serveup_param = form_data.get('serveup', serveup_param)
