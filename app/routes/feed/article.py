@@ -231,7 +231,7 @@ async def article_endpoint(
         kkyy_clean = kkyy.strip().strip("'\"")
         # Get feededit from query params, form data, or JSON (PHP $_REQUEST gets both)
         # feededit_param was initialized earlier, now update it with actual value
-        feededit_param = feededit or request.query_params.get('feedit') or feededit_param
+        feededit_param = feededit or request.query_params.get('feedit')
         if not feededit_param:
             if form_data:
                 feededit_param = form_data.get('feedit')
