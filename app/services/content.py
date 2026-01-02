@@ -800,9 +800,9 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                 if resourcesactive == '1' or resourcesactive == 1:
                     # Resources active - show main article link (resfulltext) + Resources link (resfeedtext)
                     if (item.get('NoContent') == 0 or is_bron_val) and len(item.get('linkouturl', '').strip()) > 5:
-                            # External link
-                            foot += '<li><a style="padding-right: 0px !important;" href="' + item['linkouturl'] + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
-                        else:
+                        # External link
+                        foot += '<li><a style="padding-right: 0px !important;" href="' + item['linkouturl'] + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
+                    else:
                         # Internal link to main content page (resfulltext) - use toAscii(html_entity_decode(seo_text_custom(...))) for slug
                         slug_text = seo_text_custom(item['restitle'])  # seo_text_custom
                         slug_text = html.unescape(slug_text)  # html_entity_decode
@@ -811,7 +811,7 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                         slug_text = slug_text.replace(' ', '-')  # str_replace(' ', '-', ...)
                         main_link = linkdomain + '/' + slug_text + '-' + str(item['id']) + '/'
                         foot += '<li><a style="padding-right: 0px !important;" href="' + main_link + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
-                    else:
+                else:
                     # Resources not active - show only Business Collective link (resfeedtext)
                     if not bclink:
                         # Build bclink if not already built
