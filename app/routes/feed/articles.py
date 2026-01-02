@@ -359,6 +359,16 @@ img.align-left { max-width:100%!important;" }
     # PHP line 172: if($domains['script_version'] >= 3 && $domains['wp_plugin'] != 1 && $domains['iswin'] != 1 && $domains['usepurl'] != 0)
     if script_version >= 3 and wp_plugin != 1 and iswin != 1 and usepurl != 0:
         # Generate footer HTML (similar to Articles30.php seo_automation_build_footer30)
+        # #region agent log
+        from app.services.content import _debug_log
+        _debug_log("articles.py:articles_endpoint", "Calling build_footer_wp for PHP plugin", {
+            "wp_plugin": wp_plugin,
+            "wp_plugin_type": type(wp_plugin).__name__,
+            "script_version": script_version,
+            "iswin": iswin,
+            "usepurl": usepurl
+        }, "A")
+        # #endregion
         footer_html = build_footer_wp(domainid, domain_category, domain_settings)
         
         # TODO: Add social media icons if needed (PHP lines 176-253)
