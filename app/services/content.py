@@ -2941,7 +2941,8 @@ def build_bcpage_wp(
                 
                 # Priority check: packageoverride -> linkouturl -> existing logic
                 # If packageoverride is true, link points to homepage
-                if link.get('packageoverride') in [1, True, '1']:
+                packageoverride_val = link.get('packageoverride')
+                if packageoverride_val in [1, True, '1'] or (isinstance(packageoverride_val, str) and packageoverride_val.lower() == 'true'):
                     linkurl = linkalone
                 # Else if linkouturl exists, use it
                 elif link.get('linkouturl') and len(str(link.get('linkouturl', '')).strip()) > 5:
@@ -2998,8 +2999,20 @@ def build_bcpage_wp(
                         # CodeURL equivalent - simplified
                         linkurl = linkdomain + '/?Action=1&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '&PageID=' + str(link.get('bubblefeedid', ''))
                 else:
-                    # PHP line 372-375: Default fallback
-                    linkurl = linkalone
+                    # Default fallback: build main content page URL instead of homepage
+                    # This ensures links point to the main content page when packageoverride is false and linkouturl is not set
+                    if link.get('wp_plugin') == 1:
+                        # WordPress plugin: build slug-based URL
+                        import html
+                        slug_text = seo_text_custom(link.get('restitle', ''))
+                        slug_text = html.unescape(slug_text)
+                        slug_text = to_ascii(slug_text)
+                        slug_text = slug_text.lower()
+                        slug_text = slug_text.replace(' ', '-')
+                        linkurl = linkdomain + '/' + slug_text + '-' + str(link.get('bubblefeedid', '')) + '/'
+                    else:
+                        # Non-WP plugin: build Action=1 URL
+                        linkurl = linkdomain + '/?Action=1&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '&PageID=' + str(link.get('bubblefeedid', ''))
                 
                 follow = ' rel="nofollow"' if link.get('forceinboundnofollow') == 1 else ''
                 
