@@ -3,9 +3,6 @@ from fastapi import APIRouter, Request, Query, HTTPException, Form
 from fastapi.responses import JSONResponse, HTMLResponse, Response
 from typing import Optional
 import logging
-import json
-import os
-from datetime import datetime
 from app.database import db
 from app.services.auth import validate_api_credentials
 from app.services.content import build_footer_wp, build_pages_array
@@ -54,22 +51,8 @@ async def article_endpoint(
     
     # For POST requests, also check form data and JSON body (PHP $_REQUEST includes both GET and POST)
     # Note: POST requests can have parameters in query string OR body
-    # Initialize these variables for both GET and POST requests
     form_data = None
     json_data = None
-    # Initialize feededit_param early to ensure it's always defined
-    feededit_param = None
-    # #region agent log
-    try:
-        import os
-        log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug.log")
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "article.py:58", "message": "feededit_param initialized", "data": {"feedit_param": feededit_param, "feedit": feededit, "apiid": apiid, "apikey": apikey, "kkyy": kkyy}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
-    except Exception:
-        pass
-    # #endregion
-    
     if request.method == "POST":
         # First, check query params (POST requests can have params in URL too)
         # PHP $_REQUEST merges $_GET and $_POST, so we check both
@@ -239,89 +222,17 @@ async def article_endpoint(
         logger.debug(f"POST request - Final extracted params - domain: {domain}, apiid: {apiid}, apikey: {apikey}, kkyy: {kkyy}, feededit: {feededit}")
     
     # WordPress plugin feed routing (kkyy-based)
-    # #region agent log
-    try:
-        import os
-        log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug.log")
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "article.py:229", "message": "Before kkyy routing check", "data": {"apiid": apiid, "apikey": apikey, "kkyy": kkyy, "feedit_param_exists": "feedit_param" in locals(), "feedit_param_value": locals().get("feedit_param")}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
-    except Exception:
-        pass
-    # #endregion
     if apiid and apikey and kkyy:
-        # #region agent log
-        try:
-            import os
-            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug.log")
-            os.makedirs(os.path.dirname(log_path), exist_ok=True)
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "article.py:231", "message": "Inside kkyy routing block", "data": {"apiid": apiid, "apikey": apikey, "kkyy": kkyy}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
-        except Exception:
-            pass
-        # #endregion
-        # Strip whitespace and quotes from kkyy for comparison (handle URL encoding issues)
-        kkyy_clean = kkyy.strip().strip("'\"")
-        # Get feededit from query params, form data, or JSON (PHP $_REQUEST gets both)
-        # feededit_param was initialized earlier (line 58), now update it with actual value
-        # Get feededit from function parameter first, then query params, then form/json data
-        # #region agent log
-        try:
-            import os
-            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug.log")
-            os.makedirs(os.path.dirname(log_path), exist_ok=True)
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "article.py:240", "message": "Before feededit_param assignment", "data": {"feedit": feededit, "query_feedit": request.query_params.get('feedit'), "form_data_exists": form_data is not None, "json_data_exists": json_data is not None}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
-        except Exception:
-            pass
-        # #endregion
-        feededit_param = None
-        if feededit:
-            feededit_param = feededit
-        elif request.query_params.get('feedit'):
-            feededit_param = request.query_params.get('feedit')
-        elif form_data and form_data.get('feedit'):
-            feededit_param = form_data.get('feedit')
-        elif json_data and json_data.get('feedit'):
-            feededit_param = json_data.get('feedit')
-        # #region agent log
-        try:
-            import os
-            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug.log")
-            os.makedirs(os.path.dirname(log_path), exist_ok=True)
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "article.py:250", "message": "After feededit_param assignment", "data": {"feedit_param": feededit_param, "feedit_param_type": type(feededit_param).__name__, "feedit_param_in_locals": "feedit_param" in locals()}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
-        except Exception as e:
-            try:
-                import os
-                log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug.log")
-                os.makedirs(os.path.dirname(log_path), exist_ok=True)
-                with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "article.py:250", "message": "Exception in feededit_param log", "data": {"error": str(e)}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
-            except Exception:
-                pass
-        # #endregion
-        # Debug log - feededit_param should always be defined (initialized above)
-        # #region agent log
-        try:
-            import os
-            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug.log")
-            os.makedirs(os.path.dirname(log_path), exist_ok=True)
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "D", "location": "article.py:255", "message": "Before logger.debug call", "data": {"feedit_param": feededit_param, "feedit_param_in_locals": "feedit_param" in locals(), "locals_keys": list(locals().keys())[:10]}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
-        except Exception as e:
-            # Log to stderr as fallback
-            import sys
-            print(f"DEBUG LOG ERROR: {e}", file=sys.stderr)
-        # #endregion
-        # Safety check: ensure feededit_param is defined before using in logger.debug
-        if 'feedit_param' not in locals():
-            feededit_param = None
-        logger.debug(f"WordPress plugin routing - kkyy: {repr(kkyy)}, kkyy_clean: {repr(kkyy_clean)}, apiid: {apiid}, apikey: {apikey}, feededit_param: {feedit_param}")
         # Route to WordPress plugin feeds based on kkyy value
-        if kkyy_clean == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy_clean == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
+        if kkyy == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
             # Route to apifeedwp30 handler
-            # feededit_param already extracted above
+            # Get feededit from query params, form data, or JSON (PHP $_REQUEST gets both)
+            feededit_param = feededit or request.query_params.get('feedit')
+            if not feededit_param:
+                if form_data:
+                    feededit_param = form_data.get('feedit')
+                elif json_data:
+                    feededit_param = json_data.get('feedit')
             serveup_param = request.query_params.get('serveup', '0')
             if form_data:
                 serveup_param = form_data.get('serveup', serveup_param)
@@ -446,7 +357,7 @@ async def article_endpoint(
         
         if Action == '1':
             # Website Reference page
-            from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer, _debug_log, is_bron
+            from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer, _debug_log
             # #region agent log
             _debug_log("article.py:article_endpoint", "Before build_page_wp call", {
                 "bubbleid": bubbleid,
@@ -457,32 +368,6 @@ async def article_endpoint(
                 "script_version": script_version
             }, "A")
             # #endregion
-            
-            # BRON domains: Skip main keyword pages, but allow supporting keyword pages
-            if is_bron(domain_category.get('servicetype')):
-                # Check if this is a supporting keyword (exists in bwp_bubblefeedsupport)
-                if bubbleid:
-                    support_check_sql = """
-                        SELECT id FROM bwp_bubblefeedsupport 
-                        WHERE id = %s AND domainid = %s AND deleted != 1
-                    """
-                    is_supporting = db.fetch_row(support_check_sql, (bubbleid, domainid))
-                    if not is_supporting:
-                        # This is a main keyword for BRON - skip page creation
-                        logger.info(f"BRON domain: Skipping main keyword page (bubbleid={bubbleid})")
-                        return HTMLResponse(content="", status_code=404)
-                elif keyword_param:
-                    # Try to find by keyword - check if it's a supporting keyword
-                    support_check_sql = """
-                        SELECT id FROM bwp_bubblefeedsupport 
-                        WHERE restitle = %s AND domainid = %s AND deleted != 1
-                    """
-                    is_supporting = db.fetch_row(support_check_sql, (keyword_param, domainid))
-                    if not is_supporting:
-                        # This is a main keyword for BRON - skip page creation
-                        logger.info(f"BRON domain: Skipping main keyword page (keyword={keyword_param})")
-                        return HTMLResponse(content="", status_code=404)
-            
             logger.info(f"WP Plugin Action=1: bubbleid={bubbleid}, domainid={domainid}, keyword={keyword_param}")
             wpage = build_page_wp(
                 bubbleid=bubbleid,
@@ -645,7 +530,7 @@ async def article_endpoint(
     # #endregion
     if Action == '1':
         # Website Reference (non-WP) - use same function as WP but it handles wp_plugin internally
-        from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer, is_bron
+        from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
         # Extract pageid and keyword
         pageid_param = pageid or ''
         keyword_param = k or key or ''
@@ -664,31 +549,6 @@ async def article_endpoint(
             "keyword_param": keyword_param
         }, "A")
         # #endregion
-        
-        # BRON domains: Skip main keyword pages, but allow supporting keyword pages
-        if is_bron(domain_category.get('servicetype')):
-            # Check if this is a supporting keyword (exists in bwp_bubblefeedsupport)
-            if bubbleid:
-                support_check_sql = """
-                    SELECT id FROM bwp_bubblefeedsupport 
-                    WHERE id = %s AND domainid = %s AND deleted != 1
-                """
-                is_supporting = db.fetch_row(support_check_sql, (bubbleid, domainid))
-                if not is_supporting:
-                    # This is a main keyword for BRON - skip page creation
-                    logger.info(f"BRON domain: Skipping main keyword page (bubbleid={bubbleid})")
-                    return HTMLResponse(content="", status_code=404)
-            elif keyword_param:
-                # Try to find by keyword - check if it's a supporting keyword
-                support_check_sql = """
-                    SELECT id FROM bwp_bubblefeedsupport 
-                    WHERE restitle = %s AND domainid = %s AND deleted != 1
-                """
-                is_supporting = db.fetch_row(support_check_sql, (keyword_param, domainid))
-                if not is_supporting:
-                    # This is a main keyword for BRON - skip page creation
-                    logger.info(f"BRON domain: Skipping main keyword page (keyword={keyword_param})")
-                    return HTMLResponse(content="", status_code=404)
         
         wpage = build_page_wp(
             bubbleid=bubbleid,

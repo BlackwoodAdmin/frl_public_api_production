@@ -780,14 +780,7 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                 # PHP condition: links_per_page >=1 || 1==1 (always true)
                 if item.get('links_per_page', 0) >= 1 or True:  # Always true like PHP
                     if is_bron_val:
-                        # BRON: Use ID format for feedtext page
-                        wp_plugin = domain_data.get('wp_plugin', 0)
-                        if wp_plugin == 1:
-                            # WordPress: /idbc/
-                            bclink = linkdomain + '/' + str(item['id']) + 'bc/'
-                        else:
-                            # PHP: ?Action=2&PageID=id
-                            bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&PageID=' + str(item['id'])
+                        bclink = linkdomain + '/' + str(item['id']) + 'bc/'
                     else:
                         # Use toAscii(html_entity_decode(seo_text_custom(...))) for slug
                         slug_text = seo_text_custom(item['restitle'])  # seo_text_custom
@@ -806,27 +799,11 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                 resourcesactive = str(domain_data.get('resourcesactive', ''))
                 if resourcesactive == '1' or resourcesactive == 1:
                     # Resources active - show main article link (resfulltext) + Resources link (resfeedtext)
-                    # BRON domains: Use linkouturl for main keyword, or feedtext page URL if no linkouturl
-                    if is_bron_val:
-                        # BRON: Check if linkouturl exists, otherwise use feedtext page URL
-                        if item.get('linkouturl') and len(item.get('linkouturl', '').strip()) > 5:
-                            # Use linkouturl for BRON main keyword
-                            main_link = item['linkouturl']
-                        else:
-                            # Fallback to feedtext page URL for BRON
-                            wp_plugin = domain_data.get('wp_plugin', 0)
-                            if wp_plugin == 1:
-                                # WordPress: /idbc/
-                                main_link = linkdomain + '/' + str(item['id']) + 'bc/'
-                            else:
-                                # PHP: ?Action=2&PageID=id
-                                main_link = code_url(domainid, domain_data, domain_settings) + '?Action=2&PageID=' + str(item['id'])
-                        foot += '<li><a style="padding-right: 0px !important;" href="' + main_link + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
-                    elif (item.get('NoContent') == 0 or is_bron_val) and len(item.get('linkouturl', '').strip()) > 5:
-                        # External link (non-BRON)
+                    if (item.get('NoContent') == 0 or is_bron_val) and len(item.get('linkouturl', '').strip()) > 5:
+                        # External link
                         foot += '<li><a style="padding-right: 0px !important;" href="' + item['linkouturl'] + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
                     else:
-                        # Internal link to main content page (resfulltext) - non-BRON
+                        # Internal link to main content page (resfulltext)
                         # Check if WordPress plugin or PHP plugin to use correct URL structure
                         wp_plugin = domain_data.get('wp_plugin', 0)
                         # #region agent log
@@ -861,14 +838,7 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                     if not bclink:
                         # Build bclink if not already built
                         if is_bron_val:
-                            # BRON: Use ID format for feedtext page
-                            wp_plugin = domain_data.get('wp_plugin', 0)
-                            if wp_plugin == 1:
-                                # WordPress: /idbc/
-                                bclink = linkdomain + '/' + str(item['id']) + 'bc/'
-                            else:
-                                # PHP: ?Action=2&PageID=id
-                                bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&PageID=' + str(item['id'])
+                            bclink = linkdomain + '/' + str(item['id']) + 'bc/'
                         else:
                             slug_text = seo_text_custom(item['restitle'])
                             slug_text = html.unescape(slug_text)
@@ -2653,33 +2623,23 @@ def build_bcpage_wp(
     domain_status = domain_data.get('status')
     domain_status_str = str(domain_status) if domain_status is not None else ''
     script_version_num = get_script_version_num(domain_data.get('script_version'))
-    isBRON_val = is_bron(domain_data.get('servicetype'))
     
     if domain_status_str in ['2', '10']:
-        # BRON domains: H1 link points to feedtext page (Action=2) using ID format
-        if isBRON_val:
-            if domain_data.get('wp_plugin') == 1:
-                # WordPress: /idbc/
-                resurl = dl + '/' + str(res.get('id', '')) + 'bc/'
-            else:
-                # PHP: ?Action=2&PageID=id
-                resurl = code_url(domainid, domain_data, domain_settings) + "?Action=2&amp;PageID=" + str(res.get('id', ''))
+        # For WordPress plugins, always use WordPress URL structure
+        # resurl is used for H1 link which should point to Action=1 (main page) - /slug-id/ (no bc suffix)
+        # Action=2 (feed pages) URLs with 'bc' suffix are built separately when linking TO feed pages
+        if domain_data.get('wp_plugin') == 1:
+            slug_text = seo_text_custom(res.get('restitle', ''))
+            slug_text = html.unescape(slug_text)
+            slug_text = to_ascii(slug_text)
+            slug_text = slug_text.lower()
+            slug_text = slug_text.replace(' ', '-')
+            # H1 link points to main page (Action=1) - no 'bc' suffix
+            resurl = dl + '/' + slug_text + '-' + str(res.get('id', '')) + '/'
         else:
-            # Non-BRON: For WordPress plugins, always use WordPress URL structure
-            # resurl is used for H1 link which should point to Action=1 (main page) - /slug-id/ (no bc suffix)
-            # Action=2 (feed pages) URLs with 'bc' suffix are built separately when linking TO feed pages
-            if domain_data.get('wp_plugin') == 1:
-                slug_text = seo_text_custom(res.get('restitle', ''))
-                slug_text = html.unescape(slug_text)
-                slug_text = to_ascii(slug_text)
-                slug_text = slug_text.lower()
-                slug_text = slug_text.replace(' ', '-')
-                # H1 link points to main page (Action=1) - no 'bc' suffix
-                resurl = dl + '/' + slug_text + '-' + str(res.get('id', '')) + '/'
-            else:
-                # PHP: if($rd == 1 && $domain_category['script_version'] >= 3 && $domain_category['wp_plugin'] != 1 && $domain_category['iswin'] != 1 && $domain_category['usepurl'] != 0)
-                # For now, use CodeURL equivalent (simplified)
-                resurl = code_url(domainid, domain_data, domain_settings) + "?Action=1&amp;k=" + seo_slug(seo_filter_text_custom(res.get('restitle', ''))) + '&amp;PageID=' + str(res.get('id', ''))
+            # PHP: if($rd == 1 && $domain_category['script_version'] >= 3 && $domain_category['wp_plugin'] != 1 && $domain_category['iswin'] != 1 && $domain_category['usepurl'] != 0)
+            # For now, use CodeURL equivalent (simplified)
+            resurl = code_url(domainid, domain_data, domain_settings) + "?Action=1&amp;k=" + seo_slug(seo_filter_text_custom(res.get('restitle', ''))) + '&amp;PageID=' + str(res.get('id', ''))
     else:
         resurl = dl
     
@@ -3840,19 +3800,7 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                     links_per_page = item.get('links_per_page', 0) or 0
                     
                     # Always build Resources link regardless of links_per_page
-                    # Check if BRON domain for Resources link format
-                    is_bron_val = is_bron(domain_data.get('servicetype'))
-                    if is_bron_val:
-                        # BRON: Use ID format for feedtext page
-                        wp_plugin = domain_data.get('wp_plugin', 0)
-                        if wp_plugin == 1:
-                            # WordPress: /idbc/
-                            bclink = linkdomain + '/' + str(item_id) + 'bc/'
-                        else:
-                            # PHP: ?Action=2&PageID=id
-                            bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;PageID=' + str(item_id)
-                    else:
-                        bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
+                    bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
                     newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
                     
                     if links_per_page >= 1:
@@ -3929,20 +3877,7 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                         "linkouturl": item.get('linkouturl', '')
                     }, "A")
                     # #endregion
-                    # Check if BRON domain
-                    is_bron_val = is_bron(domain_data.get('servicetype'))
-                    
-                    if is_bron_val:
-                        # BRON: Use linkouturl for main keyword, or feedtext page URL if no linkouturl
-                        if item.get('linkouturl') and len(item.get('linkouturl', '').strip()) > 5:
-                            # Use linkouturl for BRON main keyword
-                            main_link = item['linkouturl']
-                        else:
-                            # Fallback to feedtext page URL for BRON
-                            linkurl = code_url(domainid, domain_data, domain_settings)
-                            main_link = f'{linkurl}?Action=2&amp;PageID={item_id}'
-                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}">{clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
-                    elif domain_category.get('resourcesactive') == '1':
+                    if domain_category.get('resourcesactive') == '1':
                         if item.get('NoContent') == 0 and len(item.get('linkouturl', '').strip()) > 5:
                             feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
                         else:
@@ -3975,19 +3910,7 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                     links_per_page = item.get('links_per_page', 0) or 0
                     
                     # Always build Resources link regardless of links_per_page
-                    # Check if BRON domain for Resources link format
-                    is_bron_val = is_bron(domain_data.get('servicetype'))
-                    if is_bron_val:
-                        # BRON: Use ID format for feedtext page
-                        wp_plugin = domain_data.get('wp_plugin', 0)
-                        if wp_plugin == 1:
-                            # WordPress: /idbc/
-                            bclink = linkdomain + '/' + str(item_id) + 'bc/'
-                        else:
-                            # PHP: ?Action=2&PageID=id
-                            bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;PageID=' + str(item_id)
-                    else:
-                        bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
+                    bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
                     newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
                     
                     if links_per_page >= 1:
@@ -4024,20 +3947,7 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                             sssnav += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;k={slug}&amp;PageID={link.get("bubblefeedid", "")}"> {clean_title(seo_filter_text_custom(link.get("restitle", "")))} </a></li>\n'
                     
                     # Build category link (PHP lines 1758-1764)
-                    # Check if BRON domain
-                    is_bron_val = is_bron(domain_data.get('servicetype'))
-                    
-                    if is_bron_val:
-                        # BRON: Use linkouturl for main keyword, or feedtext page URL if no linkouturl
-                        if item.get('linkouturl') and len(item.get('linkouturl', '').strip()) > 5:
-                            # Use linkouturl for BRON main keyword
-                            main_link = item['linkouturl']
-                        else:
-                            # Fallback to feedtext page URL for BRON
-                            linkurl = code_url(domainid, domain_data, domain_settings)
-                            main_link = f'{linkurl}?Action=2&amp;PageID={item_id}'
-                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}">{clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
-                    elif domain_category.get('resourcesactive') == '1':
+                    if domain_category.get('resourcesactive') == '1':
                         linkurl = code_url(domainid, domain_data, domain_settings)
                         category_slug = seo_slug(seo_filter_text_custom(item.get('category', '')))
                         feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;category={category_slug}&amp;c={item.get("categoryid", "")}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
@@ -4054,19 +3964,7 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                 # PHP line 1767: elseif(strlen(trim($silo[$i]['linkouturl'])) > 5)
                 elif len(item.get('linkouturl', '').strip()) > 5:
                     # Always build Resources link regardless of links_per_page
-                    # Check if BRON domain for Resources link format
-                    is_bron_val = is_bron(domain_data.get('servicetype'))
-                    if is_bron_val:
-                        # BRON: Use ID format for feedtext page
-                        wp_plugin = domain_data.get('wp_plugin', 0)
-                        if wp_plugin == 1:
-                            # WordPress: /idbc/
-                            bclink = linkdomain + '/' + str(item.get('id', '')) + 'bc/'
-                        else:
-                            # PHP: ?Action=2&PageID=id
-                            bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;PageID=' + str(item.get('id', ''))
-                    else:
-                        bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
+                    bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
                     newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
                     feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
             
