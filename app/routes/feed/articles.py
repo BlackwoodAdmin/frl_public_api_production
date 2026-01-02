@@ -277,6 +277,15 @@ async def articles_endpoint(
                         wp_plugin=domain_category.get('wp_plugin', 0)
                     )
                     
+                    # #region agent log
+                    from app.services.content import _count_divs, _debug_log
+                    div_counts_final = _count_divs(full_page_html)
+                    _debug_log("articles.py:articles_endpoint", "After wrap_content_with_header_footer", {
+                        "full_page_html_length": len(full_page_html),
+                        "div_counts": div_counts_final
+                    }, "B")
+                    # #endregion
+                    
                     # PHP Articles.php includes feed-home.css.php at lines 255 and 471
                     # Add feed-home.css.php CSS before </head> or at the end of <head>
                     feed_home_css = '''<style type="text/css">
