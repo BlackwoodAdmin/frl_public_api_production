@@ -235,9 +235,6 @@ async def article_endpoint(
                 feededit_param = form_data.get('feedit')
             elif json_data:
                 feededit_param = json_data.get('feedit')
-        # Ensure feededit_param is not None (default to None if not found)
-        if feededit_param is None:
-            feededit_param = None
         logger.debug(f"WordPress plugin routing - kkyy: {repr(kkyy)}, kkyy_clean: {repr(kkyy_clean)}, apiid: {apiid}, apikey: {apikey}, feededit: {feedit_param}")
         # Route to WordPress plugin feeds based on kkyy value
         if kkyy_clean == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy_clean == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
