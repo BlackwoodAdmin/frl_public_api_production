@@ -864,8 +864,8 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                             # BRON: Use ID format for feedtext page
                             wp_plugin = domain_data.get('wp_plugin', 0)
                             if wp_plugin == 1:
-                                # WordPress: /id/
-                                bclink = linkdomain + '/' + str(item['id']) + '/'
+                                # WordPress: /idbc/
+                                bclink = linkdomain + '/' + str(item['id']) + 'bc/'
                             else:
                                 # PHP: ?Action=2&PageID=id
                                 bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&PageID=' + str(item['id'])
@@ -4060,8 +4060,8 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                         # BRON: Use ID format for feedtext page
                         wp_plugin = domain_data.get('wp_plugin', 0)
                         if wp_plugin == 1:
-                            # WordPress: /id/
-                            bclink = linkdomain + '/' + str(item.get('id', '')) + '/'
+                            # WordPress: /idbc/
+                            bclink = linkdomain + '/' + str(item.get('id', '')) + 'bc/'
                         else:
                             # PHP: ?Action=2&PageID=id
                             bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;PageID=' + str(item.get('id', ''))
