@@ -54,6 +54,8 @@ async def article_endpoint(
     # Initialize these variables for both GET and POST requests
     form_data = None
     json_data = None
+    # Initialize feededit_param early to ensure it's always defined
+    feededit_param = None
     
     if request.method == "POST":
         # First, check query params (POST requests can have params in URL too)
@@ -228,8 +230,8 @@ async def article_endpoint(
         # Strip whitespace and quotes from kkyy for comparison (handle URL encoding issues)
         kkyy_clean = kkyy.strip().strip("'\"")
         # Get feededit from query params, form data, or JSON (PHP $_REQUEST gets both)
-        # Initialize feededit_param to ensure it's always defined
-        feededit_param = feededit or request.query_params.get('feedit')
+        # feededit_param was initialized earlier, now update it with actual value
+        feededit_param = feededit or request.query_params.get('feedit') or feededit_param
         if not feededit_param:
             if form_data:
                 feededit_param = form_data.get('feedit')
