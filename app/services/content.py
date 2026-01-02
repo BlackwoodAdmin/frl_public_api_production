@@ -2888,9 +2888,9 @@ def build_bcpage_wp(
                         linkurl = linkdomain + '/' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
                     else:
                         linkurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', ''))) + '-' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
-                elif len(link.get('linkouturl', '')) > 5 and link.get('status') in ['2', '10'] and (not is_seom(link.get('servicetype')) or is_bron(link.get('servicetype'))):
+                elif link.get('linkouturl') and len(str(link.get('linkouturl', '')).strip()) > 5 and link.get('status') in ['2', '10'] and (not is_seom(link.get('servicetype')) or is_bron(link.get('servicetype'))):
                     # PHP line 333: linkouturl if NOT SEOM OR if BRON
-                    linkurl = link['linkouturl'].strip()
+                    linkurl = str(link['linkouturl']).strip()
                 elif link.get('skipfeedchecker') == 1:
                     # PHP line 337-340
                     linkurl = linkdomainalone
@@ -3891,11 +3891,13 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                             # #endregion
                             feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
                     else:
+                        # Keyword link should always point to Action=1 (resfulltext) - main content page
+                        # Resources link (newsf) already points to Action=2 (resfeedtext)
                         linkurl = code_url(domainid, domain_data, domain_settings)
                         slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                        main_link = f'{linkurl}?Action=2&amp;k={slug}'
+                        main_link = f'{linkurl}?Action=1&amp;k={slug}&amp;PageID={item_id}'
                         # #region agent log
-                        _debug_log("content.py:build_article_links", "Generated main link (resourcesactive!=1)", {
+                        _debug_log("content.py:build_article_links", "Generated main link (resourcesactive!=1) - keyword link to Action=1", {
                             "main_link": main_link
                         }, "A")
                         # #endregion
@@ -3950,9 +3952,12 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                         category_slug = seo_slug(seo_filter_text_custom(item.get('category', '')))
                         feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;category={category_slug}&amp;c={item.get("categoryid", "")}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
                     else:
+                        # Keyword link should always point to Action=1 (resfulltext) - main content page
+                        # Resources link (newsf) already points to Action=2 (resfeedtext)
                         linkurl = code_url(domainid, domain_data, domain_settings)
                         slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=2&amp;k={slug}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
+                        main_link = f'{linkurl}?Action=1&amp;k={slug}&amp;PageID={item_id}'
+                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
                     
                     num_lnks += 1
                 
