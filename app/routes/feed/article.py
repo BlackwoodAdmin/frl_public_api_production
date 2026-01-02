@@ -1003,10 +1003,10 @@ async def handle_apifeedwp30(
             )
         else:
             # Return as JSON string (default)
-        return Response(
-            content=json.dumps(escaped_html),
-            media_type="application/json"
-        )
+            return Response(
+                content=json.dumps(escaped_html),
+                media_type="application/json"
+            )
     
     elif feededit == '1':
         # Handle feededit=1 (pages array)
