@@ -2700,11 +2700,15 @@ def build_bcpage_wp(
     else:
         resurl = dl
     
+    # For BRON domains only: if linkouturl exists, use it for H1 link (like footer links)
+    servicetype = domain_data.get('servicetype')
+    if is_bron(servicetype) and res.get('linkouturl') and len(str(res.get('linkouturl', '')).strip()) > 5:
+        resurl = str(res['linkouturl']).strip()
+    
     # PHP line 241: H1 with " - Resources" suffix
     bcpage += f'<h1 class="h1"><a href="{resurl}" style="">{clean_title(seo_filter_text_custom(res.get("restitle", "")))} - Resources</a></h1>\n'
     
     # PHP lines 242-257: Supporting keywords as H2 links for SEOM/BRON
-    servicetype = domain_data.get('servicetype')
     isSEOM_val = is_seom(servicetype)
     isBRON_val = is_bron(servicetype)
     
