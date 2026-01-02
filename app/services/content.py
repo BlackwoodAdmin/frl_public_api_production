@@ -2939,7 +2939,15 @@ def build_bcpage_wp(
                 # PHP line 322-376: Complex conditional logic for link URL building
                 haslinkspg_count = haslinks if haslinks else 0
                 
-                if haslinkspg_count > 0 and link.get('wp_plugin') != 1 and link.get('servicetype') == 356 and link.get('status') in ['2', '10']:
+                # Priority check: packageoverride -> linkouturl -> existing logic
+                # If packageoverride is true, link points to homepage
+                if link.get('packageoverride') in [1, True, '1']:
+                    linkurl = linkalone
+                # Else if linkouturl exists, use it
+                elif link.get('linkouturl') and len(str(link.get('linkouturl', '')).strip()) > 5:
+                    linkurl = str(link['linkouturl']).strip()
+                # Otherwise, continue with existing logic
+                elif haslinkspg_count > 0 and link.get('wp_plugin') != 1 and link.get('servicetype') == 356 and link.get('status') in ['2', '10']:
                     # PHP line 322-324: CodeURL for non-WP plugin with servicetype 356
                     # Simplified CodeURL - would need full implementation
                     linkurl = linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', '')))
