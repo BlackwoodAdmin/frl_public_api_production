@@ -61,7 +61,9 @@ async def article_endpoint(
     feededit_param = None
     # #region agent log
     try:
-        log_path = r"d:\www\FRLPublic\.cursor\debug.log"
+        import os
+        log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug.log")
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "article.py:58", "message": "feededit_param initialized", "data": {"feedit_param": feededit_param, "feedit": feededit, "apiid": apiid, "apikey": apikey, "kkyy": kkyy}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
     except Exception:
@@ -239,7 +241,9 @@ async def article_endpoint(
     # WordPress plugin feed routing (kkyy-based)
     # #region agent log
     try:
-        log_path = r"d:\www\FRLPublic\.cursor\debug.log"
+        import os
+        log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug.log")
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "article.py:229", "message": "Before kkyy routing check", "data": {"apiid": apiid, "apikey": apikey, "kkyy": kkyy, "feedit_param_exists": "feedit_param" in locals(), "feedit_param_value": locals().get("feedit_param")}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
     except Exception:
@@ -248,7 +252,9 @@ async def article_endpoint(
     if apiid and apikey and kkyy:
         # #region agent log
         try:
-            log_path = r"d:\www\FRLPublic\.cursor\debug.log"
+            import os
+            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug.log")
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A", "location": "article.py:231", "message": "Inside kkyy routing block", "data": {"apiid": apiid, "apikey": apikey, "kkyy": kkyy}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
         except Exception:
@@ -261,7 +267,9 @@ async def article_endpoint(
         # Get feededit from function parameter first, then query params, then form/json data
         # #region agent log
         try:
-            log_path = r"d:\www\FRLPublic\.cursor\debug.log"
+            import os
+            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug.log")
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "article.py:240", "message": "Before feededit_param assignment", "data": {"feedit": feededit, "query_feedit": request.query_params.get('feedit'), "form_data_exists": form_data is not None, "json_data_exists": json_data is not None}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
         except Exception:
@@ -278,12 +286,16 @@ async def article_endpoint(
             feededit_param = json_data.get('feedit')
         # #region agent log
         try:
-            log_path = r"d:\www\FRLPublic\.cursor\debug.log"
+            import os
+            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug.log")
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "article.py:250", "message": "After feededit_param assignment", "data": {"feedit_param": feededit_param, "feedit_param_type": type(feededit_param).__name__, "feedit_param_in_locals": "feedit_param" in locals()}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
         except Exception as e:
             try:
-                log_path = r"d:\www\FRLPublic\.cursor\debug.log"
+                import os
+                log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug.log")
+                os.makedirs(os.path.dirname(log_path), exist_ok=True)
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C", "location": "article.py:250", "message": "Exception in feededit_param log", "data": {"error": str(e)}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
             except Exception:
@@ -292,12 +304,19 @@ async def article_endpoint(
         # Debug log - feededit_param should always be defined (initialized above)
         # #region agent log
         try:
-            log_path = r"d:\www\FRLPublic\.cursor\debug.log"
+            import os
+            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".cursor", "debug.log")
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "D", "location": "article.py:255", "message": "Before logger.debug call", "data": {"feedit_param": feededit_param, "feedit_param_in_locals": "feedit_param" in locals(), "locals_keys": list(locals().keys())[:10]}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
-        except Exception:
-            pass
+        except Exception as e:
+            # Log to stderr as fallback
+            import sys
+            print(f"DEBUG LOG ERROR: {e}", file=sys.stderr)
         # #endregion
+        # Safety check: ensure feededit_param is defined before using in logger.debug
+        if 'feedit_param' not in locals():
+            feededit_param = None
         logger.debug(f"WordPress plugin routing - kkyy: {repr(kkyy)}, kkyy_clean: {repr(kkyy_clean)}, apiid: {apiid}, apikey: {apikey}, feededit_param: {feedit_param}")
         # Route to WordPress plugin feeds based on kkyy value
         if kkyy_clean == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy_clean == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
