@@ -803,13 +803,21 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                         # External link
                         foot += '<li><a style="padding-right: 0px !important;" href="' + item['linkouturl'] + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
                     else:
-                        # Internal link to main content page (resfulltext) - use toAscii(html_entity_decode(seo_text_custom(...))) for slug
-                        slug_text = seo_text_custom(item['restitle'])  # seo_text_custom
-                        slug_text = html.unescape(slug_text)  # html_entity_decode
-                        slug_text = to_ascii(slug_text)  # toAscii
-                        slug_text = slug_text.lower()  # strtolower
-                        slug_text = slug_text.replace(' ', '-')  # str_replace(' ', '-', ...)
-                        main_link = linkdomain + '/' + slug_text + '-' + str(item['id']) + '/'
+                        # Internal link to main content page (resfulltext)
+                        # Check if WordPress plugin or PHP plugin to use correct URL structure
+                        wp_plugin = domain_data.get('wp_plugin', 0)
+                        if wp_plugin == 1:
+                            # WordPress plugin: use /slug-id/ format
+                            slug_text = seo_text_custom(item['restitle'])  # seo_text_custom
+                            slug_text = html.unescape(slug_text)  # html_entity_decode
+                            slug_text = to_ascii(slug_text)  # toAscii
+                            slug_text = slug_text.lower()  # strtolower
+                            slug_text = slug_text.replace(' ', '-')  # str_replace(' ', '-', ...)
+                            main_link = linkdomain + '/' + slug_text + '-' + str(item['id']) + '/'
+                        else:
+                            # PHP plugin: use ?Action=1&k=keyword&PageID=id format
+                            keyword_slug = seo_filter_text_custom(item['restitle']).lower().replace(' ', '-')
+                            main_link = linkdomain + '/?Action=1&k=' + keyword_slug + '&PageID=' + str(item['id'])
                         foot += '<li><a style="padding-right: 0px !important;" href="' + main_link + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
                 else:
                     # Resources not active - show only Business Collective link (resfeedtext)
