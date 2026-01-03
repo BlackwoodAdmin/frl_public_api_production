@@ -2655,9 +2655,6 @@ def build_bcpage_wp(
                 elif link.get('linkouturl') and len(str(link.get('linkouturl', '')).strip()) > 5 and link.get('status') in ['2', '10'] and (not is_seom(link.get('servicetype')) or is_bron(link.get('servicetype'))):
                     # PHP line 333: linkouturl if NOT SEOM OR if BRON
                     linkurl = str(link['linkouturl']).strip()
-                elif link.get('skipfeedchecker') == 1:
-                    # PHP line 337-340
-                    linkurl = linkdomainalone
                 elif not link.get('bubblecat') and link.get('wp_plugin') == 1 and (len(link.get('resfulltext') or '') >= 50 or len(link.get('resshorttext') or '') >= 50) and link.get('status') in ['2', '10']:
                     # PHP line 342-344: WP plugin without bubblecat
                     import html
@@ -2786,10 +2783,9 @@ def build_bcpage_wp(
                 
                 # Build image URL - use current link data directly
                 # PHP line 386-405: Simplified to always use current link data
-                if link.get('skipfeedchecker') == 1 and link.get('linkskipfeedchecker') != 1:
-                    # PHP line 386-388
-                    imageurl = linkdomainalone
-                elif link.get('status') in ['2', '10', '8']:
+                # Normalize status to string for comparison (handle both string and integer)
+                link_status = str(link.get('status', '')) if link.get('status') is not None else ''
+                if link_status in ['2', '10', '8'] and link.get('restitle') and link.get('bubblefeedid'):
                     # Build feedtext URL using current link's data
                     if link.get('wp_plugin') != 1:
                         # Non-WP plugin: build Action=2 URL
