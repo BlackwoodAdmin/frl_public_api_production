@@ -9,6 +9,7 @@ import time
 import logging
 import json
 import fcntl
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from app.database import db
@@ -20,6 +21,10 @@ router = APIRouter()
 # File-based stats storage (shared across workers)
 STATS_FILE = Path("/tmp/frl_python_api_stats.json")
 STATS_LOCK_FILE = Path("/tmp/frl_python_api_stats.lock")
+
+# Log file configuration
+LOG_FILE_PATH = os.getenv("LOG_FILE_PATH", "/var/log/frl-python-api/app.log")
+USE_JOURNALCTL = os.getenv("USE_JOURNALCTL", "false").lower() == "true"
 
 # Initialize stats file if it doesn't exist
 if not STATS_FILE.exists():
@@ -225,6 +230,45 @@ def _get_gunicorn_processes():
             pass
     
     return processes, master_pid
+
+
+def _parse_log_line(line: str) -> Dict[str, str]:
+    """Parse a log line into components."""
+    # Expected format: "2024-01-01 12:00:00 - app.main - INFO - message"
+    parts = line.split(' - ', 3)
+    if len(parts) >= 4:
+        return {
+            "timestamp": parts[0],
+            "module": parts[1],
+            "level": parts[2],
+            "message": parts[3]
+        }
+    elif len(parts) >= 2:
+        return {
+            "timestamp": parts[0] if parts[0] else "",
+            "level": "INFO",
+            "message": ' - '.join(parts[1:])
+        }
+    else:
+        return {
+            "timestamp": "",
+            "level": "INFO",
+            "message": line
+        }
+
+
+def _extract_log_level(line: str) -> str:
+    """Extract log level from journalctl output or log line."""
+    line_upper = line.upper()
+    if "ERROR" in line_upper or "ERR" in line_upper:
+        return "ERROR"
+    elif "WARNING" in line_upper or "WARN" in line_upper:
+        return "WARNING"
+    elif "INFO" in line_upper:
+        return "INFO"
+    elif "DEBUG" in line_upper:
+        return "DEBUG"
+    return "INFO"
 
 
 @router.get("/workers", response_class=JSONResponse)
@@ -513,6 +557,176 @@ async def get_health():
         }
 
 
+@router.get("/logs", response_class=JSONResponse)
+async def get_logs(limit: int = 1000, level: Optional[str] = None):
+    """Get application logs."""
+    try:
+        logs = []
+        
+        if USE_JOURNALCTL:
+            # Read from systemd journal
+            cmd = ["journalctl", "-u", "frl-python-api", "-n", str(limit), "--no-pager", "-o", "short-iso"]
+            if level:
+                # Map level to journalctl priority
+                priority_map = {
+                    "ERROR": "err",
+                    "WARNING": "warning",
+                    "INFO": "info",
+                    "DEBUG": "debug"
+                }
+                if level.upper() in priority_map:
+                    cmd.extend(["--priority", priority_map[level.upper()]])
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')
+                for line in lines:
+                    if line.strip():
+                        logs.append({
+                            "timestamp": line[:19] if len(line) > 19 else "",
+                            "level": _extract_log_level(line),
+                            "message": line[20:] if len(line) > 20 else line
+                        })
+        else:
+            # Read from log file
+            log_path = Path(LOG_FILE_PATH)
+            if log_path.exists():
+                with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    lines = f.readlines()
+                    # Get last N lines
+                    lines = lines[-limit:] if len(lines) > limit else lines
+                    
+                    for line in lines:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        
+                        # Parse log line
+                        log_entry = _parse_log_line(line)
+                        if level and log_entry.get('level', '').upper() != level.upper():
+                            continue
+                        logs.append(log_entry)
+            else:
+                return {
+                    "error": f"Log file not found: {LOG_FILE_PATH}",
+                    "logs": [],
+                    "suggestion": "Set LOG_FILE_PATH environment variable or configure logging to write to a file"
+                }
+        
+        return {
+            "logs": logs,
+            "total": len(logs),
+            "source": "journalctl" if USE_JOURNALCTL else LOG_FILE_PATH
+        }
+    except Exception as e:
+        logger.error(f"Error getting logs: {e}")
+        return {
+            "error": str(e),
+            "logs": []
+        }
+
+
+@router.get("/worker/{pid}/logs", response_class=JSONResponse)
+async def get_worker_logs(pid: int, limit: int = 1000, level: Optional[str] = None):
+    """Get logs for a specific worker process."""
+    try:
+        logs = []
+        
+        # Verify process exists
+        try:
+            proc = psutil.Process(pid)
+            proc_name = proc.name()
+        except psutil.NoSuchProcess:
+            return {
+                "error": f"Process {pid} not found",
+                "logs": [],
+                "pid": pid
+            }
+        
+        if USE_JOURNALCTL:
+            # Read from systemd journal filtered by PID
+            cmd = [
+                "journalctl",
+                "-u", "frl-python-api",
+                "_PID=" + str(pid),
+                "-n", str(limit),
+                "--no-pager",
+                "-o", "short-iso"
+            ]
+            if level:
+                priority_map = {
+                    "ERROR": "err",
+                    "WARNING": "warning",
+                    "INFO": "info",
+                    "DEBUG": "debug"
+                }
+                if level.upper() in priority_map:
+                    cmd.extend(["--priority", priority_map[level.upper()]])
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')
+                for line in lines:
+                    if line.strip():
+                        logs.append({
+                            "timestamp": line[:19] if len(line) > 19 else "",
+                            "level": _extract_log_level(line),
+                            "message": line[20:] if len(line) > 20 else line
+                        })
+        else:
+            # Read from log file and filter by PID
+            log_path = Path(LOG_FILE_PATH)
+            if log_path.exists():
+                with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    lines = f.readlines()
+                    # Get last N lines (we'll filter by PID after)
+                    lines = lines[-limit*2:] if len(lines) > limit*2 else lines
+                    
+                    for line in lines:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        
+                        # Check if line contains PID (format: "PID:12345" or "[12345]")
+                        pid_str = str(pid)
+                        if pid_str not in line:
+                            continue
+                        
+                        # Parse log line
+                        log_entry = _parse_log_line(line)
+                        if level and log_entry.get('level', '').upper() != level.upper():
+                            continue
+                        
+                        # Add PID info to entry
+                        log_entry['pid'] = pid
+                        logs.append(log_entry)
+                        
+                        if len(logs) >= limit:
+                            break
+            else:
+                return {
+                    "error": f"Log file not found: {LOG_FILE_PATH}",
+                    "logs": [],
+                    "pid": pid,
+                    "suggestion": "Set LOG_FILE_PATH environment variable or use journalctl"
+                }
+        
+        return {
+            "logs": logs,
+            "total": len(logs),
+            "pid": pid,
+            "process_name": proc_name if 'proc_name' in locals() else "unknown",
+            "source": "journalctl" if USE_JOURNALCTL else LOG_FILE_PATH
+        }
+    except Exception as e:
+        logger.error(f"Error getting worker logs: {e}")
+        return {
+            "error": str(e),
+            "logs": [],
+            "pid": pid
+        }
+
+
 @router.get("/dashboard", response_class=HTMLResponse)
 async def get_dashboard():
     """HTML dashboard for monitoring Gunicorn workers."""
@@ -792,6 +1006,7 @@ async def get_dashboard():
                 <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/stats/page">Stats</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
+                <li><a href="/monitor/logs/page">Logs</a></li>
             </ul>
         </nav>
         
@@ -1113,6 +1328,7 @@ async def get_worker_detail_page(pid: int):
                 <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/stats/page">Stats</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
+                <li><a href="/monitor/logs/page">Logs</a></li>
             </ul>
         </nav>
         
@@ -1145,6 +1361,7 @@ async def get_worker_detail_page(pid: int):
                 html += '<div class="detail-item"><div class="detail-label">Uptime</div><div class="detail-value">' + formatUptime(data.uptime_seconds || 0) + '</div></div>';
                 html += '<div class="detail-item"><div class="detail-label">CPU %</div><div class="detail-value">' + (data.cpu_percent || 0).toFixed(2) + '%</div></div>';
                 html += '<div class="detail-item"><div class="detail-label">Threads</div><div class="detail-value">' + (data.num_threads || 0) + '</div></div>';
+                html += '<div class="detail-item"><div class="detail-label">Logs</div><div class="detail-value"><a href="/monitor/worker/' + data.pid + '/logs/page" style="color: #2c3e50; text-decoration: none; font-weight: 600;">View Logs →</a></div></div>';
                 html += '</div></div>';
                 
                 // Memory Section
@@ -2022,6 +2239,685 @@ async def get_health_page():
         
         // Auto-refresh every 5 seconds
         setInterval(fetchHealth, 5000);
+    </script>
+</body>
+</html>
+    """
+    return HTMLResponse(content=html_content)
+
+
+@router.get("/logs/page", response_class=HTMLResponse)
+async def get_logs_page():
+    """HTML page for viewing application logs."""
+    html_content = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logs - Gunicorn Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, monospace;
+            background: #f5f5f5;
+            color: #333;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .nav-menu {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .nav-menu ul {
+            list-style: none;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 0;
+            padding: 0;
+        }
+        .nav-menu li {
+            margin: 0;
+        }
+        .nav-menu a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }
+        .nav-menu a:hover {
+            background-color: #f0f0f0;
+        }
+        .nav-menu a.active {
+            background-color: #2c3e50;
+            color: white;
+        }
+        .logs-controls {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .logs-controls label {
+            font-size: 14px;
+            color: #666;
+        }
+        .logs-controls select,
+        .logs-controls input {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .logs-controls button {
+            padding: 6px 16px;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .logs-controls button:hover {
+            background: #34495e;
+        }
+        .logs-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-height: 80vh;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #333;
+            word-wrap: break-word;
+        }
+        .log-entry:hover {
+            background: #2a2a2a;
+        }
+        .log-timestamp {
+            color: #858585;
+            margin-right: 10px;
+        }
+        .log-level {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 10px;
+            min-width: 60px;
+            text-align: center;
+        }
+        .log-level.ERROR {
+            background: #f44336;
+            color: white;
+        }
+        .log-level.WARNING {
+            background: #ff9800;
+            color: white;
+        }
+        .log-level.INFO {
+            background: #2196F3;
+            color: white;
+        }
+        .log-level.DEBUG {
+            background: #9e9e9e;
+            color: white;
+        }
+        .log-message {
+            color: #d4d4d4;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .auto-scroll {
+            margin-left: auto;
+        }
+        .auto-scroll input {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="/monitor/dashboard">Dashboard</a></li>
+                <li><a href="/monitor/workers/page">Workers</a></li>
+                <li><a href="/monitor/stats/page">Stats</a></li>
+                <li><a href="/monitor/health/page">Health</a></li>
+                <li><a href="/monitor/logs/page" class="active">Logs</a></li>
+            </ul>
+        </nav>
+        
+        <div class="logs-controls">
+            <label>
+                Limit:
+                <select id="limit-select">
+                    <option value="100">100</option>
+                    <option value="500" selected>500</option>
+                    <option value="1000">1000</option>
+                    <option value="5000">5000</option>
+                </select>
+            </label>
+            <label>
+                Level:
+                <select id="level-select">
+                    <option value="">All</option>
+                    <option value="ERROR">ERROR</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="INFO">INFO</option>
+                    <option value="DEBUG">DEBUG</option>
+                </select>
+            </label>
+            <button onclick="fetchLogs()">Refresh</button>
+            <div class="auto-scroll">
+                <input type="checkbox" id="auto-scroll" checked>
+                <label for="auto-scroll">Auto-scroll</label>
+            </div>
+            <div class="auto-scroll">
+                <input type="checkbox" id="auto-refresh">
+                <label for="auto-refresh">Auto-refresh (5s)</label>
+            </div>
+        </div>
+        
+        <div id="error-container"></div>
+        <div id="logs-container" class="logs-container loading">Loading logs...</div>
+    </div>
+    
+    <script>
+        let autoRefreshInterval = null;
+        
+        function formatLogEntry(log) {
+            const timestamp = log.timestamp || '';
+            const level = (log.level || 'INFO').toUpperCase();
+            const message = log.message || '';
+            const module = log.module ? `[${log.module}]` : '';
+            
+            return `
+                <div class="log-entry">
+                    <span class="log-timestamp">${timestamp}</span>
+                    <span class="log-level ${level}">${level}</span>
+                    ${module ? `<span style="color: #858585;">${module}</span>` : ''}
+                    <span class="log-message">${escapeHtml(message)}</span>
+                </div>
+            `;
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        async function fetchLogs() {
+            try {
+                const limit = document.getElementById('limit-select').value;
+                const level = document.getElementById('level-select').value;
+                const params = new URLSearchParams({ limit });
+                if (level) params.append('level', level);
+                
+                const response = await fetch('/monitor/logs?' + params);
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('logs-container').innerHTML = 
+                        '<div class="error">Error: ' + data.error + '</div>';
+                    document.getElementById('error-container').innerHTML = '';
+                    return;
+                }
+                
+                if (data.logs.length === 0) {
+                    document.getElementById('logs-container').innerHTML = 
+                        '<div class="loading">No logs found</div>';
+                    document.getElementById('error-container').innerHTML = '';
+                    return;
+                }
+                
+                let html = '';
+                data.logs.forEach(log => {
+                    html += formatLogEntry(log);
+                });
+                
+                document.getElementById('logs-container').innerHTML = html;
+                document.getElementById('error-container').innerHTML = '';
+                
+                // Auto-scroll to bottom if enabled
+                if (document.getElementById('auto-scroll').checked) {
+                    const container = document.getElementById('logs-container');
+                    container.scrollTop = container.scrollHeight;
+                }
+            } catch (error) {
+                document.getElementById('logs-container').innerHTML = 
+                    '<div class="error">Error fetching logs: ' + error.message + '</div>';
+                document.getElementById('error-container').innerHTML = '';
+            }
+        }
+        
+        function toggleAutoRefresh() {
+            const checkbox = document.getElementById('auto-refresh');
+            if (checkbox.checked) {
+                autoRefreshInterval = setInterval(fetchLogs, 5000);
+            } else {
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }
+            }
+        }
+        
+        document.getElementById('auto-refresh').addEventListener('change', toggleAutoRefresh);
+        
+        // Initial load
+        fetchLogs();
+    </script>
+</body>
+</html>
+    """
+    return HTMLResponse(content=html_content)
+
+
+@router.get("/worker/{pid}/logs/page", response_class=HTMLResponse)
+async def get_worker_logs_page(pid: int):
+    """HTML page for viewing worker-specific logs."""
+    html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worker {pid} Logs - Gunicorn Monitor</title>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, monospace;
+            background: #f5f5f5;
+            color: #333;
+            padding: 20px;
+        }}
+        .container {{
+            max-width: 1600px;
+            margin: 0 auto;
+        }}
+        .nav-menu {{
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }}
+        .nav-menu ul {{
+            list-style: none;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 0;
+            padding: 0;
+        }}
+        .nav-menu li {{
+            margin: 0;
+        }}
+        .nav-menu a {{
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }}
+        .nav-menu a:hover {{
+            background-color: #f0f0f0;
+        }}
+        .nav-menu a.active {{
+            background-color: #2c3e50;
+            color: white;
+        }}
+        .worker-info {{
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }}
+        .worker-info h2 {{
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }}
+        .worker-info p {{
+            color: #666;
+            margin: 5px 0;
+        }}
+        .logs-controls {{
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }}
+        .logs-controls label {{
+            font-size: 14px;
+            color: #666;
+        }}
+        .logs-controls select,
+        .logs-controls input {{
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }}
+        .logs-controls button {{
+            padding: 6px 16px;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }}
+        .logs-controls button:hover {{
+            background: #34495e;
+        }}
+        .logs-container {{
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-height: 80vh;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+        }}
+        .log-entry {{
+            padding: 4px 0;
+            border-bottom: 1px solid #333;
+            word-wrap: break-word;
+        }}
+        .log-entry:hover {{
+            background: #2a2a2a;
+        }}
+        .log-timestamp {{
+            color: #858585;
+            margin-right: 10px;
+        }}
+        .log-level {{
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 10px;
+            min-width: 60px;
+            text-align: center;
+        }}
+        .log-level.ERROR {{
+            background: #f44336;
+            color: white;
+        }}
+        .log-level.WARNING {{
+            background: #ff9800;
+            color: white;
+        }}
+        .log-level.INFO {{
+            background: #2196F3;
+            color: white;
+        }}
+        .log-level.DEBUG {{
+            background: #9e9e9e;
+            color: white;
+        }}
+        .log-message {{
+            color: #d4d4d4;
+        }}
+        .loading {{
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }}
+        .error {{
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }}
+        .auto-scroll {{
+            margin-left: auto;
+        }}
+        .auto-scroll input {{
+            margin-right: 5px;
+        }}
+        .back-link {{
+            display: inline-block;
+            color: #2c3e50;
+            text-decoration: none;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }}
+        .back-link:hover {{
+            text-decoration: underline;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="/monitor/dashboard">Dashboard</a></li>
+                <li><a href="/monitor/workers/page">Workers</a></li>
+                <li><a href="/monitor/stats/page">Stats</a></li>
+                <li><a href="/monitor/health/page">Health</a></li>
+                <li><a href="/monitor/logs/page">Logs</a></li>
+            </ul>
+        </nav>
+        
+        <a href="/monitor/worker/{pid}/page" class="back-link">← Back to Worker {pid} Details</a>
+        
+        <div class="worker-info" id="worker-info">
+            <h2>Worker Process {pid}</h2>
+            <p id="process-info">Loading process information...</p>
+        </div>
+        
+        <div class="logs-controls">
+            <label>
+                Limit:
+                <select id="limit-select">
+                    <option value="100">100</option>
+                    <option value="500" selected>500</option>
+                    <option value="1000">1000</option>
+                    <option value="5000">5000</option>
+                </select>
+            </label>
+            <label>
+                Level:
+                <select id="level-select">
+                    <option value="">All</option>
+                    <option value="ERROR">ERROR</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="INFO">INFO</option>
+                    <option value="DEBUG">DEBUG</option>
+                </select>
+            </label>
+            <button onclick="fetchLogs()">Refresh</button>
+            <div class="auto-scroll">
+                <input type="checkbox" id="auto-scroll" checked>
+                <label for="auto-scroll">Auto-scroll</label>
+            </div>
+            <div class="auto-scroll">
+                <input type="checkbox" id="auto-refresh">
+                <label for="auto-refresh">Auto-refresh (5s)</label>
+            </div>
+        </div>
+        
+        <div id="error-container"></div>
+        <div id="logs-container" class="logs-container loading">Loading logs...</div>
+    </div>
+    
+    <script>
+        const pid = {pid};
+        let autoRefreshInterval = null;
+        
+        function formatLogEntry(log) {{
+            const timestamp = log.timestamp || '';
+            const level = (log.level || 'INFO').toUpperCase();
+            const message = log.message || '';
+            const module = log.module ? `[${{log.module}}]` : '';
+            
+            return `
+                <div class="log-entry">
+                    <span class="log-timestamp">${{timestamp}}</span>
+                    <span class="log-level ${{level}}">${{level}}</span>
+                    ${{module ? `<span style="color: #858585;">${{module}}</span>` : ''}}
+                    <span class="log-message">${{escapeHtml(message)}}</span>
+                </div>
+            `;
+        }}
+        
+        function escapeHtml(text) {{
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }}
+        
+        async function fetchWorkerInfo() {{
+            try {{
+                const response = await fetch(`/monitor/worker/${{pid}}`);
+                const data = await response.json();
+                
+                if (data.error) {{
+                    document.getElementById('process-info').textContent = 
+                        'Error: ' + data.error;
+                    return;
+                }}
+                
+                document.getElementById('process-info').innerHTML = 
+                    `Process: <strong>${{data.name || 'N/A'}}</strong> | ` +
+                    `Status: <strong>${{data.status || 'N/A'}}</strong> | ` +
+                    `Uptime: <strong>${{formatUptime(data.uptime_seconds || 0)}}</strong>`;
+            }} catch (error) {{
+                document.getElementById('process-info').textContent = 
+                    'Error loading process info: ' + error.message;
+            }}
+        }}
+        
+        function formatUptime(seconds) {{
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            
+            if (days > 0) return `${{days}}d ${{hours}}h ${{minutes}}m`;
+            if (hours > 0) return `${{hours}}h ${{minutes}}m`;
+            if (minutes > 0) return `${{minutes}}m ${{secs}}s`;
+            return `${{secs}}s`;
+        }}
+        
+        async function fetchLogs() {{
+            try {{
+                const limit = document.getElementById('limit-select').value;
+                const level = document.getElementById('level-select').value;
+                const params = new URLSearchParams({{ limit }});
+                if (level) params.append('level', level);
+                
+                const response = await fetch(`/monitor/worker/${{pid}}/logs?${{params}}`);
+                const data = await response.json();
+                
+                if (data.error) {{
+                    document.getElementById('logs-container').innerHTML = 
+                        '<div class="error">Error: ' + data.error + '</div>';
+                    document.getElementById('error-container').innerHTML = '';
+                    return;
+                }}
+                
+                if (data.logs.length === 0) {{
+                    document.getElementById('logs-container').innerHTML = 
+                        '<div class="loading">No logs found for this worker</div>';
+                    document.getElementById('error-container').innerHTML = '';
+                    return;
+                }}
+                
+                let html = '';
+                data.logs.forEach(log => {{
+                    html += formatLogEntry(log);
+                }});
+                
+                document.getElementById('logs-container').innerHTML = html;
+                document.getElementById('error-container').innerHTML = '';
+                
+                // Auto-scroll to bottom if enabled
+                if (document.getElementById('auto-scroll').checked) {{
+                    const container = document.getElementById('logs-container');
+                    container.scrollTop = container.scrollHeight;
+                }}
+            }} catch (error) {{
+                document.getElementById('logs-container').innerHTML = 
+                    '<div class="error">Error fetching logs: ' + error.message + '</div>';
+                document.getElementById('error-container').innerHTML = '';
+            }}
+        }}
+        
+        function toggleAutoRefresh() {{
+            const checkbox = document.getElementById('auto-refresh');
+            if (checkbox.checked) {{
+                autoRefreshInterval = setInterval(fetchLogs, 5000);
+            }} else {{
+                if (autoRefreshInterval) {{
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }}
+            }}
+        }}
+        
+        document.getElementById('auto-refresh').addEventListener('change', toggleAutoRefresh);
+        
+        // Initial load
+        fetchWorkerInfo();
+        fetchLogs();
     </script>
 </body>
 </html>
