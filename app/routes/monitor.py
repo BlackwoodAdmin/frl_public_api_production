@@ -577,16 +577,43 @@ async def get_logs(limit: int = 1000, level: Optional[str] = None):
                 if level.upper() in priority_map:
                     cmd.extend(["--priority", priority_map[level.upper()]])
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-            if result.returncode == 0:
-                lines = result.stdout.strip().split('\n')
-                for line in lines:
-                    if line.strip():
-                        logs.append({
-                            "timestamp": line[:19] if len(line) > 19 else "",
-                            "level": _extract_log_level(line),
-                            "message": line[20:] if len(line) > 20 else line
-                        })
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    lines = result.stdout.strip().split('\n')
+                    for line in lines:
+                        if line.strip():
+                            logs.append({
+                                "timestamp": line[:19] if len(line) > 19 else "",
+                                "level": _extract_log_level(line),
+                                "message": line[20:] if len(line) > 20 else line
+                            })
+                else:
+                    # journalctl command failed
+                    error_msg = result.stderr.strip() or f"journalctl returned code {result.returncode}"
+                    
+                    # Check for specific error types
+                    error_lower = error_msg.lower()
+                    if "permission denied" in error_lower or "access denied" in error_lower:
+                        suggestion = "Permission denied. The application user may need to be added to systemd-journal group or run with appropriate permissions."
+                    elif "no such file" in error_lower or "not found" in error_lower:
+                        suggestion = "Service 'frl-python-api' may not exist or journalctl cannot find it. Verify the service name."
+                    else:
+                        suggestion = "Check if journalctl has permission to read logs or if the service name 'frl-python-api' is correct. Try running 'journalctl -u frl-python-api -n 10' manually."
+                    
+                    return {
+                        "error": f"Failed to read logs from journalctl: {error_msg}",
+                        "logs": [],
+                        "suggestion": suggestion,
+                        "source": "journalctl"
+                    }
+            except subprocess.TimeoutExpired:
+                return {
+                    "error": "journalctl command timed out after 5 seconds",
+                    "logs": [],
+                    "suggestion": "Log volume may be very large. Try reducing the limit parameter or check system performance.",
+                    "source": "journalctl"
+                }
         else:
             # Read from log file
             log_path = Path(LOG_FILE_PATH)
@@ -663,16 +690,45 @@ async def get_worker_logs(pid: int, limit: int = 1000, level: Optional[str] = No
                 if level.upper() in priority_map:
                     cmd.extend(["--priority", priority_map[level.upper()]])
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-            if result.returncode == 0:
-                lines = result.stdout.strip().split('\n')
-                for line in lines:
-                    if line.strip():
-                        logs.append({
-                            "timestamp": line[:19] if len(line) > 19 else "",
-                            "level": _extract_log_level(line),
-                            "message": line[20:] if len(line) > 20 else line
-                        })
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    lines = result.stdout.strip().split('\n')
+                    for line in lines:
+                        if line.strip():
+                            logs.append({
+                                "timestamp": line[:19] if len(line) > 19 else "",
+                                "level": _extract_log_level(line),
+                                "message": line[20:] if len(line) > 20 else line
+                            })
+                else:
+                    # journalctl command failed
+                    error_msg = result.stderr.strip() or f"journalctl returned code {result.returncode}"
+                    
+                    # Check for specific error types
+                    error_lower = error_msg.lower()
+                    if "permission denied" in error_lower or "access denied" in error_lower:
+                        suggestion = "Permission denied. The application user may need to be added to systemd-journal group or run with appropriate permissions."
+                    elif "no such file" in error_lower or "not found" in error_lower:
+                        suggestion = f"Service 'frl-python-api' may not exist or journalctl cannot find it. Verify the service name."
+                    else:
+                        suggestion = f"Check if journalctl has permission to read logs or if PID {pid} has any log entries. Try running 'journalctl -u frl-python-api _PID={pid} -n 10' manually."
+                    
+                    return {
+                        "error": f"Failed to read logs for PID {pid} from journalctl: {error_msg}",
+                        "logs": [],
+                        "pid": pid,
+                        "suggestion": suggestion,
+                        "source": "journalctl"
+                    }
+            except subprocess.TimeoutExpired:
+                return {
+                    "error": f"journalctl command timed out after 5 seconds for PID {pid}",
+                    "logs": [],
+                    "pid": pid,
+                    "suggestion": "Log volume may be very large. Try reducing the limit parameter or check system performance.",
+                    "source": "journalctl"
+                }
         else:
             # Read from log file and filter by PID
             log_path = Path(LOG_FILE_PATH)
