@@ -62,9 +62,6 @@ async def verify_dashboard_access(credentials: HTTPBasicCredentials = Depends(se
 STATS_FILE = Path("/var/run/frl-python-api/stats.json")
 STATS_LOCK_FILE = Path("/var/run/frl-python-api/stats.lock")
 
-# Application session ID - generated on module load (changes on app restart)
-APP_SESSION_ID = time.time()
-
 # Log file configuration
 LOG_FILE_PATH = os.getenv("LOG_FILE_PATH", "/var/log/frl-python-api/app.log")
 USE_JOURNALCTL = os.getenv("USE_JOURNALCTL", "false").lower() == "true"
@@ -117,7 +114,7 @@ try:
                 "start_time": time.time(),
                 "last_minute_requests": [],
                 "last_reset_time": time.time(),
-                "app_session_id": APP_SESSION_ID,
+                "app_session_id": None,  # Will be set on first load based on master PID
             }
             with open(STATS_FILE, 'w') as f:
                 json.dump(initial_stats, f)
@@ -165,9 +162,13 @@ def _load_stats() -> Dict[str, Any]:
                 _save_stats(stats)
                 # Continue to session check below (will reset if app_session_id is None)
             
-            # Check if app session ID matches (app restart detection)
+            # Check if app session ID matches (app restart detection using master PID)
+            # Get current master PID - all workers share the same master PID
+            _, current_master_pid = _get_gunicorn_processes()
             stored_session_id = stats.get("app_session_id")
-            if stored_session_id != APP_SESSION_ID:
+            
+            # If master PID not found (e.g., dev mode), use None to skip restart detection
+            if current_master_pid is not None and stored_session_id != current_master_pid:
                 # App has restarted - reset error-related counters
                 # Need exclusive lock to reset - use double-check pattern
                 with open(STATS_LOCK_FILE, 'r+') as lock_file:
@@ -177,22 +178,39 @@ def _load_stats() -> Dict[str, Any]:
                         with open(STATS_FILE, 'r') as f:
                             stats = json.load(f)
                         
-                        # Check again if reset is still needed
+                        # Get master PID again and check if reset is still needed
+                        _, current_master_pid = _get_gunicorn_processes()
                         stored_session_id = stats.get("app_session_id")
-                        if stored_session_id != APP_SESSION_ID:
+                        if current_master_pid is not None and stored_session_id != current_master_pid:
                             # Reset error-related counters on app restart
                             stats["errors"] = 0
                             stats["total_requests"] = 0
                             stats["request_times"] = []
                             stats["last_minute_requests"] = []
                             stats["last_reset_time"] = current_time
-                            stats["app_session_id"] = APP_SESSION_ID
+                            stats["app_session_id"] = current_master_pid
                             # Keep start_time unchanged (for uptime calculation)
                             
                             # Save reset stats
                             with open(STATS_FILE, 'w') as f:
                                 json.dump(stats, f)
                             logger.info(f"Reset error counts on app restart. Errors: 0, Total requests: 0")
+                    finally:
+                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            elif current_master_pid is not None and stored_session_id is None:
+                # First time setting session ID (migration or new install)
+                # Need exclusive lock to update
+                with open(STATS_LOCK_FILE, 'r+') as lock_file:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)  # Exclusive lock for writing
+                    try:
+                        # Reload stats and set session ID
+                        with open(STATS_FILE, 'r') as f:
+                            stats = json.load(f)
+                        
+                        if stats.get("app_session_id") is None:
+                            stats["app_session_id"] = current_master_pid
+                            with open(STATS_FILE, 'w') as f:
+                                json.dump(stats, f)
                     finally:
                         fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
             
@@ -246,7 +264,7 @@ def _load_stats() -> Dict[str, Any]:
                         "start_time": time.time(),
                         "last_minute_requests": [],
                         "last_reset_time": time.time(),
-                        "app_session_id": APP_SESSION_ID,
+                        "app_session_id": None,  # Will be set on first load based on master PID
                     }
                     
                     # Create file
@@ -265,7 +283,7 @@ def _load_stats() -> Dict[str, Any]:
             "start_time": time.time(),
             "last_minute_requests": [],
             "last_reset_time": time.time(),
-            "app_session_id": APP_SESSION_ID,
+            "app_session_id": None,  # Will be set on first load based on master PID
         }
 
 
