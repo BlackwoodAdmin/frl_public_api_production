@@ -687,9 +687,9 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                 if resourcesactive == '1' or resourcesactive == 1:
                     # Resources active - show main article link (resfulltext) + Resources link (resfeedtext)
                     if (item.get('NoContent') == 0 or is_bron_val) and len(item.get('linkouturl', '').strip()) > 5:
-                            # External link
-                            foot += '<li><a style="padding-right: 0px !important;" href="' + item['linkouturl'] + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
-                        else:
+                        # External link
+                        foot += '<li><a style="padding-right: 0px !important;" href="' + item['linkouturl'] + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
+                    else:
                         # Internal link to main content page (resfulltext)
                         # Check if WordPress plugin or PHP plugin to use correct URL structure
                         wp_plugin = domain_data.get('wp_plugin', 0)
@@ -701,7 +701,7 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                             slug_text = slug_text.lower()  # strtolower
                             slug_text = slug_text.replace(' ', '-')  # str_replace(' ', '-', ...)
                             main_link = linkdomain + '/' + slug_text + '-' + str(item['id']) + '/'
-                    else:
+                        else:
                             # PHP plugin: use ?Action=1&k=keyword&PageID=id format
                             keyword_slug = seo_filter_text_custom(item['restitle']).lower().replace(' ', '-')
                             main_link = linkdomain + '/?Action=1&k=' + keyword_slug + '&PageID=' + str(item['id'])
