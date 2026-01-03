@@ -386,6 +386,36 @@ def _extract_log_level(line: str) -> str:
     return "INFO"
 
 
+def _extract_journalctl_log_level(line: str) -> str:
+    """Extract log level from journalctl structured format.
+    
+    Parses syslog/journalctl format: TIMESTAMP LEVEL PRIORITY HOSTNAME SERVICE[PID]: MESSAGE
+    Example: "2026-01-03T15:33:40 ERROR 0500 publichost1.imagehosting.space frl-python-api[54993]: message"
+    
+    Args:
+        line: Log line from journalctl output
+        
+    Returns:
+        Log level (ERROR, WARNING, INFO, DEBUG) or falls back to keyword search
+    """
+    # Split the line by whitespace to parse structured format
+    parts = line.split(None, 3)  # Split into max 4 parts (timestamp, level, priority, rest)
+    
+    # Check if we have at least 3 parts (timestamp, level, priority)
+    if len(parts) >= 3:
+        # Check if first part looks like an ISO timestamp (contains 'T' separator)
+        timestamp_part = parts[0]
+        if 'T' in timestamp_part and len(timestamp_part) >= 10:
+            # Second part should be the log level
+            level_part = parts[1].upper()
+            # Validate it's a known log level
+            if level_part in ('ERROR', 'WARNING', 'INFO', 'DEBUG'):
+                return level_part
+    
+    # Fall back to keyword search if structured parsing fails
+    return _extract_log_level(line)
+
+
 @router.get("/workers", response_class=JSONResponse)
 async def get_workers(username: str = Depends(verify_dashboard_access)):
     """Get Gunicorn worker process information."""
@@ -714,8 +744,8 @@ async def get_logs(limit: int = 1000, level: Optional[str] = None, username: str
                     lines = result.stdout.strip().split('\n')
                     for line in lines:
                         if line.strip():
-                            # Extract log level from the line
-                            extracted_level = _extract_log_level(line)
+                            # Extract log level from the line using structured parsing
+                            extracted_level = _extract_journalctl_log_level(line)
                             
                             # Filter by level if specified
                             if level and extracted_level.upper() != level.upper():
@@ -835,8 +865,8 @@ async def get_worker_logs(pid: int, limit: int = 1000, level: Optional[str] = No
                     lines = result.stdout.strip().split('\n')
                     for line in lines:
                         if line.strip():
-                            # Extract log level from the line
-                            extracted_level = _extract_log_level(line)
+                            # Extract log level from the line using structured parsing
+                            extracted_level = _extract_journalctl_log_level(line)
                             
                             # Filter by level if specified
                             if level and extracted_level.upper() != level.upper():
