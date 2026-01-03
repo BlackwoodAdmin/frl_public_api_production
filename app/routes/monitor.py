@@ -38,8 +38,8 @@ except Exception as e:
 router = APIRouter()
 
 # File-based stats storage (shared across workers)
-STATS_FILE = Path("/tmp/frl_python_api_stats.json")
-STATS_LOCK_FILE = Path("/tmp/frl_python_api_stats.lock")
+STATS_FILE = Path("/var/run/frl-python-api/stats.json")
+STATS_LOCK_FILE = Path("/var/run/frl-python-api/stats.lock")
 
 # Log file configuration
 LOG_FILE_PATH = os.getenv("LOG_FILE_PATH", "/var/log/frl-python-api/app.log")
