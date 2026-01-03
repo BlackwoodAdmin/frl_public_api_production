@@ -2605,7 +2605,7 @@ async def get_logs_page():
             </label>
             <label>
                 Level:
-                <select id="level-select">
+                <select id="level-select" onchange="fetchLogs()">
                     <option value="">All</option>
                     <option value="ERROR">ERROR</option>
                     <option value="WARNING">WARNING</option>
@@ -2942,7 +2942,7 @@ async def get_worker_logs_page(pid: int):
             </label>
             <label>
                 Level:
-                <select id="level-select">
+                <select id="level-select" onchange="fetchLogs()">
                     <option value="">All</option>
                     <option value="ERROR">ERROR</option>
                     <option value="WARNING">WARNING</option>
