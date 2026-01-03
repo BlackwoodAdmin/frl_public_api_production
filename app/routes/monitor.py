@@ -209,6 +209,7 @@ class StatsTrackingMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         
         # Record request start time
+        logger.debug(f"Tracking request: {request.method} {request.url.path}")
         start_time = time.time()
         
         # Process request
@@ -251,6 +252,8 @@ class StatsTrackingMiddleware(BaseHTTPMiddleware):
             # Track errors (status code >= 400)
             if response.status_code >= 400:
                 stats["errors"] += 1
+            
+            logger.debug(f"Updated stats: total_requests={stats['total_requests']}, errors={stats['errors']}, response_time={response_time:.3f}s, status={response.status_code}")
         
         _update_stats(update_stats)
         
@@ -412,6 +415,7 @@ async def get_stats():
     try:
         # Load stats from shared file
         stats = _load_stats()
+        logger.debug(f"Loaded stats: total_requests={stats.get('total_requests', 0)}, errors={stats.get('errors', 0)}, request_times_count={len(stats.get('request_times', []))}, last_minute_count={len(stats.get('last_minute_requests', []))}")
         current_time = time.time()
         
         # Clean old request times (older than 1 minute)
@@ -442,7 +446,11 @@ async def get_stats():
         cpu_count = psutil.cpu_count()
         mem = psutil.virtual_memory()
         
-        return {
+        # Add diagnostic info
+        stats_file_exists = STATS_FILE.exists()
+        stats_file_size = STATS_FILE.stat().st_size if stats_file_exists else 0
+        
+        result = {
             "total_requests": total_requests,
             "requests_per_minute": len(stats["last_minute_requests"]),
             "average_response_time_ms": round(avg_response_time * 1000, 2),
@@ -457,8 +465,20 @@ async def get_stats():
                 "memory_used_gb": round(mem.used / 1024 / 1024 / 1024, 2),
                 "memory_available_gb": round(mem.available / 1024 / 1024 / 1024, 2)
             },
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "_diagnostic": {
+                "stats_file_exists": stats_file_exists,
+                "stats_file_path": str(STATS_FILE),
+                "stats_file_size": stats_file_size,
+                "raw_total_requests": stats.get("total_requests", 0),
+                "raw_errors": stats.get("errors", 0),
+                "raw_request_times_count": len(stats.get("request_times", [])),
+                "raw_last_minute_count": len(stats.get("last_minute_requests", []))
+            }
         }
+        
+        logger.info(f"Stats response: total_requests={total_requests}, file_exists={stats_file_exists}, file_size={stats_file_size}")
+        return result
     except Exception as e:
         logger.error(f"Error getting stats: {e}")
         return {
