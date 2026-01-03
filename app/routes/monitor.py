@@ -8,8 +8,9 @@ logger.info("=" * 80)
 logger.info("Initializing monitor module...")
 
 try:
-    from fastapi import APIRouter, Request
+    from fastapi import APIRouter, Request, Depends, HTTPException, status
     from fastapi.responses import HTMLResponse, JSONResponse
+    from fastapi.security import HTTPBasic, HTTPBasicCredentials
     from starlette.middleware.base import BaseHTTPMiddleware
     from typing import List, Dict, Any, Optional
     import psutil
@@ -36,6 +37,30 @@ except Exception as e:
     raise
 
 router = APIRouter()
+
+# HTTP Basic Authentication for dashboard
+security = HTTPBasic()
+
+async def verify_dashboard_access(credentials: HTTPBasicCredentials = Depends(security)):
+    """Verify user has access to dashboard."""
+    try:
+        from app.services.auth import validate_dashboard_credentials
+        
+        if not validate_dashboard_credentials(credentials.username, credentials.password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials",
+                headers={"WWW-Authenticate": "Basic"},
+            )
+        return credentials.username
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in dashboard authentication: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentication error"
+        )
 
 # File-based stats storage (shared across workers)
 STATS_FILE = Path("/var/run/frl-python-api/stats.json")
@@ -379,7 +404,7 @@ def _extract_log_level(line: str) -> str:
 
 
 @router.get("/workers", response_class=JSONResponse)
-async def get_workers():
+async def get_workers(username: str = Depends(verify_dashboard_access)):
     """Get Gunicorn worker process information."""
     try:
         workers, master_pid = _get_gunicorn_processes()
@@ -410,7 +435,7 @@ async def get_workers():
 
 
 @router.get("/stats", response_class=JSONResponse)
-async def get_stats():
+async def get_stats(username: str = Depends(verify_dashboard_access)):
     """Get request statistics and performance metrics."""
     try:
         # Load stats from shared file
@@ -500,7 +525,7 @@ async def get_stats():
 
 
 @router.get("/worker/{pid}", response_class=JSONResponse)
-async def get_worker_details(pid: int):
+async def get_worker_details(pid: int, username: str = Depends(verify_dashboard_access)):
     """Get detailed information about a specific worker process."""
     try:
         proc = psutil.Process(pid)
@@ -642,7 +667,7 @@ async def get_worker_details(pid: int):
 
 
 @router.get("/health", response_class=JSONResponse)
-async def get_health():
+async def get_health(username: str = Depends(verify_dashboard_access)):
     """Get system health status."""
     try:
         # Check database connectivity
@@ -682,7 +707,7 @@ async def get_health():
 
 
 @router.get("/logs", response_class=JSONResponse)
-async def get_logs(limit: int = 1000, level: Optional[str] = None):
+async def get_logs(limit: int = 1000, level: Optional[str] = None, username: str = Depends(verify_dashboard_access)):
     """Get application logs."""
     try:
         logs = []
@@ -784,7 +809,7 @@ async def get_logs(limit: int = 1000, level: Optional[str] = None):
 
 
 @router.get("/worker/{pid}/logs", response_class=JSONResponse)
-async def get_worker_logs(pid: int, limit: int = 1000, level: Optional[str] = None):
+async def get_worker_logs(pid: int, limit: int = 1000, level: Optional[str] = None, username: str = Depends(verify_dashboard_access)):
     """Get logs for a specific worker process."""
     try:
         logs = []
@@ -921,8 +946,198 @@ async def get_worker_logs(pid: int, limit: int = 1000, level: Optional[str] = No
         }
 
 
+@router.get("/login", response_class=HTMLResponse)
+async def get_login_page():
+    """Login page for dashboard access."""
+    html_content = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Login - FRL Python API</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .login-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+        .error.show {
+            display: block;
+        }
+        .info {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 20px;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>Dashboard Login</h1>
+        <p class="subtitle">FRL Python API Monitoring</p>
+        
+        <div id="error-message" class="error"></div>
+        
+        <form id="login-form">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required autocomplete="username">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+            </div>
+            
+            <button type="submit" class="btn">Login</button>
+        </form>
+        
+        <div class="info">
+            <strong>Note:</strong> Your browser may also prompt you with a login dialog when accessing protected pages. You can use either method to authenticate.
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('login-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('error-message');
+            
+            // Clear previous errors
+            errorDiv.classList.remove('show');
+            errorDiv.textContent = '';
+            
+            // Create basic auth header
+            const credentials = btoa(username + ':' + password);
+            
+            try {
+                // Test authentication by making a request to a protected endpoint
+                const response = await fetch('/monitor/health', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Basic ' + credentials
+                    }
+                });
+                
+                if (response.ok) {
+                    // Authentication successful - redirect to dashboard
+                    // Store credentials in sessionStorage for future requests
+                    sessionStorage.setItem('authCredentials', credentials);
+                    window.location.href = '/monitor/dashboard';
+                } else if (response.status === 401) {
+                    // Authentication failed
+                    errorDiv.textContent = 'Invalid username or password. Please try again.';
+                    errorDiv.classList.add('show');
+                } else {
+                    errorDiv.textContent = 'An error occurred. Please try again.';
+                    errorDiv.classList.add('show');
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Network error. Please check your connection and try again.';
+                errorDiv.classList.add('show');
+                console.error('Login error:', error);
+            }
+        });
+        
+        // Auto-focus username field
+        document.getElementById('username').focus();
+    </script>
+</body>
+</html>
+    """
+    return HTMLResponse(content=html_content)
+
+
 @router.get("/dashboard", response_class=HTMLResponse)
-async def get_dashboard():
+async def get_dashboard(username: str = Depends(verify_dashboard_access)):
     """HTML dashboard for monitoring Gunicorn workers."""
     html_content = """
 <!DOCTYPE html>
@@ -1377,7 +1592,7 @@ async def get_dashboard():
 
 
 @router.get("/worker/{pid}/page", response_class=HTMLResponse)
-async def get_worker_detail_page(pid: int):
+async def get_worker_detail_page(pid: int, username: str = Depends(verify_dashboard_access)):
     """HTML page for viewing detailed worker process information."""
     html_content = f"""
 <!DOCTYPE html>
@@ -1658,7 +1873,7 @@ async def get_worker_detail_page(pid: int):
 
 
 @router.get("/workers/page", response_class=HTMLResponse)
-async def get_workers_page():
+async def get_workers_page(username: str = Depends(verify_dashboard_access)):
     """HTML page for viewing worker processes."""
     html_content = """
 <!DOCTYPE html>
@@ -1893,7 +2108,7 @@ async def get_workers_page():
 
 
 @router.get("/stats/page", response_class=HTMLResponse)
-async def get_stats_page():
+async def get_stats_page(username: str = Depends(verify_dashboard_access)):
     """HTML page for viewing request statistics."""
     html_content = """
 <!DOCTYPE html>
@@ -2182,7 +2397,7 @@ async def get_stats_page():
 
 
 @router.get("/health/page", response_class=HTMLResponse)
-async def get_health_page():
+async def get_health_page(username: str = Depends(verify_dashboard_access)):
     """HTML page for viewing system health."""
     html_content = """
 <!DOCTYPE html>
@@ -2436,7 +2651,7 @@ async def get_health_page():
 
 
 @router.get("/logs/page", response_class=HTMLResponse)
-async def get_logs_page():
+async def get_logs_page(username: str = Depends(verify_dashboard_access)):
     """HTML page for viewing application logs."""
     html_content = """
 <!DOCTYPE html>
@@ -2741,7 +2956,7 @@ async def get_logs_page():
 
 
 @router.get("/worker/{pid}/logs/page", response_class=HTMLResponse)
-async def get_worker_logs_page(pid: int):
+async def get_worker_logs_page(pid: int, username: str = Depends(verify_dashboard_access)):
     """HTML page for viewing worker-specific logs."""
     html_content = f"""
 <!DOCTYPE html>
