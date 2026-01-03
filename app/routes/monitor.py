@@ -113,6 +113,7 @@ try:
                 "errors": 0,
                 "start_time": time.time(),
                 "last_minute_requests": [],
+                "last_reset_time": time.time(),
             }
             with open(STATS_FILE, 'w') as f:
                 json.dump(initial_stats, f)
@@ -125,21 +126,62 @@ except Exception as e:
 
 
 def _load_stats() -> Dict[str, Any]:
-    """Load stats from file with locking."""
+    """Load stats from file with locking.
+    
+    Also handles 3-hour automatic reset of error counts and migration of stats format.
+    """
     try:
         # Ensure lock file exists
         STATS_LOCK_FILE.touch(exist_ok=True)
         
         # Check if file exists first (without lock to avoid unnecessary locking)
         if STATS_FILE.exists():
-            # File exists - read with shared lock
+            # File exists - read with shared lock first
             with open(STATS_LOCK_FILE, 'r+') as lock_file:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)  # Shared lock for reading
                 try:
                     with open(STATS_FILE, 'r') as f:
-                        return json.load(f)
+                        stats = json.load(f)
                 finally:
                     fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            
+            # Migration: Add last_reset_time if missing
+            current_time = time.time()
+            if "last_reset_time" not in stats:
+                stats["last_reset_time"] = current_time
+                # Save migrated stats (will use exclusive lock in _save_stats)
+                _save_stats(stats)
+                return stats
+            
+            # Check if 3 hours (10800 seconds) have passed since last reset
+            time_since_reset = current_time - stats.get("last_reset_time", current_time)
+            if time_since_reset >= 10800:  # 3 hours
+                # Need exclusive lock to reset - use double-check pattern
+                with open(STATS_LOCK_FILE, 'r+') as lock_file:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)  # Exclusive lock for writing
+                    try:
+                        # Double-check: reload stats in case another process already reset
+                        with open(STATS_FILE, 'r') as f:
+                            stats = json.load(f)
+                        
+                        # Check again if reset is still needed
+                        time_since_reset = current_time - stats.get("last_reset_time", current_time)
+                        if time_since_reset >= 10800:
+                            # Reset error-related counters
+                            stats["errors"] = 0
+                            stats["total_requests"] = 0
+                            stats["request_times"] = []
+                            stats["last_reset_time"] = current_time
+                            # Keep start_time and last_minute_requests unchanged
+                            
+                            # Save reset stats
+                            with open(STATS_FILE, 'w') as f:
+                                json.dump(stats, f)
+                            logger.info(f"Reset error counts after 3 hours. Errors: 0, Total requests: 0")
+                    finally:
+                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            
+            return stats
         else:
             # File doesn't exist - create it with exclusive lock
             with open(STATS_LOCK_FILE, 'r+') as lock_file:
@@ -160,6 +202,7 @@ def _load_stats() -> Dict[str, Any]:
                         "errors": 0,
                         "start_time": time.time(),
                         "last_minute_requests": [],
+                        "last_reset_time": time.time(),
                     }
                     
                     # Create file
@@ -177,6 +220,7 @@ def _load_stats() -> Dict[str, Any]:
             "errors": 0,
             "start_time": time.time(),
             "last_minute_requests": [],
+            "last_reset_time": time.time(),
         }
 
 
