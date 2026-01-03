@@ -56,15 +56,22 @@ JOURNALCTL_PATH = _find_journalctl_path()
 
 # Initialize stats file if it doesn't exist
 if not STATS_FILE.exists():
-    initial_stats = {
-        "total_requests": 0,
-        "request_times": [],
-        "errors": 0,
-        "start_time": time.time(),
-        "last_minute_requests": [],
-    }
-    with open(STATS_FILE, 'w') as f:
-        json.dump(initial_stats, f)
+    try:
+        # Ensure directory exists
+        STATS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        
+        initial_stats = {
+            "total_requests": 0,
+            "request_times": [],
+            "errors": 0,
+            "start_time": time.time(),
+            "last_minute_requests": [],
+        }
+        with open(STATS_FILE, 'w') as f:
+            json.dump(initial_stats, f)
+        logger.info(f"Initialized stats file: {STATS_FILE}")
+    except Exception as e:
+        logger.error(f"Failed to initialize stats file {STATS_FILE}: {e}")
 
 
 def _load_stats() -> Dict[str, Any]:
@@ -73,22 +80,45 @@ def _load_stats() -> Dict[str, Any]:
         # Ensure lock file exists
         STATS_LOCK_FILE.touch(exist_ok=True)
         
-        with open(STATS_LOCK_FILE, 'r+') as lock_file:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)  # Shared lock for reading
-            try:
-                if STATS_FILE.exists():
+        # Check if file exists first (without lock to avoid unnecessary locking)
+        if STATS_FILE.exists():
+            # File exists - read with shared lock
+            with open(STATS_LOCK_FILE, 'r+') as lock_file:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)  # Shared lock for reading
+                try:
                     with open(STATS_FILE, 'r') as f:
                         return json.load(f)
-                else:
-                    return {
+                finally:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        else:
+            # File doesn't exist - create it with exclusive lock
+            with open(STATS_LOCK_FILE, 'r+') as lock_file:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)  # Exclusive lock for writing
+                try:
+                    # Double-check file doesn't exist (another process might have created it)
+                    if STATS_FILE.exists():
+                        with open(STATS_FILE, 'r') as f:
+                            return json.load(f)
+                    
+                    # Create directory if it doesn't exist
+                    STATS_FILE.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    # Initialize stats
+                    initial_stats = {
                         "total_requests": 0,
                         "request_times": [],
                         "errors": 0,
                         "start_time": time.time(),
                         "last_minute_requests": [],
                     }
-            finally:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                    
+                    # Create file
+                    with open(STATS_FILE, 'w') as f:
+                        json.dump(initial_stats, f)
+                    logger.info(f"Created stats file: {STATS_FILE}")
+                    return initial_stats
+                finally:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
     except Exception as e:
         logger.error(f"Error loading stats: {e}")
         return {
@@ -103,6 +133,9 @@ def _load_stats() -> Dict[str, Any]:
 def _save_stats(stats: Dict[str, Any]):
     """Save stats to file with locking."""
     try:
+        # Ensure directory exists
+        STATS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        
         # Ensure lock file exists
         STATS_LOCK_FILE.touch(exist_ok=True)
         
@@ -111,10 +144,11 @@ def _save_stats(stats: Dict[str, Any]):
             try:
                 with open(STATS_FILE, 'w') as f:
                     json.dump(stats, f)
+                logger.debug(f"Saving stats: total_requests={stats.get('total_requests', 0)}, errors={stats.get('errors', 0)}")
             finally:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
     except Exception as e:
-        logger.error(f"Error saving stats: {e}")
+        logger.error(f"Error saving stats to {STATS_FILE}: {e}")
 
 
 def _update_stats(update_func):
