@@ -1,21 +1,39 @@
 """Monitoring endpoints for Gunicorn workers and system health."""
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
-from typing import List, Dict, Any, Optional
-import psutil
-import os
-import time
 import logging
-import json
-import fcntl
-import subprocess
-import shutil
-from datetime import datetime
-from pathlib import Path
-from app.database import db
+import traceback
 
+# Get logger early
 logger = logging.getLogger(__name__)
+logger.info("=" * 80)
+logger.info("Initializing monitor module...")
+
+try:
+    from fastapi import APIRouter, Request
+    from fastapi.responses import HTMLResponse, JSONResponse
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from typing import List, Dict, Any, Optional
+    import psutil
+    import os
+    import time
+    import json
+    import fcntl
+    import subprocess
+    import shutil
+    from datetime import datetime
+    from pathlib import Path
+    logger.info("✓ Successfully imported standard libraries")
+except Exception as e:
+    logger.error(f"✗ Failed to import standard libraries: {e}")
+    logger.error(traceback.format_exc())
+    raise
+
+try:
+    from app.database import db
+    logger.info("✓ Successfully imported app.database")
+except Exception as e:
+    logger.error(f"✗ Failed to import app.database: {e}")
+    logger.error(traceback.format_exc())
+    raise
 
 router = APIRouter()
 
@@ -30,6 +48,7 @@ USE_JOURNALCTL = os.getenv("USE_JOURNALCTL", "false").lower() == "true"
 
 def _find_journalctl_path() -> str:
     """Find the path to journalctl executable."""
+    logger.debug("Finding journalctl path...")
     # Common system paths for journalctl
     common_paths = [
         "/usr/bin/journalctl",
@@ -41,37 +60,60 @@ def _find_journalctl_path() -> str:
     # First try to find it in PATH
     journalctl_path = shutil.which("journalctl")
     if journalctl_path:
+        logger.info(f"✓ Found journalctl in PATH: {journalctl_path}")
         return journalctl_path
     
     # If not in PATH, try common system paths
     for path in common_paths:
         if os.path.exists(path) and os.access(path, os.X_OK):
+            logger.info(f"✓ Found journalctl at: {path}")
             return path
     
     # If still not found, return default
+    logger.warning("⚠ journalctl not found in PATH or common locations, using default")
     return "journalctl"  # Will fail with better error message
 
 # Cache the journalctl path
-JOURNALCTL_PATH = _find_journalctl_path()
+try:
+    logger.info("Detecting journalctl path...")
+    JOURNALCTL_PATH = _find_journalctl_path()
+    logger.info(f"✓ Journalctl path set to: {JOURNALCTL_PATH}")
+except Exception as e:
+    logger.error(f"✗ Failed to find journalctl path: {e}")
+    logger.error(traceback.format_exc())
+    JOURNALCTL_PATH = "journalctl"  # Fallback
 
 # Initialize stats file if it doesn't exist
-if not STATS_FILE.exists():
-    try:
-        # Ensure directory exists
-        STATS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        
-        initial_stats = {
-            "total_requests": 0,
-            "request_times": [],
-            "errors": 0,
-            "start_time": time.time(),
-            "last_minute_requests": [],
-        }
-        with open(STATS_FILE, 'w') as f:
-            json.dump(initial_stats, f)
-        logger.info(f"Initialized stats file: {STATS_FILE}")
-    except Exception as e:
-        logger.error(f"Failed to initialize stats file {STATS_FILE}: {e}")
+try:
+    logger.info(f"Checking stats file: {STATS_FILE}")
+    if not STATS_FILE.exists():
+        logger.info("Stats file does not exist, creating...")
+        try:
+            # Ensure directory exists
+            STATS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            logger.info(f"✓ Ensured directory exists: {STATS_FILE.parent}")
+            
+            initial_stats = {
+                "total_requests": 0,
+                "request_times": [],
+                "errors": 0,
+                "start_time": time.time(),
+                "last_minute_requests": [],
+            }
+            with open(STATS_FILE, 'w') as f:
+                json.dump(initial_stats, f)
+            logger.info(f"✓ Initialized stats file: {STATS_FILE}")
+        except Exception as e:
+            logger.error(f"✗ Failed to initialize stats file {STATS_FILE}: {e}")
+            logger.error(traceback.format_exc())
+    else:
+        logger.info(f"✓ Stats file already exists: {STATS_FILE}")
+except Exception as e:
+    logger.error(f"✗ Error checking stats file: {e}")
+    logger.error(traceback.format_exc())
+
+logger.info("✓ Monitor module initialization completed")
+logger.info("=" * 80)
 
 
 def _load_stats() -> Dict[str, Any]:

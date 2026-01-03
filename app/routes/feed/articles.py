@@ -1,12 +1,37 @@
 """Articles.php endpoint - Homepage/Footer content router."""
-from fastapi import APIRouter, Request, Query, HTTPException
-from fastapi.responses import HTMLResponse
-from typing import Optional
 import logging
-from app.database import db
-from app.services.content import build_footer_wp, build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
+import traceback
 
 logger = logging.getLogger(__name__)
+logger.info("Initializing articles.py route module...")
+
+try:
+    from fastapi import APIRouter, Request, Query, HTTPException
+    from fastapi.responses import HTMLResponse
+    from typing import Optional
+    logger.info("✓ Successfully imported FastAPI components")
+except Exception as e:
+    logger.error(f"✗ Failed to import FastAPI components: {e}")
+    logger.error(traceback.format_exc())
+    raise
+
+try:
+    from app.database import db
+    logger.info("✓ Successfully imported app.database")
+except Exception as e:
+    logger.error(f"✗ Failed to import app.database: {e}")
+    logger.error(traceback.format_exc())
+    raise
+
+try:
+    from app.services.content import build_footer_wp, build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
+    logger.info("✓ Successfully imported app.services.content functions")
+except Exception as e:
+    logger.error(f"✗ Failed to import app.services.content: {e}")
+    logger.error(traceback.format_exc())
+    raise
+
+logger.info("✓ articles.py module initialization completed")
 
 router = APIRouter()
 
