@@ -289,6 +289,11 @@ async def get_stats():
         workers, _ = _get_gunicorn_processes()
         active_workers = len([w for w in workers if w.get('status') == 'running'])
         
+        # Get system CPU and memory usage
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        cpu_count = psutil.cpu_count()
+        mem = psutil.virtual_memory()
+        
         return {
             "total_requests": total_requests,
             "requests_per_minute": len(stats["last_minute_requests"]),
@@ -296,6 +301,14 @@ async def get_stats():
             "error_rate": round(error_rate, 4),
             "active_workers": active_workers,
             "uptime_seconds": int(current_time - stats["start_time"]),
+            "system": {
+                "cpu_percent": round(cpu_percent, 2),
+                "cpu_count": cpu_count,
+                "memory_percent": round(mem.percent, 2),
+                "memory_total_gb": round(mem.total / 1024 / 1024 / 1024, 2),
+                "memory_used_gb": round(mem.used / 1024 / 1024 / 1024, 2),
+                "memory_available_gb": round(mem.available / 1024 / 1024 / 1024, 2)
+            },
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
     except Exception as e:
@@ -306,7 +319,157 @@ async def get_stats():
             "requests_per_minute": 0,
             "average_response_time_ms": 0,
             "error_rate": 0,
-            "active_workers": 0
+            "active_workers": 0,
+            "system": {
+                "cpu_percent": 0,
+                "cpu_count": 0,
+                "memory_percent": 0,
+                "memory_total_gb": 0,
+                "memory_used_gb": 0,
+                "memory_available_gb": 0
+            }
+        }
+
+
+@router.get("/worker/{pid}", response_class=JSONResponse)
+async def get_worker_details(pid: int):
+    """Get detailed information about a specific worker process."""
+    try:
+        proc = psutil.Process(pid)
+        
+        # Basic process info
+        proc_info = {
+            "pid": pid,
+            "name": proc.name(),
+            "status": proc.status(),
+            "create_time": proc.create_time(),
+            "uptime_seconds": int(time.time() - proc.create_time()),
+            "cmdline": proc.cmdline(),
+        }
+        
+        # CPU info
+        try:
+            cpu_times = proc.cpu_times()
+            proc_info["cpu_times"] = {
+                "user": round(cpu_times.user, 2),
+                "system": round(cpu_times.system, 2),
+                "children_user": round(cpu_times.children_user, 2) if hasattr(cpu_times, 'children_user') else 0,
+                "children_system": round(cpu_times.children_system, 2) if hasattr(cpu_times, 'children_system') else 0,
+            }
+            proc_info["cpu_percent"] = proc.cpu_percent(interval=0.1)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            proc_info["cpu_times"] = None
+            proc_info["cpu_percent"] = 0
+        
+        # Memory info
+        try:
+            mem_info = proc.memory_info()
+            mem_full = proc.memory_full_info() if hasattr(proc, 'memory_full_info') else None
+            proc_info["memory"] = {
+                "rss_mb": round(mem_info.rss / 1024 / 1024, 2),
+                "vms_mb": round(mem_info.vms / 1024 / 1024, 2),
+            }
+            if mem_full:
+                proc_info["memory"]["shared_mb"] = round(mem_full.shared / 1024 / 1024, 2) if hasattr(mem_full, 'shared') else 0
+                proc_info["memory"]["text_mb"] = round(mem_full.text / 1024 / 1024, 2) if hasattr(mem_full, 'text') else 0
+                proc_info["memory"]["data_mb"] = round(mem_full.data / 1024 / 1024, 2) if hasattr(mem_full, 'data') else 0
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            proc_info["memory"] = None
+        
+        # Child processes
+        try:
+            children = proc.children(recursive=False)
+            proc_info["children"] = []
+            for child in children:
+                try:
+                    proc_info["children"].append({
+                        "pid": child.pid,
+                        "name": child.name(),
+                        "status": child.status(),
+                    })
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            proc_info["children"] = []
+        
+        # Threads
+        try:
+            threads = proc.threads()
+            proc_info["threads"] = [
+                {
+                    "id": t.id,
+                    "user_time": round(t.user_time, 2) if hasattr(t, 'user_time') else 0,
+                    "system_time": round(t.system_time, 2) if hasattr(t, 'system_time') else 0,
+                }
+                for t in threads
+            ]
+            proc_info["num_threads"] = len(threads)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            proc_info["threads"] = []
+            proc_info["num_threads"] = 0
+        
+        # Open files
+        try:
+            open_files = proc.open_files()
+            proc_info["open_files"] = [
+                {
+                    "path": f.path,
+                    "fd": f.fd if hasattr(f, 'fd') else None,
+                }
+                for f in open_files[:50]  # Limit to first 50
+            ]
+            proc_info["num_open_files"] = len(open_files)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            proc_info["open_files"] = []
+            proc_info["num_open_files"] = 0
+        
+        # Network connections
+        try:
+            connections = proc.connections(kind='inet')
+            proc_info["connections"] = [
+                {
+                    "fd": c.fd if hasattr(c, 'fd') and c.fd else None,
+                    "family": str(c.family),
+                    "type": str(c.type),
+                    "laddr": f"{c.laddr.ip}:{c.laddr.port}" if c.laddr else None,
+                    "raddr": f"{c.raddr.ip}:{c.raddr.port}" if c.raddr else None,
+                    "status": c.status if hasattr(c, 'status') else None,
+                }
+                for c in connections[:50]  # Limit to first 50
+            ]
+            proc_info["num_connections"] = len(connections)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            proc_info["connections"] = []
+            proc_info["num_connections"] = 0
+        
+        # I/O statistics
+        try:
+            io_counters = proc.io_counters()
+            proc_info["io"] = {
+                "read_count": io_counters.read_count,
+                "write_count": io_counters.write_count,
+                "read_bytes_mb": round(io_counters.read_bytes / 1024 / 1024, 2),
+                "write_bytes_mb": round(io_counters.write_bytes / 1024 / 1024, 2),
+            }
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            proc_info["io"] = None
+        
+        return proc_info
+    except psutil.NoSuchProcess:
+        return {
+            "error": f"Process {pid} not found",
+            "pid": pid
+        }
+    except psutil.AccessDenied:
+        return {
+            "error": f"Access denied to process {pid}",
+            "pid": pid
+        }
+    except Exception as e:
+        logger.error(f"Error getting worker details: {e}")
+        return {
+            "error": str(e),
+            "pid": pid
         }
 
 
@@ -503,10 +666,135 @@ async def get_dashboard():
             color: #666;
             font-size: 12px;
         }
+        .system-metrics {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .system-metrics h2 {
+            color: #2c3e50;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .metric-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s ease;
+        }
+        .progress-fill.warning {
+            background: #ff9800;
+        }
+        .progress-fill.danger {
+            background: #f44336;
+        }
+        .nav-menu {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .nav-menu ul {
+            list-style: none;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 0;
+            padding: 0;
+        }
+        .nav-menu li {
+            margin: 0;
+        }
+        .nav-menu a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }
+        .nav-menu a:hover {
+            background-color: #f0f0f0;
+        }
+        .nav-menu a.active {
+            background-color: #2c3e50;
+            color: white;
+        }
+        .worker-link {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .worker-link:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="system-metrics" id="system-metrics">
+            <h2>System Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Usage</div>
+                    <div class="metric-value" id="memory-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="/monitor/dashboard" class="active">Dashboard</a></li>
+                <li><a href="/monitor/workers" target="_blank">Workers (JSON)</a></li>
+                <li><a href="/monitor/stats" target="_blank">Stats (JSON)</a></li>
+                <li><a href="/monitor/health" target="_blank">Health (JSON)</a></li>
+            </ul>
+        </nav>
+        
         <header>
             <h1>Gunicorn Worker Monitor</h1>
             <div class="refresh-indicator">
@@ -595,7 +883,7 @@ async def get_dashboard():
                 
                 data.workers.forEach(worker => {
                     html += '<tr>';
-                    html += '<td>' + worker.pid + '</td>';
+                    html += '<td><a href="/monitor/worker/' + worker.pid + '/page" class="worker-link">' + worker.pid + '</a></td>';
                     html += '<td>' + worker.cpu_percent.toFixed(2) + '%</td>';
                     html += '<td>' + formatMemory(worker.memory_mb) + '</td>';
                     html += '<td class="uptime">' + formatUptime(worker.uptime_seconds) + '</td>';
@@ -635,6 +923,28 @@ async def get_dashboard():
                 document.getElementById('active-workers').textContent = data.active_workers;
                 document.getElementById('uptime').textContent = formatUptime(data.uptime_seconds);
                 
+                // Update system metrics
+                if (data.system) {
+                    const cpuPercent = data.system.cpu_percent;
+                    const memPercent = data.system.memory_percent;
+                    
+                    document.getElementById('cpu-percent').textContent = cpuPercent.toFixed(1) + '%';
+                    const cpuProgress = document.getElementById('cpu-progress');
+                    cpuProgress.style.width = cpuPercent + '%';
+                    cpuProgress.className = 'progress-fill' + 
+                        (cpuPercent > 80 ? ' danger' : cpuPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-percent').textContent = memPercent.toFixed(1) + '%';
+                    const memProgress = document.getElementById('memory-progress');
+                    memProgress.style.width = memPercent + '%';
+                    memProgress.className = 'progress-fill' + 
+                        (memPercent > 80 ? ' danger' : memPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-details').textContent = 
+                        data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.memory_total_gb.toFixed(2) + ' GB';
+                }
+                
                 document.getElementById('error-container').innerHTML = '';
             } catch (error) {
                 document.getElementById('error-container').innerHTML = 
@@ -651,6 +961,286 @@ async def get_dashboard():
         
         // Auto-refresh every 5 seconds
         setInterval(refresh, 5000);
+    </script>
+</body>
+</html>
+    """
+    return HTMLResponse(content=html_content)
+
+
+@router.get("/worker/{pid}/page", response_class=HTMLResponse)
+async def get_worker_detail_page(pid: int):
+    """HTML page for viewing detailed worker process information."""
+    html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worker {pid} Details - Gunicorn Monitor</title>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            padding: 20px;
+        }}
+        .container {{
+            max-width: 1400px;
+            margin: 0 auto;
+        }}
+        .back-link {{
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+        }}
+        .back-link:hover {{
+            text-decoration: underline;
+        }}
+        .detail-section {{
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }}
+        .detail-section h2 {{
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }}
+        .detail-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }}
+        .detail-item {{
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }}
+        .detail-label {{
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }}
+        .detail-value {{
+            font-size: 16px;
+            font-weight: 600;
+            color: #2c3e50;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }}
+        th {{
+            text-align: left;
+            padding: 10px;
+            background: #f8f9fa;
+            color: #666;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            border-bottom: 2px solid #e0e0e0;
+        }}
+        td {{
+            padding: 10px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 14px;
+        }}
+        .loading {{
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }}
+        .error {{
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }}
+        .nav-menu {{
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }}
+        .nav-menu ul {{
+            list-style: none;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 0;
+            padding: 0;
+        }}
+        .nav-menu li {{
+            margin: 0;
+        }}
+        .nav-menu a {{
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }}
+        .nav-menu a:hover {{
+            background-color: #f0f0f0;
+        }}
+        .nav-menu a.active {{
+            background-color: #2c3e50;
+            color: white;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="/monitor/dashboard">Dashboard</a></li>
+                <li><a href="/monitor/workers" target="_blank">Workers (JSON)</a></li>
+                <li><a href="/monitor/stats" target="_blank">Stats (JSON)</a></li>
+                <li><a href="/monitor/health" target="_blank">Health (JSON)</a></li>
+            </ul>
+        </nav>
+        
+        <a href="/monitor/dashboard" class="back-link">← Back to Dashboard</a>
+        
+        <div id="worker-details" class="loading">Loading worker details...</div>
+    </div>
+    
+    <script>
+        async function loadWorkerDetails() {{
+            try {{
+                const response = await fetch('/monitor/worker/{pid}');
+                const data = await response.json();
+                
+                if (data.error) {{
+                    document.getElementById('worker-details').innerHTML = 
+                        '<div class="error">Error: ' + data.error + '</div>';
+                    return;
+                }}
+                
+                let html = '';
+                
+                // Overview Section
+                html += '<div class="detail-section">';
+                html += '<h2>Overview</h2>';
+                html += '<div class="detail-grid">';
+                html += '<div class="detail-item"><div class="detail-label">PID</div><div class="detail-value">' + data.pid + '</div></div>';
+                html += '<div class="detail-item"><div class="detail-label">Name</div><div class="detail-value">' + (data.name || 'N/A') + '</div></div>';
+                html += '<div class="detail-item"><div class="detail-label">Status</div><div class="detail-value">' + (data.status || 'N/A') + '</div></div>';
+                html += '<div class="detail-item"><div class="detail-label">Uptime</div><div class="detail-value">' + formatUptime(data.uptime_seconds || 0) + '</div></div>';
+                html += '<div class="detail-item"><div class="detail-label">CPU %</div><div class="detail-value">' + (data.cpu_percent || 0).toFixed(2) + '%</div></div>';
+                html += '<div class="detail-item"><div class="detail-label">Threads</div><div class="detail-value">' + (data.num_threads || 0) + '</div></div>';
+                html += '</div></div>';
+                
+                // Memory Section
+                if (data.memory) {{
+                    html += '<div class="detail-section">';
+                    html += '<h2>Memory</h2>';
+                    html += '<div class="detail-grid">';
+                    html += '<div class="detail-item"><div class="detail-label">RSS</div><div class="detail-value">' + data.memory.rss_mb.toFixed(2) + ' MB</div></div>';
+                    html += '<div class="detail-item"><div class="detail-label">VMS</div><div class="detail-value">' + data.memory.vms_mb.toFixed(2) + ' MB</div></div>';
+                    if (data.memory.shared_mb !== undefined) {{
+                        html += '<div class="detail-item"><div class="detail-label">Shared</div><div class="detail-value">' + data.memory.shared_mb.toFixed(2) + ' MB</div></div>';
+                    }}
+                    html += '</div></div>';
+                }}
+                
+                // Children Section
+                if (data.children && data.children.length > 0) {{
+                    html += '<div class="detail-section">';
+                    html += '<h2>Child Processes (' + data.children.length + ')</h2>';
+                    html += '<table><thead><tr><th>PID</th><th>Name</th><th>Status</th></tr></thead><tbody>';
+                    data.children.forEach(child => {{
+                        html += '<tr><td>' + child.pid + '</td><td>' + child.name + '</td><td>' + child.status + '</td></tr>';
+                    }});
+                    html += '</tbody></table></div>';
+                }}
+                
+                // Threads Section
+                if (data.threads && data.threads.length > 0) {{
+                    html += '<div class="detail-section">';
+                    html += '<h2>Threads (' + data.threads.length + ')</h2>';
+                    html += '<table><thead><tr><th>Thread ID</th><th>User Time</th><th>System Time</th></tr></thead><tbody>';
+                    data.threads.slice(0, 20).forEach(thread => {{
+                        html += '<tr><td>' + thread.id + '</td><td>' + thread.user_time.toFixed(2) + 's</td><td>' + thread.system_time.toFixed(2) + 's</td></tr>';
+                    }});
+                    if (data.threads.length > 20) {{
+                        html += '<tr><td colspan="3">... and ' + (data.threads.length - 20) + ' more</td></tr>';
+                    }}
+                    html += '</tbody></table></div>';
+                }}
+                
+                // Connections Section
+                if (data.connections && data.connections.length > 0) {{
+                    html += '<div class="detail-section">';
+                    html += '<h2>Network Connections (' + data.connections.length + ')</h2>';
+                    html += '<table><thead><tr><th>Local Address</th><th>Remote Address</th><th>Status</th><th>Type</th></tr></thead><tbody>';
+                    data.connections.forEach(conn => {{
+                        html += '<tr><td>' + (conn.laddr || 'N/A') + '</td><td>' + (conn.raddr || 'N/A') + '</td><td>' + (conn.status || 'N/A') + '</td><td>' + (conn.type || 'N/A') + '</td></tr>';
+                    }});
+                    html += '</tbody></table></div>';
+                }}
+                
+                // I/O Section
+                if (data.io) {{
+                    html += '<div class="detail-section">';
+                    html += '<h2>I/O Statistics</h2>';
+                    html += '<div class="detail-grid">';
+                    html += '<div class="detail-item"><div class="detail-label">Read Count</div><div class="detail-value">' + data.io.read_count.toLocaleString() + '</div></div>';
+                    html += '<div class="detail-item"><div class="detail-label">Write Count</div><div class="detail-value">' + data.io.write_count.toLocaleString() + '</div></div>';
+                    html += '<div class="detail-item"><div class="detail-label">Read Bytes</div><div class="detail-value">' + data.io.read_bytes_mb.toFixed(2) + ' MB</div></div>';
+                    html += '<div class="detail-item"><div class="detail-label">Write Bytes</div><div class="detail-value">' + data.io.write_bytes_mb.toFixed(2) + ' MB</div></div>';
+                    html += '</div></div>';
+                }}
+                
+                // Command Line Section
+                if (data.cmdline && data.cmdline.length > 0) {{
+                    html += '<div class="detail-section">';
+                    html += '<h2>Command Line</h2>';
+                    html += '<div style="background: #f8f9fa; padding: 15px; border-radius: 4px; font-family: monospace; word-break: break-all;">';
+                    html += data.cmdline.join(' ');
+                    html += '</div></div>';
+                }}
+                
+                document.getElementById('worker-details').innerHTML = html;
+            }} catch (error) {{
+                document.getElementById('worker-details').innerHTML = 
+                    '<div class="error">Error loading worker details: ' + error.message + '</div>';
+            }}
+        }}
+        
+        function formatUptime(seconds) {{
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            
+            if (days > 0) return `${{days}}d ${{hours}}h ${{minutes}}m`;
+            if (hours > 0) return `${{hours}}h ${{minutes}}m`;
+            if (minutes > 0) return `${{minutes}}m ${{secs}}s`;
+            return `${{secs}}s`;
+        }}
+        
+        // Load on page load
+        loadWorkerDetails();
+        
+        // Auto-refresh every 5 seconds
+        setInterval(loadWorkerDetails, 5000);
     </script>
 </body>
 </html>
