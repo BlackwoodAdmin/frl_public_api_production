@@ -10,6 +10,7 @@ import logging
 import json
 import fcntl
 import subprocess
+import shutil
 from datetime import datetime
 from pathlib import Path
 from app.database import db
@@ -25,6 +26,33 @@ STATS_LOCK_FILE = Path("/tmp/frl_python_api_stats.lock")
 # Log file configuration
 LOG_FILE_PATH = os.getenv("LOG_FILE_PATH", "/var/log/frl-python-api/app.log")
 USE_JOURNALCTL = os.getenv("USE_JOURNALCTL", "false").lower() == "true"
+
+
+def _find_journalctl_path() -> str:
+    """Find the path to journalctl executable."""
+    # Common system paths for journalctl
+    common_paths = [
+        "/usr/bin/journalctl",
+        "/bin/journalctl",
+        "/usr/sbin/journalctl",
+        "/sbin/journalctl"
+    ]
+    
+    # First try to find it in PATH
+    journalctl_path = shutil.which("journalctl")
+    if journalctl_path:
+        return journalctl_path
+    
+    # If not in PATH, try common system paths
+    for path in common_paths:
+        if os.path.exists(path) and os.access(path, os.X_OK):
+            return path
+    
+    # If still not found, return default
+    return "journalctl"  # Will fail with better error message
+
+# Cache the journalctl path
+JOURNALCTL_PATH = _find_journalctl_path()
 
 # Initialize stats file if it doesn't exist
 if not STATS_FILE.exists():
@@ -564,8 +592,17 @@ async def get_logs(limit: int = 1000, level: Optional[str] = None):
         logs = []
         
         if USE_JOURNALCTL:
+            # Verify journalctl is available
+            if not os.path.exists(JOURNALCTL_PATH) or not os.access(JOURNALCTL_PATH, os.X_OK):
+                return {
+                    "error": f"journalctl not found at {JOURNALCTL_PATH}",
+                    "logs": [],
+                    "suggestion": "journalctl is required for reading systemd logs. Install systemd or set USE_JOURNALCTL=false to use file-based logging.",
+                    "source": "journalctl"
+                }
+            
             # Read from systemd journal
-            cmd = ["journalctl", "-u", "frl-python-api", "-n", str(limit), "--no-pager", "-o", "short-iso"]
+            cmd = [JOURNALCTL_PATH, "-u", "frl-python-api", "-n", str(limit), "--no-pager", "-o", "short-iso"]
             if level:
                 # Map level to journalctl priority
                 priority_map = {
@@ -671,9 +708,19 @@ async def get_worker_logs(pid: int, limit: int = 1000, level: Optional[str] = No
             }
         
         if USE_JOURNALCTL:
+            # Verify journalctl is available
+            if not os.path.exists(JOURNALCTL_PATH) or not os.access(JOURNALCTL_PATH, os.X_OK):
+                return {
+                    "error": f"journalctl not found at {JOURNALCTL_PATH}",
+                    "logs": [],
+                    "pid": pid,
+                    "suggestion": "journalctl is required for reading systemd logs. Install systemd or set USE_JOURNALCTL=false to use file-based logging.",
+                    "source": "journalctl"
+                }
+            
             # Read from systemd journal filtered by PID
             cmd = [
-                "journalctl",
+                JOURNALCTL_PATH,
                 "-u", "frl-python-api",
                 "_PID=" + str(pid),
                 "-n", str(limit),
