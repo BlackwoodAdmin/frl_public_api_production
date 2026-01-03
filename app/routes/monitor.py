@@ -229,17 +229,16 @@ def _load_stats() -> Dict[str, Any]:
                         # Check again if reset is still needed
                         time_since_reset = current_time - stats.get("last_reset_time", current_time)
                         if time_since_reset >= 10800:
-                            # Reset error-related counters
+                            # Reset error-related counters (keep total_requests for cumulative count)
                             stats["errors"] = 0
-                            stats["total_requests"] = 0
                             stats["request_times"] = []
                             stats["last_reset_time"] = current_time
-                            # Keep start_time and last_minute_requests unchanged
+                            # Keep start_time, total_requests, and last_minute_requests unchanged
                             
                             # Save reset stats
                             with open(STATS_FILE, 'w') as f:
                                 json.dump(stats, f)
-                            logger.info(f"Reset error counts after 3 hours. Errors: 0, Total requests: 0")
+                            logger.info(f"Reset error counts after 3 hours. Errors: 0")
                     finally:
                         fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
             
