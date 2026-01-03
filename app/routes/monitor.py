@@ -62,6 +62,9 @@ async def verify_dashboard_access(credentials: HTTPBasicCredentials = Depends(se
 STATS_FILE = Path("/var/run/frl-python-api/stats.json")
 STATS_LOCK_FILE = Path("/var/run/frl-python-api/stats.lock")
 
+# Application session ID - generated on module load (changes on app restart)
+APP_SESSION_ID = time.time()
+
 # Log file configuration
 LOG_FILE_PATH = os.getenv("LOG_FILE_PATH", "/var/log/frl-python-api/app.log")
 USE_JOURNALCTL = os.getenv("USE_JOURNALCTL", "false").lower() == "true"
@@ -114,6 +117,7 @@ try:
                 "start_time": time.time(),
                 "last_minute_requests": [],
                 "last_reset_time": time.time(),
+                "app_session_id": APP_SESSION_ID,
             }
             with open(STATS_FILE, 'w') as f:
                 json.dump(initial_stats, f)
@@ -145,13 +149,52 @@ def _load_stats() -> Dict[str, Any]:
                 finally:
                     fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
             
-            # Migration: Add last_reset_time if missing
             current_time = time.time()
+            
+            # Migration: Add missing fields if needed
+            needs_migration = False
             if "last_reset_time" not in stats:
                 stats["last_reset_time"] = current_time
+                needs_migration = True
+            if "app_session_id" not in stats:
+                stats["app_session_id"] = None  # Will trigger reset below
+                needs_migration = True
+            
+            if needs_migration:
                 # Save migrated stats (will use exclusive lock in _save_stats)
                 _save_stats(stats)
-                return stats
+                # Continue to session check below (will reset if app_session_id is None)
+            
+            # Check if app session ID matches (app restart detection)
+            stored_session_id = stats.get("app_session_id")
+            if stored_session_id != APP_SESSION_ID:
+                # App has restarted - reset error-related counters
+                # Need exclusive lock to reset - use double-check pattern
+                with open(STATS_LOCK_FILE, 'r+') as lock_file:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)  # Exclusive lock for writing
+                    try:
+                        # Double-check: reload stats in case another process already reset
+                        with open(STATS_FILE, 'r') as f:
+                            stats = json.load(f)
+                        
+                        # Check again if reset is still needed
+                        stored_session_id = stats.get("app_session_id")
+                        if stored_session_id != APP_SESSION_ID:
+                            # Reset error-related counters on app restart
+                            stats["errors"] = 0
+                            stats["total_requests"] = 0
+                            stats["request_times"] = []
+                            stats["last_minute_requests"] = []
+                            stats["last_reset_time"] = current_time
+                            stats["app_session_id"] = APP_SESSION_ID
+                            # Keep start_time unchanged (for uptime calculation)
+                            
+                            # Save reset stats
+                            with open(STATS_FILE, 'w') as f:
+                                json.dump(stats, f)
+                            logger.info(f"Reset error counts on app restart. Errors: 0, Total requests: 0")
+                    finally:
+                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
             
             # Check if 3 hours (10800 seconds) have passed since last reset
             time_since_reset = current_time - stats.get("last_reset_time", current_time)
@@ -203,6 +246,7 @@ def _load_stats() -> Dict[str, Any]:
                         "start_time": time.time(),
                         "last_minute_requests": [],
                         "last_reset_time": time.time(),
+                        "app_session_id": APP_SESSION_ID,
                     }
                     
                     # Create file
@@ -221,6 +265,7 @@ def _load_stats() -> Dict[str, Any]:
             "start_time": time.time(),
             "last_minute_requests": [],
             "last_reset_time": time.time(),
+            "app_session_id": APP_SESSION_ID,
         }
 
 
