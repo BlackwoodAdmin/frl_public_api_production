@@ -1107,7 +1107,6 @@ async def get_dashboard():
             <ul>
                 <li><a href="/monitor/dashboard" class="active">Dashboard</a></li>
                 <li><a href="/monitor/workers/page">Workers</a></li>
-                <li><a href="/monitor/stats/page">Stats</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
             </ul>
@@ -1429,7 +1428,6 @@ async def get_worker_detail_page(pid: int):
             <ul>
                 <li><a href="/monitor/dashboard">Dashboard</a></li>
                 <li><a href="/monitor/workers/page">Workers</a></li>
-                <li><a href="/monitor/stats/page">Stats</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
             </ul>
@@ -1711,7 +1709,6 @@ async def get_workers_page():
             <ul>
                 <li><a href="/monitor/dashboard">Dashboard</a></li>
                 <li><a href="/monitor/workers/page" class="active">Workers</a></li>
-                <li><a href="/monitor/stats/page">Stats</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
             </ul>
         </nav>
@@ -1964,7 +1961,6 @@ async def get_stats_page():
             <ul>
                 <li><a href="/monitor/dashboard">Dashboard</a></li>
                 <li><a href="/monitor/workers/page">Workers</a></li>
-                <li><a href="/monitor/stats/page" class="active">Stats</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
             </ul>
         </nav>
@@ -2257,7 +2253,6 @@ async def get_health_page():
             <ul>
                 <li><a href="/monitor/dashboard">Dashboard</a></li>
                 <li><a href="/monitor/workers/page">Workers</a></li>
-                <li><a href="/monitor/stats/page">Stats</a></li>
                 <li><a href="/monitor/health/page" class="active">Health</a></li>
             </ul>
         </nav>
@@ -2522,7 +2517,6 @@ async def get_logs_page():
             <ul>
                 <li><a href="/monitor/dashboard">Dashboard</a></li>
                 <li><a href="/monitor/workers/page">Workers</a></li>
-                <li><a href="/monitor/stats/page">Stats</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page" class="active">Logs</a></li>
             </ul>
@@ -2853,7 +2847,6 @@ async def get_worker_logs_page(pid: int):
             <ul>
                 <li><a href="/monitor/dashboard">Dashboard</a></li>
                 <li><a href="/monitor/workers/page">Workers</a></li>
-                <li><a href="/monitor/stats/page">Stats</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
             </ul>
