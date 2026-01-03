@@ -7,21 +7,88 @@ import psutil
 import os
 import time
 import logging
+import json
+import fcntl
 from datetime import datetime
+from pathlib import Path
 from app.database import db
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# In-memory stats tracking
-_stats = {
-    "total_requests": 0,
-    "request_times": [],
-    "errors": 0,
-    "start_time": time.time(),
-    "last_minute_requests": [],
-}
+# File-based stats storage (shared across workers)
+STATS_FILE = Path("/tmp/frl_python_api_stats.json")
+STATS_LOCK_FILE = Path("/tmp/frl_python_api_stats.lock")
+
+# Initialize stats file if it doesn't exist
+if not STATS_FILE.exists():
+    initial_stats = {
+        "total_requests": 0,
+        "request_times": [],
+        "errors": 0,
+        "start_time": time.time(),
+        "last_minute_requests": [],
+    }
+    with open(STATS_FILE, 'w') as f:
+        json.dump(initial_stats, f)
+
+
+def _load_stats() -> Dict[str, Any]:
+    """Load stats from file with locking."""
+    try:
+        # Ensure lock file exists
+        STATS_LOCK_FILE.touch(exist_ok=True)
+        
+        with open(STATS_LOCK_FILE, 'r+') as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)  # Shared lock for reading
+            try:
+                if STATS_FILE.exists():
+                    with open(STATS_FILE, 'r') as f:
+                        return json.load(f)
+                else:
+                    return {
+                        "total_requests": 0,
+                        "request_times": [],
+                        "errors": 0,
+                        "start_time": time.time(),
+                        "last_minute_requests": [],
+                    }
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+    except Exception as e:
+        logger.error(f"Error loading stats: {e}")
+        return {
+            "total_requests": 0,
+            "request_times": [],
+            "errors": 0,
+            "start_time": time.time(),
+            "last_minute_requests": [],
+        }
+
+
+def _save_stats(stats: Dict[str, Any]):
+    """Save stats to file with locking."""
+    try:
+        # Ensure lock file exists
+        STATS_LOCK_FILE.touch(exist_ok=True)
+        
+        with open(STATS_LOCK_FILE, 'r+') as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)  # Exclusive lock for writing
+            try:
+                with open(STATS_FILE, 'w') as f:
+                    json.dump(stats, f)
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+    except Exception as e:
+        logger.error(f"Error saving stats: {e}")
+
+
+def _update_stats(update_func):
+    """Atomically update stats."""
+    stats = _load_stats()
+    update_func(stats)
+    _save_stats(stats)
 
 
 class StatsTrackingMiddleware(BaseHTTPMiddleware):
@@ -40,28 +107,43 @@ class StatsTrackingMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
         except Exception as e:
             # Track errors
-            _stats["errors"] += 1
-            _stats["total_requests"] += 1
-            current_time = time.time()
-            _stats["last_minute_requests"].append(current_time)
+            def update_error(stats):
+                stats["errors"] += 1
+                stats["total_requests"] += 1
+                current_time = time.time()
+                stats["last_minute_requests"].append(current_time)
+                # Clean old timestamps (older than 1 minute)
+                stats["last_minute_requests"] = [
+                    t for t in stats["last_minute_requests"]
+                    if current_time - t < 60
+                ]
+            _update_stats(update_error)
             raise
         
         # Calculate response time
         response_time = time.time() - start_time
         
-        # Update stats
-        _stats["total_requests"] += 1
-        current_time = time.time()
-        _stats["last_minute_requests"].append(current_time)
+        # Update stats atomically
+        def update_stats(stats):
+            stats["total_requests"] += 1
+            current_time = time.time()
+            stats["last_minute_requests"].append(current_time)
+            # Clean old timestamps (older than 1 minute)
+            stats["last_minute_requests"] = [
+                t for t in stats["last_minute_requests"]
+                if current_time - t < 60
+            ]
+            
+            # Track response time (keep last 100)
+            stats["request_times"].append(response_time)
+            if len(stats["request_times"]) > 100:
+                stats["request_times"] = stats["request_times"][-100:]
+            
+            # Track errors (status code >= 400)
+            if response.status_code >= 400:
+                stats["errors"] += 1
         
-        # Track response time (keep last 100)
-        _stats["request_times"].append(response_time)
-        if len(_stats["request_times"]) > 100:
-            _stats["request_times"] = _stats["request_times"][-100:]
-        
-        # Track errors (status code >= 400)
-        if response.status_code >= 400:
-            _stats["errors"] += 1
+        _update_stats(update_stats)
         
         return response
 
@@ -180,23 +262,28 @@ async def get_workers():
 async def get_stats():
     """Get request statistics and performance metrics."""
     try:
+        # Load stats from shared file
+        stats = _load_stats()
         current_time = time.time()
         
         # Clean old request times (older than 1 minute)
-        _stats["last_minute_requests"] = [
-            t for t in _stats["last_minute_requests"]
+        stats["last_minute_requests"] = [
+            t for t in stats["last_minute_requests"]
             if current_time - t < 60
         ]
         
+        # Save cleaned stats back
+        _save_stats(stats)
+        
         # Calculate average response time
         avg_response_time = 0
-        if _stats["request_times"]:
-            recent_times = _stats["request_times"][-100:]  # Last 100 requests
+        if stats["request_times"]:
+            recent_times = stats["request_times"][-100:]  # Last 100 requests
             avg_response_time = sum(recent_times) / len(recent_times) if recent_times else 0
         
         # Calculate error rate
-        total_requests = _stats["total_requests"]
-        error_rate = _stats["errors"] / total_requests if total_requests > 0 else 0
+        total_requests = stats["total_requests"]
+        error_rate = stats["errors"] / total_requests if total_requests > 0 else 0
         
         # Get active workers
         workers, _ = _get_gunicorn_processes()
@@ -204,11 +291,11 @@ async def get_stats():
         
         return {
             "total_requests": total_requests,
-            "requests_per_minute": len(_stats["last_minute_requests"]),
+            "requests_per_minute": len(stats["last_minute_requests"]),
             "average_response_time_ms": round(avg_response_time * 1000, 2),
             "error_rate": round(error_rate, 4),
             "active_workers": active_workers,
-            "uptime_seconds": int(current_time - _stats["start_time"]),
+            "uptime_seconds": int(current_time - stats["start_time"]),
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
     except Exception as e:
