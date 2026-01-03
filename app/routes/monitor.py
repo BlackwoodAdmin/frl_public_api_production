@@ -338,10 +338,10 @@ class StatsTrackingMiddleware(BaseHTTPMiddleware):
                 stats["total_requests"] += 1
                 current_time = time.time()
                 stats["last_minute_requests"].append(current_time)
-                # Clean old timestamps (older than 1 hour)
+                # Clean old timestamps (older than 5 minutes)
                 stats["last_minute_requests"] = [
                     t for t in stats["last_minute_requests"]
-                    if current_time - t < 3600
+                    if current_time - t < 300
                 ]
             _update_stats(update_error)
             raise
@@ -354,10 +354,10 @@ class StatsTrackingMiddleware(BaseHTTPMiddleware):
             stats["total_requests"] += 1
             current_time = time.time()
             stats["last_minute_requests"].append(current_time)
-            # Clean old timestamps (older than 1 hour)
+            # Clean old timestamps (older than 5 minutes)
             stats["last_minute_requests"] = [
                 t for t in stats["last_minute_requests"]
-                if current_time - t < 3600
+                if current_time - t < 300
             ]
             
             # Track response time (keep last 100)
@@ -575,10 +575,10 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
         logger.debug(f"Loaded stats: total_requests={stats.get('total_requests', 0)}, errors={stats.get('errors', 0)}, request_times_count={len(stats.get('request_times', []))}, last_minute_count={len(stats.get('last_minute_requests', []))}")
         current_time = time.time()
         
-        # Clean old request times (older than 1 hour)
+        # Clean old request times (older than 5 minutes)
         stats["last_minute_requests"] = [
             t for t in stats["last_minute_requests"]
-            if current_time - t < 3600
+            if current_time - t < 300
         ]
         
         # Save cleaned stats back
@@ -607,8 +607,8 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
         stats_file_exists = STATS_FILE.exists()
         stats_file_size = STATS_FILE.stat().st_size if stats_file_exists else 0
         
-        # Calculate average requests per minute (based on last hour)
-        requests_per_minute = round(len(stats["last_minute_requests"]) / 60, 2) if stats["last_minute_requests"] else 0
+        # Calculate average requests per minute (based on last 5 minutes)
+        requests_per_minute = round(len(stats["last_minute_requests"]) / 5, 2) if stats["last_minute_requests"] else 0
         
         result = {
             "total_requests": total_requests,
