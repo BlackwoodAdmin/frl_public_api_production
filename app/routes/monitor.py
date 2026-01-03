@@ -603,16 +603,6 @@ async def get_logs(limit: int = 1000, level: Optional[str] = None):
             
             # Read from systemd journal
             cmd = [JOURNALCTL_PATH, "-u", "frl-python-api", "-n", str(limit), "--no-pager", "-o", "short-iso"]
-            if level:
-                # Map level to journalctl priority
-                priority_map = {
-                    "ERROR": "err",
-                    "WARNING": "warning",
-                    "INFO": "info",
-                    "DEBUG": "debug"
-                }
-                if level.upper() in priority_map:
-                    cmd.extend(["--priority", priority_map[level.upper()]])
             
             try:
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
@@ -620,9 +610,16 @@ async def get_logs(limit: int = 1000, level: Optional[str] = None):
                     lines = result.stdout.strip().split('\n')
                     for line in lines:
                         if line.strip():
+                            # Extract log level from the line
+                            extracted_level = _extract_log_level(line)
+                            
+                            # Filter by level if specified
+                            if level and extracted_level.upper() != level.upper():
+                                continue
+                            
                             logs.append({
                                 "timestamp": line[:19] if len(line) > 19 else "",
-                                "level": _extract_log_level(line),
+                                "level": extracted_level,
                                 "message": line[20:] if len(line) > 20 else line
                             })
                 else:
@@ -727,15 +724,6 @@ async def get_worker_logs(pid: int, limit: int = 1000, level: Optional[str] = No
                 "--no-pager",
                 "-o", "short-iso"
             ]
-            if level:
-                priority_map = {
-                    "ERROR": "err",
-                    "WARNING": "warning",
-                    "INFO": "info",
-                    "DEBUG": "debug"
-                }
-                if level.upper() in priority_map:
-                    cmd.extend(["--priority", priority_map[level.upper()]])
             
             try:
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
@@ -743,9 +731,16 @@ async def get_worker_logs(pid: int, limit: int = 1000, level: Optional[str] = No
                     lines = result.stdout.strip().split('\n')
                     for line in lines:
                         if line.strip():
+                            # Extract log level from the line
+                            extracted_level = _extract_log_level(line)
+                            
+                            # Filter by level if specified
+                            if level and extracted_level.upper() != level.upper():
+                                continue
+                            
                             logs.append({
                                 "timestamp": line[:19] if len(line) > 19 else "",
-                                "level": _extract_log_level(line),
+                                "level": extracted_level,
                                 "message": line[20:] if len(line) > 20 else line
                             })
                 else:
