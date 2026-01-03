@@ -13,7 +13,7 @@ class Database:
     
     def __init__(self):
         self.connection = None
-        self._init_connection()
+        # Don't create connection here - create it lazily
     
     def _init_connection(self):
         """Initialize database connection."""
@@ -36,9 +36,27 @@ class Database:
             logger.error(f"Database connection failed: {e}")
             raise
     
+    def _ensure_connection(self):
+        """Ensure database connection exists and is valid."""
+        if self.connection is None:
+            self._init_connection()
+        else:
+            # Check if connection is still alive
+            try:
+                self.connection.ping(reconnect=True)
+            except:
+                # Connection is dead, recreate it
+                if self.connection:
+                    try:
+                        self.connection.close()
+                    except:
+                        pass
+                self._init_connection()
+    
     @contextmanager
     def get_cursor(self):
         """Get database cursor with automatic cleanup."""
+        self._ensure_connection()  # Ensure connection exists before getting cursor
         try:
             cursor = self.connection.cursor()
             yield cursor
@@ -47,6 +65,7 @@ class Database:
     
     def fetch_one(self, query: str, params: Optional[tuple] = None) -> Optional[Any]:
         """Fetch a single value (equivalent to PHP FetchOne)."""
+        self._ensure_connection()  # Ensure connection before use
         try:
             with self.get_cursor() as cursor:
                 cursor.execute(query, params)
@@ -63,6 +82,7 @@ class Database:
     
     def fetch_row(self, query: str, params: Optional[tuple] = None) -> Optional[Dict[str, Any]]:
         """Fetch a single row (equivalent to PHP FetchRow)."""
+        self._ensure_connection()  # Ensure connection before use
         try:
             with self.get_cursor() as cursor:
                 cursor.execute(query, params)
@@ -73,6 +93,7 @@ class Database:
     
     def fetch_all(self, query: str, params: Optional[tuple] = None) -> List[Dict[str, Any]]:
         """Fetch all rows (equivalent to PHP FetchAll)."""
+        self._ensure_connection()  # Ensure connection before use
         try:
             with self.get_cursor() as cursor:
                 cursor.execute(query, params)
@@ -83,6 +104,7 @@ class Database:
     
     def execute(self, query: str, params: Optional[tuple] = None) -> int:
         """Execute a query and return affected rows."""
+        self._ensure_connection()  # Ensure connection before use
         try:
             with self.get_cursor() as cursor:
                 affected = cursor.execute(query, params)
