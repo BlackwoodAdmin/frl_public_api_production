@@ -789,9 +789,9 @@ async def get_dashboard():
         <nav class="nav-menu">
             <ul>
                 <li><a href="/monitor/dashboard" class="active">Dashboard</a></li>
-                <li><a href="/monitor/workers" target="_blank">Workers (JSON)</a></li>
-                <li><a href="/monitor/stats" target="_blank">Stats (JSON)</a></li>
-                <li><a href="/monitor/health" target="_blank">Health (JSON)</a></li>
+                <li><a href="/monitor/workers/page">Workers</a></li>
+                <li><a href="/monitor/stats/page">Stats</a></li>
+                <li><a href="/monitor/health/page">Health</a></li>
             </ul>
         </nav>
         
@@ -1110,9 +1110,9 @@ async def get_worker_detail_page(pid: int):
         <nav class="nav-menu">
             <ul>
                 <li><a href="/monitor/dashboard">Dashboard</a></li>
-                <li><a href="/monitor/workers" target="_blank">Workers (JSON)</a></li>
-                <li><a href="/monitor/stats" target="_blank">Stats (JSON)</a></li>
-                <li><a href="/monitor/health" target="_blank">Health (JSON)</a></li>
+                <li><a href="/monitor/workers/page">Workers</a></li>
+                <li><a href="/monitor/stats/page">Stats</a></li>
+                <li><a href="/monitor/health/page">Health</a></li>
             </ul>
         </nav>
         
@@ -1241,6 +1241,787 @@ async def get_worker_detail_page(pid: int):
         
         // Auto-refresh every 5 seconds
         setInterval(loadWorkerDetails, 5000);
+    </script>
+</body>
+</html>
+    """
+    return HTMLResponse(content=html_content)
+
+
+@router.get("/workers/page", response_class=HTMLResponse)
+async def get_workers_page():
+    """HTML page for viewing worker processes."""
+    html_content = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workers - Gunicorn Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .nav-menu {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .nav-menu ul {
+            list-style: none;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 0;
+            padding: 0;
+        }
+        .nav-menu li {
+            margin: 0;
+        }
+        .nav-menu a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }
+        .nav-menu a:hover {
+            background-color: #f0f0f0;
+        }
+        .nav-menu a.active {
+            background-color: #2c3e50;
+            color: white;
+        }
+        .workers-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .workers-section h2 {
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            text-align: left;
+            padding: 12px;
+            background: #f8f9fa;
+            color: #666;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        tr:hover {
+            background: #f8f9fa;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-running {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-idle {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-dead {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .worker-link {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .worker-link:hover {
+            text-decoration: underline;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .uptime {
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="/monitor/dashboard">Dashboard</a></li>
+                <li><a href="/monitor/workers/page" class="active">Workers</a></li>
+                <li><a href="/monitor/stats/page">Stats</a></li>
+                <li><a href="/monitor/health/page">Health</a></li>
+            </ul>
+        </nav>
+        
+        <div class="workers-section">
+            <h2>Worker Processes</h2>
+            <div id="error-container"></div>
+            <div id="workers-container" class="loading">Loading workers...</div>
+        </div>
+    </div>
+    
+    <script>
+        function formatUptime(seconds) {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            
+            if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            if (minutes > 0) return `${minutes}m ${secs}s`;
+            return `${secs}s`;
+        }
+        
+        function formatMemory(mb) {
+            if (mb >= 1024) return (mb / 1024).toFixed(2) + ' GB';
+            return mb.toFixed(2) + ' MB';
+        }
+        
+        async function fetchWorkers() {
+            try {
+                const response = await fetch('/monitor/workers');
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('workers-container').innerHTML = 
+                        '<div class="error">Error: ' + data.error + '</div>';
+                    document.getElementById('error-container').innerHTML = '';
+                    return;
+                }
+                
+                if (data.workers.length === 0) {
+                    document.getElementById('workers-container').innerHTML = 
+                        '<div class="loading">No workers found. Make sure Gunicorn is running.</div>';
+                    document.getElementById('error-container').innerHTML = '';
+                    return;
+                }
+                
+                let html = '<table><thead><tr>';
+                html += '<th>PID</th>';
+                html += '<th>CPU %</th>';
+                html += '<th>Memory</th>';
+                html += '<th>Uptime</th>';
+                html += '<th>Status</th>';
+                html += '</tr></thead><tbody>';
+                
+                data.workers.forEach(worker => {
+                    html += '<tr>';
+                    html += '<td><a href="/monitor/worker/' + worker.pid + '/page" class="worker-link">' + worker.pid + '</a></td>';
+                    html += '<td>' + worker.cpu_percent.toFixed(2) + '%</td>';
+                    html += '<td>' + formatMemory(worker.memory_mb) + '</td>';
+                    html += '<td class="uptime">' + formatUptime(worker.uptime_seconds) + '</td>';
+                    html += '<td><span class="status-badge status-' + worker.status + '">' + worker.status + '</span></td>';
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table>';
+                html += '<div style="margin-top: 10px; color: #666; font-size: 12px;">';
+                html += 'Master PID: ' + (data.master_pid || 'N/A') + ' | Total Workers: ' + data.total_workers;
+                html += '</div>';
+                
+                document.getElementById('workers-container').innerHTML = html;
+                document.getElementById('error-container').innerHTML = '';
+            } catch (error) {
+                document.getElementById('workers-container').innerHTML = 
+                    '<div class="error">Error fetching workers: ' + error.message + '</div>';
+                document.getElementById('error-container').innerHTML = '';
+            }
+        }
+        
+        // Initial load
+        fetchWorkers();
+        
+        // Auto-refresh every 5 seconds
+        setInterval(fetchWorkers, 5000);
+    </script>
+</body>
+</html>
+    """
+    return HTMLResponse(content=html_content)
+
+
+@router.get("/stats/page", response_class=HTMLResponse)
+async def get_stats_page():
+    """HTML page for viewing request statistics."""
+    html_content = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stats - Gunicorn Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .nav-menu {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .nav-menu ul {
+            list-style: none;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 0;
+            padding: 0;
+        }
+        .nav-menu li {
+            margin: 0;
+        }
+        .nav-menu a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }
+        .nav-menu a:hover {
+            background-color: #f0f0f0;
+        }
+        .nav-menu a.active {
+            background-color: #2c3e50;
+            color: white;
+        }
+        .system-metrics {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .system-metrics h2 {
+            color: #2c3e50;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .metric-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s ease;
+        }
+        .progress-fill.warning {
+            background: #ff9800;
+        }
+        .progress-fill.danger {
+            background: #f44336;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .stat-unit {
+            font-size: 14px;
+            color: #999;
+            font-weight: normal;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="/monitor/dashboard">Dashboard</a></li>
+                <li><a href="/monitor/workers/page">Workers</a></li>
+                <li><a href="/monitor/stats/page" class="active">Stats</a></li>
+                <li><a href="/monitor/health/page">Health</a></li>
+            </ul>
+        </nav>
+        
+        <div id="error-container"></div>
+        
+        <div class="system-metrics" id="system-metrics">
+            <h2>System Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Usage</div>
+                    <div class="metric-value" id="memory-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stats-grid" id="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Requests</div>
+                <div class="stat-value" id="total-requests">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Requests/Min</div>
+                <div class="stat-value" id="requests-per-minute">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Response Time</div>
+                <div class="stat-value" id="avg-response-time">-<span class="stat-unit"> ms</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Error Rate</div>
+                <div class="stat-value" id="error-rate">-<span class="stat-unit">%</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Active Workers</div>
+                <div class="stat-value" id="active-workers">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Uptime</div>
+                <div class="stat-value" id="uptime">-</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function formatUptime(seconds) {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            
+            if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            if (minutes > 0) return `${minutes}m ${secs}s`;
+            return `${secs}s`;
+        }
+        
+        async function fetchStats() {
+            try {
+                const response = await fetch('/monitor/stats');
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('error-container').innerHTML = 
+                        '<div class="error">Error: ' + data.error + '</div>';
+                    return;
+                }
+                
+                document.getElementById('total-requests').textContent = data.total_requests.toLocaleString();
+                document.getElementById('requests-per-minute').textContent = data.requests_per_minute;
+                document.getElementById('avg-response-time').innerHTML = 
+                    data.average_response_time_ms.toFixed(2) + '<span class="stat-unit"> ms</span>';
+                document.getElementById('error-rate').innerHTML = 
+                    (data.error_rate * 100).toFixed(2) + '<span class="stat-unit">%</span>';
+                document.getElementById('active-workers').textContent = data.active_workers;
+                document.getElementById('uptime').textContent = formatUptime(data.uptime_seconds);
+                
+                // Update system metrics
+                if (data.system) {
+                    const cpuPercent = data.system.cpu_percent;
+                    const memPercent = data.system.memory_percent;
+                    
+                    document.getElementById('cpu-percent').textContent = cpuPercent.toFixed(1) + '%';
+                    const cpuProgress = document.getElementById('cpu-progress');
+                    cpuProgress.style.width = cpuPercent + '%';
+                    cpuProgress.className = 'progress-fill' + 
+                        (cpuPercent > 80 ? ' danger' : cpuPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-percent').textContent = memPercent.toFixed(1) + '%';
+                    const memProgress = document.getElementById('memory-progress');
+                    memProgress.style.width = memPercent + '%';
+                    memProgress.className = 'progress-fill' + 
+                        (memPercent > 80 ? ' danger' : memPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-details').textContent = 
+                        data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.memory_total_gb.toFixed(2) + ' GB';
+                }
+                
+                document.getElementById('error-container').innerHTML = '';
+            } catch (error) {
+                document.getElementById('error-container').innerHTML = 
+                    '<div class="error">Error fetching stats: ' + error.message + '</div>';
+            }
+        }
+        
+        // Initial load
+        fetchStats();
+        
+        // Auto-refresh every 5 seconds
+        setInterval(fetchStats, 5000);
+    </script>
+</body>
+</html>
+    """
+    return HTMLResponse(content=html_content)
+
+
+@router.get("/health/page", response_class=HTMLResponse)
+async def get_health_page():
+    """HTML page for viewing system health."""
+    html_content = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health - Gunicorn Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .nav-menu {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .nav-menu ul {
+            list-style: none;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 0;
+            padding: 0;
+        }
+        .nav-menu li {
+            margin: 0;
+        }
+        .nav-menu a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }
+        .nav-menu a:hover {
+            background-color: #f0f0f0;
+        }
+        .nav-menu a.active {
+            background-color: #2c3e50;
+            color: white;
+        }
+        .health-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .health-section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        .status-banner {
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .status-banner.healthy {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-banner.degraded {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-banner.unhealthy {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status-banner h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        .health-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .health-card {
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .health-card h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        .health-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .health-item:last-child {
+            border-bottom: none;
+        }
+        .health-label {
+            color: #666;
+            font-size: 14px;
+        }
+        .health-value {
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-healthy {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-unhealthy {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="/monitor/dashboard">Dashboard</a></li>
+                <li><a href="/monitor/workers/page">Workers</a></li>
+                <li><a href="/monitor/stats/page">Stats</a></li>
+                <li><a href="/monitor/health/page" class="active">Health</a></li>
+            </ul>
+        </nav>
+        
+        <div id="error-container"></div>
+        <div id="health-container" class="loading">Loading health status...</div>
+    </div>
+    
+    <script>
+        async function fetchHealth() {
+            try {
+                const response = await fetch('/monitor/health');
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('health-container').innerHTML = 
+                        '<div class="error">Error: ' + data.error + '</div>';
+                    document.getElementById('error-container').innerHTML = '';
+                    return;
+                }
+                
+                let html = '';
+                
+                // Overall status banner
+                const statusClass = data.status === 'healthy' ? 'healthy' : 
+                                   data.status === 'degraded' ? 'degraded' : 'unhealthy';
+                html += '<div class="status-banner ' + statusClass + '">';
+                html += '<h1>System Status: ' + data.status.toUpperCase() + '</h1>';
+                html += '<div>Last updated: ' + new Date(data.timestamp).toLocaleString() + '</div>';
+                html += '</div>';
+                
+                // Health details
+                html += '<div class="health-grid">';
+                
+                // Database health
+                html += '<div class="health-card">';
+                html += '<h3>Database</h3>';
+                html += '<div class="health-item">';
+                html += '<span class="health-label">Status:</span>';
+                html += '<span class="health-value">';
+                html += '<span class="status-badge status-' + (data.database.status === 'healthy' ? 'healthy' : 'unhealthy') + '">';
+                html += data.database.status;
+                html += '</span></span></div>';
+                html += '<div class="health-item">';
+                html += '<span class="health-label">Connected:</span>';
+                html += '<span class="health-value">' + (data.database.connected ? 'Yes' : 'No') + '</span>';
+                html += '</div>';
+                html += '</div>';
+                
+                // Workers health
+                html += '<div class="health-card">';
+                html += '<h3>Workers</h3>';
+                html += '<div class="health-item">';
+                html += '<span class="health-label">Status:</span>';
+                html += '<span class="health-value">';
+                html += '<span class="status-badge status-' + (data.workers.status === 'healthy' ? 'healthy' : 'unhealthy') + '">';
+                html += data.workers.status;
+                html += '</span></span></div>';
+                html += '<div class="health-item">';
+                html += '<span class="health-label">Count:</span>';
+                html += '<span class="health-value">' + data.workers.count + '</span>';
+                html += '</div>';
+                html += '<div class="health-item">';
+                html += '<span class="health-label">Master PID:</span>';
+                html += '<span class="health-value">' + (data.workers.master_pid || 'N/A') + '</span>';
+                html += '</div>';
+                html += '</div>';
+                
+                html += '</div>';
+                
+                document.getElementById('health-container').innerHTML = html;
+                document.getElementById('error-container').innerHTML = '';
+            } catch (error) {
+                document.getElementById('health-container').innerHTML = 
+                    '<div class="error">Error fetching health: ' + error.message + '</div>';
+                document.getElementById('error-container').innerHTML = '';
+            }
+        }
+        
+        // Initial load
+        fetchHealth();
+        
+        // Auto-refresh every 5 seconds
+        setInterval(fetchHealth, 5000);
     </script>
 </body>
 </html>
