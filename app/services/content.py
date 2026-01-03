@@ -2900,11 +2900,8 @@ def build_bcpage_wp(
                         bcpage += f'<img itemprop="image" src="//imagehosting.space/feed/pageimage.php?domain={link["domain_name"]}" alt="{link["domain_name"]}" style="display:none !important;">\n'
                     else:
                         # For sites without map: image link should point to feedtext page
-                        # Check linkouturl first (takes priority), then packageoverride, then use feedtext URL
-                        if link.get('linkouturl') and len(str(link.get('linkouturl', '')).strip()) > 5:
-                            image_link_url = str(link['linkouturl']).strip()
-                        else:
-                            image_link_url = build_feedtext_url(link, linkdomain, linkalone, bcvardomain, haslinkspg, link_settings)
+                        # build_feedtext_url() already handles packageoverride (returns homepage if true)
+                        image_link_url = build_feedtext_url(link, linkdomain, linkalone, bcvardomain, haslinkspg, link_settings)
                         bcpage += f'<a href="{image_link_url}" target="_blank"{follow}><img itemprop="image" src="//imagehosting.space/feed/pageimage.php?domain={link["domain_name"]}" alt="{link["domain_name"]}" style="width:130px !important;height:110px;"></a>\n'
                     
                     bcpage += '</div>\n'
@@ -3044,11 +3041,8 @@ def build_bcpage_wp(
                 if map_val == 1:
                     # PHP line 714-715: map == 1
                     # For sites with map: shorttext link should point to feedtext page
-                    # Check linkouturl first (takes priority), then packageoverride, then use feedtext URL
-                    if link.get('linkouturl') and len(str(link.get('linkouturl', '')).strip()) > 5:
-                        shorttext_link_url = str(link['linkouturl']).strip()
-                    else:
-                        shorttext_link_url = build_feedtext_url(link, linkdomain, linkalone, bcvardomain, haslinkspg, link_settings)
+                    # build_feedtext_url() already handles packageoverride (returns homepage if true)
+                    shorttext_link_url = build_feedtext_url(link, linkdomain, linkalone, bcvardomain, haslinkspg, link_settings)
                     # Use seo_automation_add_text_link_newbc equivalent
                     restext = seo_automation_add_text_link_newbc(restext, restextkw, shorttext_link_url, follow)
                 elif preml == 1:
