@@ -2830,7 +2830,33 @@ def build_bcpage_wp(
                         imageurl = linkdomain + '/' + slug_text + '-' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
                 else:
                     # PHP line 404-405: Default fallback
-                    imageurl = linkalone
+                    # Try to build feedtext URL using current link data if status allows
+                    if link.get('status') in ['2', '10', '8']:
+                        # Build feedtext URL using current link's data
+                        if link.get('wp_plugin') != 1:
+                            # Non-WP plugin: build Action=2 URL
+                            script_version_num = get_script_version_num(link.get('script_version'))
+                            if script_version_num >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
+                                # Use vardomain format with 'bc' suffix
+                                imageurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '/' + str(link.get('bubblefeedid', '')) + 'bc/'
+                            else:
+                                # CodeURL equivalent - simplified Action=2 format
+                                imageurl = linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', '')))
+                        elif is_bron(link.get('servicetype')):
+                            # BRON service type: use bubblefeedid with 'bc' suffix
+                            imageurl = linkdomain + '/' + str(link.get('bubblefeedid', '')) + 'bc/'
+                        else:
+                            # WordPress plugin: build slug-based URL with 'bc' suffix
+                            import html
+                            slug_text = seo_text_custom(link.get('restitle', ''))
+                            slug_text = html.unescape(slug_text)
+                            slug_text = to_ascii(slug_text)
+                            slug_text = slug_text.lower()
+                            slug_text = slug_text.replace(' ', '-')
+                            imageurl = linkdomain + '/' + slug_text + '-' + str(link.get('bubblefeedid', '')) + 'bc/'
+                    else:
+                        # Status doesn't allow feedtext URL, default to homepage
+                        imageurl = linkalone
                 
                 # Build citation container if address/name exists
                 preml = 0
