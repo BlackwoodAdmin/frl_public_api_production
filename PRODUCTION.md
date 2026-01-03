@@ -23,7 +23,42 @@ gunicorn app.main:app -c gunicorn_config.py
 
 ## Systemd Service (Production)
 
-Update your systemd service file (`/etc/systemd/system/frl-python-api.service`):
+### Updating the Service File on VPS
+
+To update the systemd service file on your VPS, follow these steps:
+
+1. **Edit the service file:**
+   ```bash
+   sudo nano /etc/systemd/system/frl-python-api.service
+   ```
+
+2. **Add the log routing configuration** (StandardOutput, StandardError, SyslogLevel, SyslogIdentifier) as shown in the example below.
+
+3. **Save and exit** (Ctrl+X, then Y, then Enter in nano).
+
+4. **Reload systemd** to recognize the changes:
+   ```bash
+   sudo systemctl daemon-reload
+   ```
+
+5. **Restart the service** to apply the new configuration:
+   ```bash
+   sudo systemctl restart frl-python-api
+   ```
+
+6. **Verify the service is running:**
+   ```bash
+   sudo systemctl status frl-python-api
+   ```
+
+7. **Check logs** to verify proper log routing:
+   ```bash
+   journalctl -u frl-python-api -n 20 --no-pager
+   ```
+
+### Service File Configuration
+
+Update your systemd service file (`/etc/systemd/system/frl-python-api.service`) with this configuration:
 
 ```ini
 [Unit]
@@ -41,6 +76,14 @@ ExecStart=/var/www/frl-python-api/venv/bin/gunicorn app.main:app -c gunicorn_con
 Restart=always
 RestartSec=10
 
+# Log routing - route both stdout and stderr to journal
+StandardOutput=journal
+StandardError=journal
+# Set default syslog priority to INFO (not ERROR)
+SyslogLevel=info
+# Optional: Set syslog identifier for easier filtering
+SyslogIdentifier=frl-python-api
+
 # Security settings
 NoNewPrivileges=true
 PrivateTmp=true
@@ -55,6 +98,29 @@ Then reload and restart:
 sudo systemctl daemon-reload
 sudo systemctl restart frl-python-api
 sudo systemctl status frl-python-api
+```
+
+### Log Routing Configuration
+
+The service file includes log routing settings to ensure proper log levels in journalctl:
+
+- **StandardOutput=journal**: Routes stdout (access logs) to systemd journal
+- **StandardError=journal**: Routes stderr (error logs) to systemd journal
+- **SyslogLevel=info**: Sets default syslog priority to INFO, preventing successful requests from appearing as ERROR
+- **SyslogIdentifier=frl-python-api**: Sets custom identifier for easier log filtering
+
+After updating the service file, verify logs are properly categorized:
+
+```bash
+# Check recent logs - should show INFO for successful requests
+journalctl -u frl-python-api -n 50 --no-pager
+
+# Filter by priority level
+journalctl -u frl-python-api -p info --no-pager
+journalctl -u frl-python-api -p err --no-pager
+
+# Filter by syslog identifier (if SyslogIdentifier is set)
+journalctl -t frl-python-api --no-pager
 ```
 
 ## Running with Uvicorn (Alternative)
