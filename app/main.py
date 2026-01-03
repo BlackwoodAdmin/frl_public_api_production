@@ -33,6 +33,10 @@ async def health():
 # Import routes
 from app.routes.feed import article, articles
 from app.routes import monitor
+from app.routes.monitor import StatsTrackingMiddleware
+
+# Add request tracking middleware (before routes to track all requests)
+app.add_middleware(StatsTrackingMiddleware)
 
 app.include_router(article.router, prefix="/feed", tags=["feed"])
 app.include_router(articles.router, prefix="/feed", tags=["feed"])

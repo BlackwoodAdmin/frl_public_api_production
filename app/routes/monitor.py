@@ -1,6 +1,7 @@
 """Monitoring endpoints for Gunicorn workers and system health."""
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from typing import List, Dict, Any, Optional
 import psutil
 import os
@@ -21,6 +22,48 @@ _stats = {
     "start_time": time.time(),
     "last_minute_requests": [],
 }
+
+
+class StatsTrackingMiddleware(BaseHTTPMiddleware):
+    """Middleware to track request statistics."""
+    
+    async def dispatch(self, request: Request, call_next):
+        # Skip tracking for monitoring endpoints to avoid recursion
+        if request.url.path.startswith("/monitor"):
+            return await call_next(request)
+        
+        # Record request start time
+        start_time = time.time()
+        
+        # Process request
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            # Track errors
+            _stats["errors"] += 1
+            _stats["total_requests"] += 1
+            current_time = time.time()
+            _stats["last_minute_requests"].append(current_time)
+            raise
+        
+        # Calculate response time
+        response_time = time.time() - start_time
+        
+        # Update stats
+        _stats["total_requests"] += 1
+        current_time = time.time()
+        _stats["last_minute_requests"].append(current_time)
+        
+        # Track response time (keep last 100)
+        _stats["request_times"].append(response_time)
+        if len(_stats["request_times"]) > 100:
+            _stats["request_times"] = _stats["request_times"][-100:]
+        
+        # Track errors (status code >= 400)
+        if response.status_code >= 400:
+            _stats["errors"] += 1
+        
+        return response
 
 
 def _get_gunicorn_processes():
