@@ -2,11 +2,25 @@
 import logging
 import traceback
 
+
+class SocketErrorFilter(logging.Filter):
+    """Filter out harmless Gunicorn socket closing errors."""
+    def filter(self, record):
+        message = record.getMessage()
+        # Filter out socket closing errors
+        if "Error while closing socket" in message and "Bad file descriptor" in message:
+            return False
+        return True
+
+
 # Configure logging FIRST before any other imports
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+# Add filter to root logger to catch all loggers including Gunicorn
+logging.getLogger().addFilter(SocketErrorFilter())
 
 logger = logging.getLogger(__name__)
 logger.info("=" * 80)
