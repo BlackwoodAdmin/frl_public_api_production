@@ -2630,28 +2630,8 @@ def build_bcpage_wp(
                 bcpage += f'<div class="{css_prefix}-spacer"></div>\n'
                 
                 # Determine link URL
-                haslinks_sql = "SELECT count(id) FROM bwp_link_placement WHERE deleted != 1 AND showondomainid = %s AND showonpgid = %s"
-                haslinks = db.fetch_one(haslinks_sql, (link['id'], link.get('bubblefeedid')))
-                haslinks = haslinks or 0
-                
-                if haslinks >= 1:
-                    haslinkspg = {'restitle': link.get('restitle'), 'showonpgid': link.get('bubblefeedid'), 'bubblefeedid': link.get('bubblefeedid')}
-                else:
-                    haslinkspg_sql = """
-                        SELECT l.id, l.showonpgid, b.restitle, b.id AS bubblefeedid 
-                        FROM bwp_link_placement l 
-                        LEFT JOIN bwp_bubblefeed b ON b.id = l.showonpgid AND b.deleted != 1 
-                        WHERE l.deleted != 1 AND b.restitle <> '' AND l.showondomainid = %s 
-                        ORDER BY RAND() LIMIT 1
-                    """
-                    haslinkspg = db.fetch_row(haslinkspg_sql, (link['id'],))
-                    if not haslinkspg:
-                        haslinkspg = {}
-                
                 # Build link URL - match PHP logic exactly
                 # PHP line 322-376: Complex conditional logic for link URL building
-                haslinkspg_count = haslinks if haslinks else 0
-                
                 # Priority check: packageoverride -> linkouturl -> existing logic
                 # If packageoverride is true, link points to homepage
                 packageoverride_val = link.get('packageoverride')
@@ -2803,60 +2783,37 @@ def build_bcpage_wp(
                         if tsups:
                             bcpage += tsups + '\n'
                 
-                # Build image URL - match PHP logic exactly
-                # PHP line 386-405: Complex conditional logic for image URL
+                # Build image URL - use current link data directly
+                # PHP line 386-405: Simplified to always use current link data
                 if link.get('skipfeedchecker') == 1 and link.get('linkskipfeedchecker') != 1:
                     # PHP line 386-388
                     imageurl = linkdomainalone
-                elif haslinkspg_count > 0 and link.get('wp_plugin') != 1 and link.get('status') in ['2', '10', '8']:
-                    # PHP line 390-395: Non-WP plugin with haslinkspg
-                    script_version_num = get_script_version_num(link.get('script_version'))
-                    if script_version_num >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
-                        imageurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', ''))) + '/' + str(haslinkspg.get('bubblefeedid', '')) + 'bc/'
+                elif link.get('status') in ['2', '10', '8']:
+                    # Build feedtext URL using current link's data
+                    if link.get('wp_plugin') != 1:
+                        # Non-WP plugin: build Action=2 URL
+                        script_version_num = get_script_version_num(link.get('script_version'))
+                        if script_version_num >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
+                            # Use vardomain format with 'bc' suffix
+                            imageurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '/' + str(link.get('bubblefeedid', '')) + 'bc/'
+                        else:
+                            # CodeURL equivalent - simplified Action=2 format
+                            imageurl = linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', '')))
+                    elif is_bron(link.get('servicetype')):
+                        # BRON service type: use bubblefeedid with 'bc' suffix
+                        imageurl = linkdomain + '/' + str(link.get('bubblefeedid', '')) + 'bc/'
                     else:
-                        # CodeURL equivalent - simplified
-                        imageurl = linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', '')))
-                elif (haslinkspg_count > 0 or is_bron(link.get('servicetype'))) and link.get('status') in ['2', '10', '8']:
-                    # PHP line 397-402: haslinkspg > 0 OR isBRON
-                    if is_bron(link.get('servicetype')):
-                        imageurl = linkdomain + '/' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
-                    else:
+                        # WordPress plugin: build slug-based URL with 'bc' suffix
                         import html
-                        slug_text = seo_text_custom(haslinkspg.get('restitle', ''))
+                        slug_text = seo_text_custom(link.get('restitle', ''))
                         slug_text = html.unescape(slug_text)
                         slug_text = to_ascii(slug_text)
                         slug_text = slug_text.lower()
                         slug_text = slug_text.replace(' ', '-')
-                        imageurl = linkdomain + '/' + slug_text + '-' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
+                        imageurl = linkdomain + '/' + slug_text + '-' + str(link.get('bubblefeedid', '')) + 'bc/'
                 else:
-                    # PHP line 404-405: Default fallback
-                    # Try to build feedtext URL using current link data if status allows
-                    if link.get('status') in ['2', '10', '8']:
-                        # Build feedtext URL using current link's data
-                        if link.get('wp_plugin') != 1:
-                            # Non-WP plugin: build Action=2 URL
-                            script_version_num = get_script_version_num(link.get('script_version'))
-                            if script_version_num >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
-                                # Use vardomain format with 'bc' suffix
-                                imageurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '/' + str(link.get('bubblefeedid', '')) + 'bc/'
-                            else:
-                                # CodeURL equivalent - simplified Action=2 format
-                                imageurl = linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', '')))
-                        elif is_bron(link.get('servicetype')):
-                            # BRON service type: use bubblefeedid with 'bc' suffix
-                            imageurl = linkdomain + '/' + str(link.get('bubblefeedid', '')) + 'bc/'
-                        else:
-                            # WordPress plugin: build slug-based URL with 'bc' suffix
-                            import html
-                            slug_text = seo_text_custom(link.get('restitle', ''))
-                            slug_text = html.unescape(slug_text)
-                            slug_text = to_ascii(slug_text)
-                            slug_text = slug_text.lower()
-                            slug_text = slug_text.replace(' ', '-')
-                            imageurl = linkdomain + '/' + slug_text + '-' + str(link.get('bubblefeedid', '')) + 'bc/'
-                    else:
-                        # Status doesn't allow feedtext URL, default to homepage
-                        imageurl = linkalone
+                    # Status doesn't allow feedtext URL, default to homepage
+                    imageurl = linkalone
                 
                 # Build citation container if address/name exists
                 preml = 0
@@ -3082,8 +3039,9 @@ def build_bcpage_wp(
                 elif preml == 1:
                     # PHP line 716-717: preml == 1
                     restext = seo_automation_add_text_link_newbc(restext, restextkw, '', follow)
-                elif (link.get('status') == '8' and haslinkspg_count > 1) or (addrndfeed == 1 and haslinkspg_count > 1):
+                elif link.get('status') == '8' or addrndfeed == 1:
                     # PHP line 718-738: Orphan link handling
+                    # Simplified: removed haslinkspg_count check since we're not using haslinks logic
                     orphan_sql = """
                         SELECT l.id, l.showonpgid, b.restitle, b.id AS bubblefeedid 
                         FROM bwp_link_placement l 
@@ -3091,7 +3049,7 @@ def build_bcpage_wp(
                         WHERE l.deleted != 1 AND b.restitle <> '' AND b.id != %s AND l.showondomainid = %s 
                         ORDER BY RAND() LIMIT 1
                     """
-                    orphanlinkspg = db.fetch_row(orphan_sql, (haslinkspg.get('bubblefeedid', ''), link['id']))
+                    orphanlinkspg = db.fetch_row(orphan_sql, (link.get('bubblefeedid', ''), link['id']))
                     if orphanlinkspg and link.get('wp_plugin') != 1:
                         # PHP line 721-726: Non-WP plugin orphan link
                         script_version_num = get_script_version_num(link.get('script_version'))
