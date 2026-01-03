@@ -2016,6 +2016,7 @@ async def get_workers_page(username: str = Depends(verify_dashboard_access)):
                 <li><a href="/monitor/dashboard">Dashboard</a></li>
                 <li><a href="/monitor/workers/page" class="active">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
+                <li><a href="/monitor/logs/page">Logs</a></li>
             </ul>
         </nav>
         
@@ -2268,6 +2269,7 @@ async def get_stats_page(username: str = Depends(verify_dashboard_access)):
                 <li><a href="/monitor/dashboard">Dashboard</a></li>
                 <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
+                <li><a href="/monitor/logs/page">Logs</a></li>
             </ul>
         </nav>
         
@@ -2560,6 +2562,7 @@ async def get_health_page(username: str = Depends(verify_dashboard_access)):
                 <li><a href="/monitor/dashboard">Dashboard</a></li>
                 <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page" class="active">Health</a></li>
+                <li><a href="/monitor/logs/page">Logs</a></li>
             </ul>
         </nav>
         
