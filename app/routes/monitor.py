@@ -1525,6 +1525,15 @@ async def get_dashboard(username: str = Depends(verify_dashboard_access)):
 </head>
 <body>
     <div class="container">
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="/monitor/dashboard" class="active">Dashboard</a></li>
+                <li><a href="/monitor/workers/page">Workers</a></li>
+                <li><a href="/monitor/health/page">Health</a></li>
+                <li><a href="/monitor/logs/page">Logs</a></li>
+            </ul>
+        </nav>
+        
         <div class="system-metrics" id="system-metrics">
             <h2>System Metrics</h2>
             <div class="metrics-grid">
@@ -1545,15 +1554,6 @@ async def get_dashboard(username: str = Depends(verify_dashboard_access)):
                 </div>
             </div>
         </div>
-        
-        <nav class="nav-menu">
-            <ul>
-                <li><a href="/monitor/dashboard" class="active">Dashboard</a></li>
-                <li><a href="/monitor/workers/page">Workers</a></li>
-                <li><a href="/monitor/health/page">Health</a></li>
-                <li><a href="/monitor/logs/page">Logs</a></li>
-            </ul>
-        </nav>
         
         <header>
             <h1>Gunicorn Worker Monitor</h1>
@@ -1863,6 +1863,59 @@ async def get_worker_detail_page(pid: int, username: str = Depends(verify_dashbo
             background-color: #2c3e50;
             color: white;
         }}
+        .system-metrics {{
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }}
+        .system-metrics h2 {{
+            color: #2c3e50;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }}
+        .metrics-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }}
+        .metric-item {{
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }}
+        .metric-label {{
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }}
+        .metric-value {{
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }}
+        .progress-bar {{
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }}
+        .progress-fill {{
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.9s ease;
+        }}
+        .progress-fill.warning {{
+            background: #ff9800;
+        }}
+        .progress-fill.danger {{
+            background: #f44336;
+        }}
     </style>
 </head>
 <body>
@@ -1875,6 +1928,27 @@ async def get_worker_detail_page(pid: int, username: str = Depends(verify_dashbo
                 <li><a href="/monitor/logs/page">Logs</a></li>
             </ul>
         </nav>
+        
+        <div class="system-metrics" id="system-metrics">
+            <h2>System Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Usage</div>
+                    <div class="metric-value" id="memory-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
+                </div>
+            </div>
+        </div>
         
         <a href="/monitor/dashboard" class="back-link">← Back to Dashboard</a>
         
@@ -1997,11 +2071,45 @@ async def get_worker_detail_page(pid: int, username: str = Depends(verify_dashbo
             return `${{secs}}s`;
         }}
         
+        async function fetchSystemMetrics() {{
+            try {{
+                const response = await fetch('/monitor/stats');
+                const data = await response.json();
+                
+                if (data.system) {{
+                    const cpuPercent = data.system.cpu_percent;
+                    const memPercent = data.system.memory_percent;
+                    
+                    document.getElementById('cpu-percent').textContent = cpuPercent.toFixed(1) + '%';
+                    const cpuProgress = document.getElementById('cpu-progress');
+                    cpuProgress.style.width = cpuPercent + '%';
+                    cpuProgress.className = 'progress-fill' + 
+                        (cpuPercent > 80 ? ' danger' : cpuPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-percent').textContent = memPercent.toFixed(1) + '%';
+                    const memProgress = document.getElementById('memory-progress');
+                    memProgress.style.width = memPercent + '%';
+                    memProgress.className = 'progress-fill' + 
+                        (memPercent > 80 ? ' danger' : memPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-details').textContent = 
+                        data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.memory_total_gb.toFixed(2) + ' GB';
+                }}
+            }} catch (error) {{
+                // Silently fail - don't break the page if system metrics fail
+            }}
+        }}
+        
         // Load on page load
+        fetchSystemMetrics();
         loadWorkerDetails();
         
         // Auto-refresh every 5 seconds
-        setInterval(loadWorkerDetails, 5000);
+        setInterval(() => {{
+            fetchSystemMetrics();
+            loadWorkerDetails();
+        }}, 5000);
     </script>
 </body>
 </html>
@@ -2157,6 +2265,27 @@ async def get_workers_page(username: str = Depends(verify_dashboard_access)):
             </ul>
         </nav>
         
+        <div class="system-metrics" id="system-metrics">
+            <h2>System Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Usage</div>
+                    <div class="metric-value" id="memory-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
+                </div>
+            </div>
+        </div>
+        
         <div class="workers-section">
             <h2>Worker Processes</h2>
             <div id="error-container"></div>
@@ -2233,11 +2362,45 @@ async def get_workers_page(username: str = Depends(verify_dashboard_access)):
             }
         }
         
+        async function fetchSystemMetrics() {
+            try {
+                const response = await fetch('/monitor/stats');
+                const data = await response.json();
+                
+                if (data.system) {
+                    const cpuPercent = data.system.cpu_percent;
+                    const memPercent = data.system.memory_percent;
+                    
+                    document.getElementById('cpu-percent').textContent = cpuPercent.toFixed(1) + '%';
+                    const cpuProgress = document.getElementById('cpu-progress');
+                    cpuProgress.style.width = cpuPercent + '%';
+                    cpuProgress.className = 'progress-fill' + 
+                        (cpuPercent > 80 ? ' danger' : cpuPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-percent').textContent = memPercent.toFixed(1) + '%';
+                    const memProgress = document.getElementById('memory-progress');
+                    memProgress.style.width = memPercent + '%';
+                    memProgress.className = 'progress-fill' + 
+                        (memPercent > 80 ? ' danger' : memPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-details').textContent = 
+                        data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.memory_total_gb.toFixed(2) + ' GB';
+                }
+            } catch (error) {
+                // Silently fail - don't break the page if system metrics fail
+            }
+        }
+        
         // Initial load
+        fetchSystemMetrics();
         fetchWorkers();
         
         // Auto-refresh every 5 seconds
-        setInterval(fetchWorkers, 5000);
+        setInterval(() => {
+            fetchSystemMetrics();
+            fetchWorkers();
+        }, 5000);
     </script>
 </body>
 </html>
@@ -2595,6 +2758,59 @@ async def get_health_page(username: str = Depends(verify_dashboard_access)):
             background-color: #2c3e50;
             color: white;
         }
+        .system-metrics {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .system-metrics h2 {
+            color: #2c3e50;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .metric-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.9s ease;
+        }
+        .progress-fill.warning {
+            background: #ff9800;
+        }
+        .progress-fill.danger {
+            background: #f44336;
+        }
         .health-section {
             background: white;
             padding: 20px;
@@ -2703,6 +2919,27 @@ async def get_health_page(username: str = Depends(verify_dashboard_access)):
             </ul>
         </nav>
         
+        <div class="system-metrics" id="system-metrics">
+            <h2>System Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Usage</div>
+                    <div class="metric-value" id="memory-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
+                </div>
+            </div>
+        </div>
+        
         <div id="error-container"></div>
         <div id="health-container" class="loading">Loading health status...</div>
     </div>
@@ -2779,10 +3016,14 @@ async def get_health_page(username: str = Depends(verify_dashboard_access)):
         }
         
         // Initial load
+        fetchSystemMetrics();
         fetchHealth();
         
         // Auto-refresh every 5 seconds
-        setInterval(fetchHealth, 5000);
+        setInterval(() => {
+            fetchSystemMetrics();
+            fetchHealth();
+        }, 5000);
     </script>
 </body>
 </html>
@@ -2849,6 +3090,59 @@ async def get_logs_page(username: str = Depends(verify_dashboard_access)):
         .nav-menu a.active {
             background-color: #2c3e50;
             color: white;
+        }
+        .system-metrics {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .system-metrics h2 {
+            color: #2c3e50;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .metric-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.9s ease;
+        }
+        .progress-fill.warning {
+            background: #ff9800;
+        }
+        .progress-fill.danger {
+            background: #f44336;
         }
         .logs-controls {
             background: white;
@@ -2967,6 +3261,27 @@ async def get_logs_page(username: str = Depends(verify_dashboard_access)):
                 <li><a href="/monitor/logs/page" class="active">Logs</a></li>
             </ul>
         </nav>
+        
+        <div class="system-metrics" id="system-metrics">
+            <h2>System Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Usage</div>
+                    <div class="metric-value" id="memory-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
+                </div>
+            </div>
+        </div>
         
         <div class="logs-controls">
             <label>
@@ -3098,7 +3413,38 @@ async def get_logs_page(username: str = Depends(verify_dashboard_access)):
         
         document.getElementById('auto-refresh').addEventListener('change', toggleAutoRefresh);
         
+        async function fetchSystemMetrics() {
+            try {
+                const response = await fetch('/monitor/stats');
+                const data = await response.json();
+                
+                if (data.system) {
+                    const cpuPercent = data.system.cpu_percent;
+                    const memPercent = data.system.memory_percent;
+                    
+                    document.getElementById('cpu-percent').textContent = cpuPercent.toFixed(1) + '%';
+                    const cpuProgress = document.getElementById('cpu-progress');
+                    cpuProgress.style.width = cpuPercent + '%';
+                    cpuProgress.className = 'progress-fill' + 
+                        (cpuPercent > 80 ? ' danger' : cpuPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-percent').textContent = memPercent.toFixed(1) + '%';
+                    const memProgress = document.getElementById('memory-progress');
+                    memProgress.style.width = memPercent + '%';
+                    memProgress.className = 'progress-fill' + 
+                        (memPercent > 80 ? ' danger' : memPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-details').textContent = 
+                        data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.memory_total_gb.toFixed(2) + ' GB';
+                }
+            } catch (error) {
+                // Silently fail - don't break the page if system metrics fail
+            }
+        }
+        
         // Initial load
+        fetchSystemMetrics();
         fetchLogs();
     </script>
 </body>
@@ -3166,6 +3512,59 @@ async def get_worker_logs_page(pid: int, username: str = Depends(verify_dashboar
         .nav-menu a.active {{
             background-color: #2c3e50;
             color: white;
+        }}
+        .system-metrics {{
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }}
+        .system-metrics h2 {{
+            color: #2c3e50;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }}
+        .metrics-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }}
+        .metric-item {{
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }}
+        .metric-label {{
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }}
+        .metric-value {{
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }}
+        .progress-bar {{
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }}
+        .progress-fill {{
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.9s ease;
+        }}
+        .progress-fill.warning {{
+            background: #ff9800;
+        }}
+        .progress-fill.danger {{
+            background: #f44336;
         }}
         .worker-info {{
             background: white;
@@ -3309,6 +3708,27 @@ async def get_worker_logs_page(pid: int, username: str = Depends(verify_dashboar
                 <li><a href="/monitor/logs/page">Logs</a></li>
             </ul>
         </nav>
+        
+        <div class="system-metrics" id="system-metrics">
+            <h2>System Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Usage</div>
+                    <div class="metric-value" id="memory-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
+                </div>
+            </div>
+        </div>
         
         <a href="/monitor/worker/{pid}/page" class="back-link">← Back to Worker {pid} Details</a>
         
@@ -3481,7 +3901,38 @@ async def get_worker_logs_page(pid: int, username: str = Depends(verify_dashboar
         
         document.getElementById('auto-refresh').addEventListener('change', toggleAutoRefresh);
         
+        async function fetchSystemMetrics() {{
+            try {{
+                const response = await fetch('/monitor/stats');
+                const data = await response.json();
+                
+                if (data.system) {{
+                    const cpuPercent = data.system.cpu_percent;
+                    const memPercent = data.system.memory_percent;
+                    
+                    document.getElementById('cpu-percent').textContent = cpuPercent.toFixed(1) + '%';
+                    const cpuProgress = document.getElementById('cpu-progress');
+                    cpuProgress.style.width = cpuPercent + '%';
+                    cpuProgress.className = 'progress-fill' + 
+                        (cpuPercent > 80 ? ' danger' : cpuPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-percent').textContent = memPercent.toFixed(1) + '%';
+                    const memProgress = document.getElementById('memory-progress');
+                    memProgress.style.width = memPercent + '%';
+                    memProgress.className = 'progress-fill' + 
+                        (memPercent > 80 ? ' danger' : memPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-details').textContent = 
+                        data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.memory_total_gb.toFixed(2) + ' GB';
+                }}
+            }} catch (error) {{
+                // Silently fail - don't break the page if system metrics fail
+            }}
+        }}
+        
         // Initial load
+        fetchSystemMetrics();
         fetchWorkerInfo();
         fetchLogs();
     </script>
