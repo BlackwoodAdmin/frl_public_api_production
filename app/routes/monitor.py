@@ -2881,7 +2881,19 @@ async def get_logs_page(username: str = Depends(verify_dashboard_access)):
                 const params = new URLSearchParams({ limit });
                 if (level) params.append('level', level);
                 
-                const response = await fetch('/monitor/logs?' + params);
+                const response = await fetch('/monitor/logs?' + params, {
+                    credentials: 'same-origin'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new Error('Server returned non-JSON response. Authentication may have failed.');
+                }
+                
                 const data = await response.json();
                 
                 if (data.error) {
@@ -3252,7 +3264,19 @@ async def get_worker_logs_page(pid: int, username: str = Depends(verify_dashboar
                 const params = new URLSearchParams({{ limit }});
                 if (level) params.append('level', level);
                 
-                const response = await fetch(`/monitor/worker/${{pid}}/logs?${{params}}`);
+                const response = await fetch(`/monitor/worker/${{pid}}/logs?${{params}}`, {{
+                    credentials: 'same-origin'
+                }});
+                
+                if (!response.ok) {{
+                    throw new Error(`HTTP ${{response.status}}: ${{response.statusText}}`);
+                }}
+                
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {{
+                    throw new Error('Server returned non-JSON response. Authentication may have failed.');
+                }}
+                
                 const data = await response.json();
                 
                 if (data.error) {{
