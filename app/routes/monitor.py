@@ -167,52 +167,53 @@ def _load_stats() -> Dict[str, Any]:
             _, current_master_pid = _get_gunicorn_processes()
             stored_session_id = stats.get("app_session_id")
             
-            # If master PID not found (e.g., dev mode), use None to skip restart detection
-            if current_master_pid is not None and stored_session_id != current_master_pid:
-                # App has restarted - reset error-related counters
-                # Need exclusive lock to reset - use double-check pattern
-                with open(STATS_LOCK_FILE, 'r+') as lock_file:
-                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)  # Exclusive lock for writing
-                    try:
-                        # Double-check: reload stats in case another process already reset
-                        with open(STATS_FILE, 'r') as f:
-                            stats = json.load(f)
-                        
-                        # Get master PID again and check if reset is still needed
-                        _, current_master_pid = _get_gunicorn_processes()
-                        stored_session_id = stats.get("app_session_id")
-                        if current_master_pid is not None and stored_session_id != current_master_pid:
-                            # Reset error-related counters on app restart
-                            stats["errors"] = 0
-                            stats["total_requests"] = 0
-                            stats["request_times"] = []
-                            stats["last_minute_requests"] = []
-                            stats["last_reset_time"] = current_time
-                            stats["app_session_id"] = current_master_pid
-                            # Keep start_time unchanged (for uptime calculation)
+            # If master PID not found (e.g., dev mode), skip restart detection
+            if current_master_pid is not None:
+                if stored_session_id is None:
+                    # First time setting session ID (migration or new install)
+                    # Need exclusive lock to update
+                    with open(STATS_LOCK_FILE, 'r+') as lock_file:
+                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)  # Exclusive lock for writing
+                        try:
+                            # Reload stats and set session ID
+                            with open(STATS_FILE, 'r') as f:
+                                stats = json.load(f)
                             
-                            # Save reset stats
-                            with open(STATS_FILE, 'w') as f:
-                                json.dump(stats, f)
-                            logger.info(f"Reset error counts on app restart. Errors: 0, Total requests: 0")
-                    finally:
-                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-            elif current_master_pid is not None and stored_session_id is None:
-                # First time setting session ID (migration or new install)
-                # Need exclusive lock to update
-                with open(STATS_LOCK_FILE, 'r+') as lock_file:
-                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)  # Exclusive lock for writing
-                    try:
-                        # Reload stats and set session ID
-                        with open(STATS_FILE, 'r') as f:
-                            stats = json.load(f)
-                        
-                        if stats.get("app_session_id") is None:
-                            stats["app_session_id"] = current_master_pid
-                            with open(STATS_FILE, 'w') as f:
-                                json.dump(stats, f)
-                    finally:
-                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                            if stats.get("app_session_id") is None:
+                                stats["app_session_id"] = current_master_pid
+                                with open(STATS_FILE, 'w') as f:
+                                    json.dump(stats, f)
+                        finally:
+                            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                elif stored_session_id != current_master_pid:
+                    # App has restarted - reset error-related counters
+                    # Need exclusive lock to reset - use double-check pattern
+                    with open(STATS_LOCK_FILE, 'r+') as lock_file:
+                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)  # Exclusive lock for writing
+                        try:
+                            # Double-check: reload stats in case another process already reset
+                            with open(STATS_FILE, 'r') as f:
+                                stats = json.load(f)
+                            
+                            # Get master PID again and check if reset is still needed
+                            _, current_master_pid = _get_gunicorn_processes()
+                            stored_session_id = stats.get("app_session_id")
+                            if current_master_pid is not None and stored_session_id is not None and stored_session_id != current_master_pid:
+                                # Reset error-related counters on app restart
+                                stats["errors"] = 0
+                                stats["total_requests"] = 0
+                                stats["request_times"] = []
+                                stats["last_minute_requests"] = []
+                                stats["last_reset_time"] = current_time
+                                stats["app_session_id"] = current_master_pid
+                                # Keep start_time unchanged (for uptime calculation)
+                                
+                                # Save reset stats
+                                with open(STATS_FILE, 'w') as f:
+                                    json.dump(stats, f)
+                                logger.info(f"Reset error counts on app restart. Errors: 0, Total requests: 0")
+                        finally:
+                            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
             
             # Check if 3 hours (10800 seconds) have passed since last reset
             time_since_reset = current_time - stats.get("last_reset_time", current_time)
@@ -337,10 +338,10 @@ class StatsTrackingMiddleware(BaseHTTPMiddleware):
                 stats["total_requests"] += 1
                 current_time = time.time()
                 stats["last_minute_requests"].append(current_time)
-                # Clean old timestamps (older than 1 minute)
+                # Clean old timestamps (older than 1 hour)
                 stats["last_minute_requests"] = [
                     t for t in stats["last_minute_requests"]
-                    if current_time - t < 60
+                    if current_time - t < 3600
                 ]
             _update_stats(update_error)
             raise
@@ -353,10 +354,10 @@ class StatsTrackingMiddleware(BaseHTTPMiddleware):
             stats["total_requests"] += 1
             current_time = time.time()
             stats["last_minute_requests"].append(current_time)
-            # Clean old timestamps (older than 1 minute)
+            # Clean old timestamps (older than 1 hour)
             stats["last_minute_requests"] = [
                 t for t in stats["last_minute_requests"]
-                if current_time - t < 60
+                if current_time - t < 3600
             ]
             
             # Track response time (keep last 100)
@@ -574,10 +575,10 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
         logger.debug(f"Loaded stats: total_requests={stats.get('total_requests', 0)}, errors={stats.get('errors', 0)}, request_times_count={len(stats.get('request_times', []))}, last_minute_count={len(stats.get('last_minute_requests', []))}")
         current_time = time.time()
         
-        # Clean old request times (older than 1 minute)
+        # Clean old request times (older than 1 hour)
         stats["last_minute_requests"] = [
             t for t in stats["last_minute_requests"]
-            if current_time - t < 60
+            if current_time - t < 3600
         ]
         
         # Save cleaned stats back
@@ -606,9 +607,12 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
         stats_file_exists = STATS_FILE.exists()
         stats_file_size = STATS_FILE.stat().st_size if stats_file_exists else 0
         
+        # Calculate average requests per minute (based on last hour)
+        requests_per_minute = round(len(stats["last_minute_requests"]) / 60, 2) if stats["last_minute_requests"] else 0
+        
         result = {
             "total_requests": total_requests,
-            "requests_per_minute": len(stats["last_minute_requests"]),
+            "requests_per_minute": requests_per_minute,
             "average_response_time_ms": round(avg_response_time * 1000, 2),
             "error_rate": round(error_rate, 4),
             "active_workers": active_workers,
