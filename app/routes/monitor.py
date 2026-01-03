@@ -1468,7 +1468,7 @@ async def get_dashboard(username: str = Depends(verify_dashboard_access)):
         .progress-fill {
             height: 100%;
             background: #4CAF50;
-            transition: width 0.3s ease;
+            transition: width 0.9s ease;
         }
         .progress-fill.warning {
             background: #ff9800;
@@ -1556,7 +1556,7 @@ async def get_dashboard(username: str = Depends(verify_dashboard_access)):
             <h1>Gunicorn Worker Monitor</h1>
             <div class="refresh-indicator">
                 <div class="refresh-dot"></div>
-                <span>Auto-refreshing every 5 seconds</span>
+                <span>Auto-refreshing every 1 second</span>
             </div>
         </header>
         
@@ -1716,8 +1716,8 @@ async def get_dashboard(username: str = Depends(verify_dashboard_access)):
         // Initial load
         refresh();
         
-        // Auto-refresh every 5 seconds
-        setInterval(refresh, 5000);
+        // Auto-refresh every 1 second
+        setInterval(refresh, 1000);
     </script>
 </body>
 </html>
