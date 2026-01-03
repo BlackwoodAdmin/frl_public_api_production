@@ -2641,16 +2641,17 @@ def build_bcpage_wp(
                 elif link.get('linkouturl') and len(str(link.get('linkouturl', '')).strip()) > 5:
                     linkurl = str(link['linkouturl']).strip()
                 # Otherwise, continue with existing logic
-                elif haslinkspg_count > 0 and link.get('wp_plugin') != 1 and link.get('servicetype') == 356 and link.get('status') in ['2', '10']:
+                elif link.get('wp_plugin') != 1 and link.get('servicetype') == 356 and link.get('status') in ['2', '10']:
                     # PHP line 322-324: CodeURL for non-WP plugin with servicetype 356
-                    # Simplified CodeURL - would need full implementation
-                    linkurl = linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', '')))
-                elif haslinkspg_count > 0 and link.get('wp_plugin') == 1 and link.get('servicetype') == 356 and link.get('status') in ['2', '10']:
+                    # Use current link data directly
+                    linkurl = linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', '')))
+                elif link.get('wp_plugin') == 1 and link.get('servicetype') == 356 and link.get('status') in ['2', '10']:
                     # PHP line 326-331: WP plugin with servicetype 356
+                    # Use current link data directly
                     if is_bron(link.get('servicetype')):
-                        linkurl = linkdomain + '/' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
+                        linkurl = linkdomain + '/' + str(link.get('bubblefeedid', '')) + 'bc/'
                     else:
-                        linkurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', ''))) + '-' + str(haslinkspg.get('showonpgid', '')) + 'bc/'
+                        linkurl = linkdomain + '/' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '-' + str(link.get('bubblefeedid', '')) + 'bc/'
                 elif link.get('linkouturl') and len(str(link.get('linkouturl', '')).strip()) > 5 and link.get('status') in ['2', '10'] and (not is_seom(link.get('servicetype')) or is_bron(link.get('servicetype'))):
                     # PHP line 333: linkouturl if NOT SEOM OR if BRON
                     linkurl = str(link['linkouturl']).strip()
