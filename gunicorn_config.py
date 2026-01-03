@@ -46,21 +46,12 @@ tmp_upload_dir = None
 
 def on_starting(server):
     """Called just before the master process is initialized."""
-    logger.info("=" * 80)
     logger.info("Gunicorn starting...")
-    logger.info(f"Bind: {bind}")
-    logger.info(f"Workers: {workers}")
-    logger.info(f"Worker class: {worker_class}")
-    logger.info("=" * 80)
 
 
 def when_ready(server):
     """Called just after the server is started."""
-    logger.info("=" * 80)
     logger.info("Gunicorn is ready to accept connections")
-    logger.info(f"Listening on: {bind}")
-    logger.info(f"Workers: {workers}")
-    logger.info("=" * 80)
 
 
 def worker_int(worker):
@@ -77,8 +68,6 @@ def worker_abort(worker):
 
 def on_exit(server):
     """Called just before exiting Gunicorn."""
-    logger.info("=" * 80)
     logger.info("Gunicorn is shutting down")
-    logger.info("=" * 80)
 
 

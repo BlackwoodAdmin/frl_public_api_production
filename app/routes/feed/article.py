@@ -3,43 +3,36 @@ import logging
 import traceback
 
 logger = logging.getLogger(__name__)
-logger.info("Initializing article.py route module...")
 
 try:
     from fastapi import APIRouter, Request, Query, HTTPException, Form
     from fastapi.responses import JSONResponse, HTMLResponse, Response
     from typing import Optional
-    logger.info("✓ Successfully imported FastAPI components")
 except Exception as e:
-    logger.error(f"✗ Failed to import FastAPI components: {e}")
+    logger.error(f"Failed to import FastAPI components: {e}")
     logger.error(traceback.format_exc())
     raise
 
 try:
     from app.database import db
-    logger.info("✓ Successfully imported app.database")
 except Exception as e:
-    logger.error(f"✗ Failed to import app.database: {e}")
+    logger.error(f"Failed to import app.database: {e}")
     logger.error(traceback.format_exc())
     raise
 
 try:
     from app.services.auth import validate_api_credentials
-    logger.info("✓ Successfully imported app.services.auth")
 except Exception as e:
-    logger.error(f"✗ Failed to import app.services.auth: {e}")
+    logger.error(f"Failed to import app.services.auth: {e}")
     logger.error(traceback.format_exc())
     raise
 
 try:
     from app.services.content import build_footer_wp, build_pages_array
-    logger.info("✓ Successfully imported app.services.content functions")
 except Exception as e:
-    logger.error(f"✗ Failed to import app.services.content: {e}")
+    logger.error(f"Failed to import app.services.content: {e}")
     logger.error(traceback.format_exc())
     raise
-
-logger.info("✓ article.py module initialization completed")
 
 router = APIRouter()
 
