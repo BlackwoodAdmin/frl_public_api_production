@@ -32,8 +32,11 @@ async def health():
 
 # Import routes
 from app.routes.feed import article, articles
+from app.routes import monitor
+
 app.include_router(article.router, prefix="/feed", tags=["feed"])
 app.include_router(articles.router, prefix="/feed", tags=["feed"])
+app.include_router(monitor.router, prefix="/monitor", tags=["monitoring"])
 
 
 if __name__ == "__main__":
