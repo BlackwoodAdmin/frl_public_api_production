@@ -480,7 +480,7 @@ ul.mdubgwi-footer-nav {padding: 0px !important;overflow:visible !important}
 .bwp_citation_conatainer br {font-size:3px !important;line-height:3px !important;}
 .bwp_citation_conatainer p {float:left !important;}
 .mobileclear-343 {margin:0 !important; padding:0px !important;height:10px !important;}
-.bwp_citation_conatainer a {float:left !important;}
+.bwp_citation_conatainer a {float:none !important;}
 @media (min-width: 768px) and (max-width: 979px) { 
 .ngodkrbsitr-container { text-align:left!important; }	 
 .align-left, .align-right { float:left!important; margin- right:1% !important; text-align: left !important; } 
