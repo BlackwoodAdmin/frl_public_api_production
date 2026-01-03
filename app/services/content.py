@@ -2783,9 +2783,11 @@ def build_bcpage_wp(
                 
                 # Build image URL - use current link data directly
                 # PHP line 386-405: Simplified to always use current link data
-                # Normalize status to string for comparison (handle both string and integer)
-                link_status = str(link.get('status', '')) if link.get('status') is not None else ''
-                if link_status in ['2', '10', '8'] and link.get('restitle') and link.get('bubblefeedid'):
+                # Check status as both string and integer (PHP uses integer comparison)
+                link_status = link.get('status')
+                status_valid = (link_status in ['2', '10', '8'] or link_status in [2, 10, 8])
+                # Build feedtext URL if status is valid (restitle and bubblefeedid will be handled with defaults)
+                if status_valid:
                     # Build feedtext URL using current link's data
                     if link.get('wp_plugin') != 1:
                         # Non-WP plugin: build Action=2 URL
