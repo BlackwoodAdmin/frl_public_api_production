@@ -79,7 +79,7 @@ except Exception as e:
     raise
 
 try:
-    from app.routes.monitor import StatsTrackingMiddleware
+    from app.routes.monitor import StatsTrackingMiddleware, _load_stats
 except Exception as e:
     logger.error(f"Failed to import StatsTrackingMiddleware: {e}")
     logger.error(traceback.format_exc())
@@ -114,6 +114,18 @@ except Exception as e:
     logger.error(f"Failed to include monitor router: {e}")
     logger.error(traceback.format_exc())
     raise
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Detect app restart and reset stats on startup."""
+    try:
+        # Call _load_stats() to trigger restart detection immediately on app startup
+        _load_stats()
+    except Exception as e:
+        # Don't crash app startup if stats loading fails
+        logger.error(f"Failed to load stats on startup: {e}")
+        logger.error(traceback.format_exc())
 
 
 if __name__ == "__main__":
