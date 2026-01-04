@@ -3413,8 +3413,6 @@ def build_bubba_page_wp(
     """
     Build Bubba page HTML (Action=3).
     Replicates seo_automation_build_bubba_page from websitereferencebubba-wp.php
-    
-    TODO: Full implementation needed - this is a placeholder
     """
     if not bubbleid or not domainid:
         return ""

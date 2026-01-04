@@ -364,8 +364,6 @@ img.align-left { max-width:100%!important;" }
     if script_version >= 3 and wp_plugin != 1 and iswin != 1 and usepurl != 0:
         # Generate footer HTML (similar to Articles30.php seo_automation_build_footer30)
         footer_html = build_footer_wp(domainid, domain_category, domain_settings)
-        
-        # TODO: Add social media icons if needed (PHP lines 176-253)
         # For now, just return the footer HTML
         return HTMLResponse(content=footer_html)
     

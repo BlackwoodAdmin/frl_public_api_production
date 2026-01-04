@@ -92,7 +92,6 @@ USE_JOURNALCTL = os.getenv("USE_JOURNALCTL", "false").lower() == "true"
 
 def _find_journalctl_path() -> str:
     """Find the path to journalctl executable."""
-    logger.debug("Finding journalctl path...")
     # Common system paths for journalctl
     common_paths = [
         "/usr/bin/journalctl",
@@ -324,7 +323,6 @@ def _save_stats(stats: Dict[str, Any]):
             try:
                 with open(STATS_FILE, 'w') as f:
                     json.dump(stats, f)
-                logger.debug(f"Saving stats: total_requests={stats.get('total_requests', 0)}, errors={stats.get('errors', 0)}")
             finally:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
     except Exception as e:
@@ -347,7 +345,6 @@ class StatsTrackingMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         
         # Record request start time
-        logger.debug(f"Tracking request: {request.method} {request.url.path}")
         start_time = time.time()
         
         # Process request
@@ -390,8 +387,6 @@ class StatsTrackingMiddleware(BaseHTTPMiddleware):
             # Track errors (only 5xx server errors, not 4xx client errors)
             if response.status_code >= 500:
                 stats["errors"] += 1
-            
-            logger.debug(f"Updated stats: total_requests={stats['total_requests']}, errors={stats['errors']}, response_time={response_time:.3f}s, status={response.status_code}")
         
         _update_stats(update_stats)
         
@@ -688,7 +683,6 @@ async def get_stats():
     try:
         # Load stats from shared file
         stats = _load_stats()
-        logger.debug(f"Loaded stats: total_requests={stats.get('total_requests', 0)}, errors={stats.get('errors', 0)}, request_times_count={len(stats.get('request_times', []))}, last_minute_count={len(stats.get('last_minute_requests', []))}")
         current_time = time.time()
         
         # Clean old request times periodically (every 10 requests, not every request)
@@ -4351,7 +4345,7 @@ async def get_log_detail_page(log_hash: str, username: str = Depends(verify_dash
                     button.textContent = originalText;
                 }}, 2000);
             }}).catch(err => {{
-                console.error('Failed to copy:', err);
+                // Silent error handling
             }});
         }}
         
