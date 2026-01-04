@@ -646,7 +646,7 @@ def _get_cached_system_metrics():
 
 
 @router.get("/workers", response_class=JSONResponse)
-async def get_workers(username: str = Depends(verify_dashboard_access)):
+async def get_workers():
     """Get Gunicorn worker process information."""
     try:
         workers, master_pid = _get_gunicorn_processes()
@@ -680,7 +680,7 @@ async def get_workers(username: str = Depends(verify_dashboard_access)):
 
 
 @router.get("/stats", response_class=JSONResponse)
-async def get_stats(username: str = Depends(verify_dashboard_access)):
+async def get_stats():
     """Get request statistics and performance metrics."""
     try:
         # Load stats from shared file
@@ -776,7 +776,7 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
 
 
 @router.get("/dashboard", response_class=JSONResponse)
-async def get_dashboard(username: str = Depends(verify_dashboard_access)):
+async def get_dashboard():
     """Get dashboard data (combined stats and workers)."""
     try:
         # Get stats and workers data
@@ -820,7 +820,7 @@ async def get_dashboard(username: str = Depends(verify_dashboard_access)):
 
 
 @router.get("/worker/{pid}", response_class=JSONResponse)
-async def get_worker_details(pid: int, username: str = Depends(verify_dashboard_access)):
+async def get_worker_details(pid: int):
     """Get detailed information about a specific worker process."""
     try:
         proc = psutil.Process(pid)
@@ -962,7 +962,7 @@ async def get_worker_details(pid: int, username: str = Depends(verify_dashboard_
 
 
 @router.get("/health", response_class=JSONResponse)
-async def get_health(username: str = Depends(verify_dashboard_access)):
+async def get_health():
     """Get system health status."""
     try:
         # Check database connectivity
@@ -1002,7 +1002,7 @@ async def get_health(username: str = Depends(verify_dashboard_access)):
 
 
 @router.get("/logs", response_class=JSONResponse)
-async def get_logs(limit: int = 1000, level: Optional[str] = None, username: str = Depends(verify_dashboard_access)):
+async def get_logs(limit: int = 1000, level: Optional[str] = None):
     """Get application logs."""
     try:
         logs = []
@@ -1104,7 +1104,7 @@ async def get_logs(limit: int = 1000, level: Optional[str] = None, username: str
 
 
 @router.get("/worker/{pid}/logs", response_class=JSONResponse)
-async def get_worker_logs(pid: int, limit: int = 1000, level: Optional[str] = None, username: str = Depends(verify_dashboard_access)):
+async def get_worker_logs(pid: int, limit: int = 1000, level: Optional[str] = None):
     """Get logs for a specific worker process."""
     try:
         logs = []
@@ -1394,8 +1394,8 @@ async def get_login_page():
             const credentials = btoa(username + ':' + password);
             
             try {
-                // Test authentication by making a request to a protected endpoint
-                const response = await fetch('/monitor/health', {
+                // Test authentication by making a request to a protected HTML endpoint
+                const response = await fetch('/monitor/dashboard/page', {
                     method: 'GET',
                     headers: {
                         'Authorization': 'Basic ' + credentials
