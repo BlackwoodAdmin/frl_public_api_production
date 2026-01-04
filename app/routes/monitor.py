@@ -6,9 +6,8 @@ import traceback
 logger = logging.getLogger(__name__)
 
 try:
-    from fastapi import APIRouter, Request, Depends, HTTPException, status
+    from fastapi import APIRouter, Request, HTTPException, status
     from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-    from fastapi.security import HTTPBasic, HTTPBasicCredentials
     from starlette.middleware.base import BaseHTTPMiddleware
     from typing import List, Dict, Any, Optional
     import psutil
@@ -34,30 +33,6 @@ except Exception as e:
     raise
 
 router = APIRouter()
-
-# HTTP Basic Authentication for dashboard
-security = HTTPBasic()
-
-async def verify_dashboard_access(credentials: HTTPBasicCredentials = Depends(security)):
-    """Verify user has access to dashboard."""
-    try:
-        from app.services.auth import validate_dashboard_credentials
-        
-        if not validate_dashboard_credentials(credentials.username, credentials.password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials",
-                headers={"WWW-Authenticate": "Basic"},
-            )
-        return credentials.username
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in dashboard authentication: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authentication error"
-        )
 
 def check_auth_for_html(request: Request):
     """Check authentication for HTML endpoints, returns (username, None) if authenticated, (None, RedirectResponse) if not."""
@@ -161,7 +136,6 @@ try:
                 "last_minute_requests": [],
                 "last_reset_time": time.time(),
                 "app_session_id": None,  # Will be set on first load based on master PID
-                "cpu_readings": [],
             }
             with open(STATS_FILE, 'w') as f:
                 json.dump(initial_stats, f)
@@ -202,9 +176,6 @@ def _load_stats() -> Dict[str, Any]:
                 needs_migration = True
             if "app_session_id" not in stats:
                 stats["app_session_id"] = None  # Will trigger reset below
-                needs_migration = True
-            if "cpu_readings" not in stats:
-                stats["cpu_readings"] = []
                 needs_migration = True
             
             if needs_migration:
@@ -254,7 +225,6 @@ def _load_stats() -> Dict[str, Any]:
                                 stats["total_requests"] = 0
                                 stats["request_times"] = []
                                 stats["last_minute_requests"] = []
-                                stats["cpu_readings"] = []
                                 stats["last_reset_time"] = current_time
                                 stats["start_time"] = current_time
                                 stats["app_session_id"] = current_master_pid
@@ -316,7 +286,6 @@ def _load_stats() -> Dict[str, Any]:
                         "last_minute_requests": [],
                         "last_reset_time": time.time(),
                         "app_session_id": None,  # Will be set on first load based on master PID
-                        "cpu_readings": [],
                     }
                     
                     # Create file
@@ -336,7 +305,6 @@ def _load_stats() -> Dict[str, Any]:
             "last_minute_requests": [],
             "last_reset_time": time.time(),
             "app_session_id": None,  # Will be set on first load based on master PID
-            "cpu_readings": [],
         }
 
 
