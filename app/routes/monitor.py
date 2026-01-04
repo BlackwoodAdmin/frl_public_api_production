@@ -1543,7 +1543,7 @@ async def get_login_page():
                 <input type="password" id="password" name="password" required autocomplete="current-password">
             </div>
             
-            <button type="button" id="login-button" class="btn">Login</button>
+            <button type="button" id="login-button" class="btn" onclick="handleLogin()">Login</button>
         </form>
     </div>
     
@@ -1618,32 +1618,9 @@ async def get_login_page():
             }
         }
         
-        try {
-            const loginButton = document.getElementById('login-button');
-            const loginForm = document.getElementById('login-form');
-            console.log('[LOGIN DEBUG] Login button element found:', loginButton !== null);
-            console.log('[LOGIN DEBUG] Login form element found:', loginForm !== null);
-            
-            if (!loginButton) {
-                console.error('[LOGIN DEBUG] ERROR: Login button element not found!');
-            } else {
-                console.log('[LOGIN DEBUG] Attaching click event listener to login button');
-                loginButton.addEventListener('click', handleLogin);
-                
-                // Also handle form submit as fallback
-                if (loginForm) {
-                    console.log('[LOGIN DEBUG] Also attaching submit event listener to login form');
-                    loginForm.addEventListener('submit', function(e) {
-                        console.log('[LOGIN DEBUG] ===== FORM SUBMIT EVENT FIRED =====');
-                        e.preventDefault();
-                        handleLogin();
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('[LOGIN DEBUG] ERROR: Failed to attach login handler:', error);
-            console.error('[LOGIN DEBUG] Error details:', error.name, error.message, error.stack);
-        }
+        // Make handleLogin globally available for onclick handler
+        window.handleLogin = handleLogin;
+        console.log('[LOGIN DEBUG] handleLogin function registered globally');
         
         // Auto-focus username field
         try {
