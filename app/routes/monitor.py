@@ -3638,8 +3638,9 @@ async def get_logs_page(request: Request):
             margin-right: 10px;
         }
         .log-entry .log-link {
-            color: #ff0000;
+            color: #ffffff;
             text-decoration: underline;
+            font-weight: bold;
         }
         .log-entry .log-link:hover {
             color: #2196F3;
