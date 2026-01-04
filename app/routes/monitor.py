@@ -3059,6 +3059,14 @@ async def get_stats_page(request: Request):
                     </div>
                     <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
                 </div>
+                <div class="metric-item">
+                    <div class="metric-label">Disk Usage</div>
+                    <div class="metric-value" id="disk-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="disk-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="disk-details">-</div>
+                </div>
             </div>
         </div>
         
@@ -4046,6 +4054,17 @@ async def get_logs_page(request: Request):
                     document.getElementById('memory-details').textContent = 
                         data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
                         data.system.memory_total_gb.toFixed(2) + ' GB';
+                    
+                    const diskPercent = data.system.disk_percent;
+                    document.getElementById('disk-percent').textContent = diskPercent.toFixed(1) + '%';
+                    const diskProgress = document.getElementById('disk-progress');
+                    diskProgress.style.width = diskPercent + '%';
+                    diskProgress.className = 'progress-fill' + 
+                        (diskPercent > 80 ? ' danger' : diskPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('disk-details').textContent = 
+                        data.system.disk_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.disk_total_gb.toFixed(2) + ' GB';
                 }
             } catch (error) {
                 // Silently fail - don't break the page if system metrics fail
@@ -4516,6 +4535,17 @@ async def get_log_detail_page(log_hash: str, request: Request):
                     document.getElementById('memory-details').textContent = 
                         data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
                         data.system.memory_total_gb.toFixed(2) + ' GB';
+                    
+                    const diskPercent = data.system.disk_percent;
+                    document.getElementById('disk-percent').textContent = diskPercent.toFixed(1) + '%';
+                    const diskProgress = document.getElementById('disk-progress');
+                    diskProgress.style.width = diskPercent + '%';
+                    diskProgress.className = 'progress-fill' + 
+                        (diskPercent > 80 ? ' danger' : diskPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('disk-details').textContent = 
+                        data.system.disk_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.disk_total_gb.toFixed(2) + ' GB';
                 }}
             }} catch (error) {{
                 // Silently fail - don't break the page if system metrics fail
