@@ -716,6 +716,7 @@ async def get_stats():
         
         result = {
             "total_requests": total_requests,
+            "errors": stats["errors"],
             "requests_per_minute": requests_per_minute,
             "average_response_time_ms": round(avg_response_time * 1000, 2),
             "error_rate": round(error_rate, 4),
