@@ -1559,10 +1559,26 @@ async def get_login_page(error: Optional[str] = Query(None)):
 
 
 @router.post("/login", response_class=HTMLResponse)
-async def post_login_page(username: str = Form(...), password: str = Form(...)):
+async def post_login_page(request: Request, username: Optional[str] = Form(None), password: Optional[str] = Form(None)):
     """Handle login form submission."""
     try:
         from app.services.auth import validate_dashboard_credentials
+        
+        # If Form parameters are None, try to parse form data manually
+        if username is None or password is None:
+            try:
+                form_data = await request.form()
+                username = username or form_data.get("username")
+                password = password or form_data.get("password")
+            except Exception as form_error:
+                logger.error(f"post_login_page: Failed to parse form data: {form_error}")
+                error_msg = quote("Invalid form data. Please try again.")
+                return RedirectResponse(url=f"/monitor/login?error={error_msg}", status_code=302)
+        
+        if not username or not password:
+            logger.warning("post_login_page: Missing username or password")
+            error_msg = quote("Username and password are required.")
+            return RedirectResponse(url=f"/monitor/login?error={error_msg}", status_code=302)
         
         logger.debug(f"post_login_page: Login attempt for username: {username}")
         
