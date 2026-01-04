@@ -71,6 +71,14 @@ _system_metrics_cache = {
 }
 SYSTEM_METRICS_CACHE_TTL = 0.5  # Cache for 0.5 seconds
 
+# Cache for process enumeration (reduces CPU overhead)
+_process_enumeration_cache = {
+    "data": None,
+    "timestamp": 0,
+    "lock": threading.Lock()
+}
+PROCESS_ENUMERATION_CACHE_TTL = 0.5  # Cache for 0.5 seconds
+
 # Log file configuration
 LOG_FILE_PATH = os.getenv("LOG_FILE_PATH", "/var/log/frl-python-api/app.log")
 USE_JOURNALCTL = os.getenv("USE_JOURNALCTL", "false").lower() == "true"
@@ -392,7 +400,24 @@ class StatsTrackingMiddleware(BaseHTTPMiddleware):
 
 
 def _get_gunicorn_processes():
-    """Find Gunicorn master and worker processes."""
+    """Find Gunicorn master and worker processes with caching."""
+    current_time = time.time()
+    
+    with _process_enumeration_cache["lock"]:
+        # Check if cache is valid
+        if (_process_enumeration_cache["data"] is not None and 
+            current_time - _process_enumeration_cache["timestamp"] < PROCESS_ENUMERATION_CACHE_TTL):
+            return _process_enumeration_cache["data"]
+        
+        # Cache expired or missing - refresh it
+        result = _get_gunicorn_processes_uncached()
+        _process_enumeration_cache["data"] = result
+        _process_enumeration_cache["timestamp"] = current_time
+        return result
+
+
+def _get_gunicorn_processes_uncached():
+    """Find Gunicorn master and worker processes (uncached implementation)."""
     processes = []
     master_pid = None
     
@@ -628,14 +653,18 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
         logger.debug(f"Loaded stats: total_requests={stats.get('total_requests', 0)}, errors={stats.get('errors', 0)}, request_times_count={len(stats.get('request_times', []))}, last_minute_count={len(stats.get('last_minute_requests', []))}")
         current_time = time.time()
         
-        # Clean old request times (older than 5 minutes)
-        stats["last_minute_requests"] = [
-            t for t in stats["last_minute_requests"]
-            if current_time - t < 300
-        ]
-        
-        # Save cleaned stats back
-        _save_stats(stats)
+        # Clean old request times periodically (every 10 requests, not every request)
+        # Use modulo on request count to determine when to clean
+        should_clean = stats.get("total_requests", 0) % 10 == 0
+        if should_clean:
+            original_count = len(stats["last_minute_requests"])
+            stats["last_minute_requests"] = [
+                t for t in stats["last_minute_requests"]
+                if current_time - t < 300
+            ]
+            # Only save if cleaning actually removed items
+            if len(stats["last_minute_requests"]) < original_count:
+                _save_stats(stats)
         
         # Calculate average response time
         avg_response_time = 0
@@ -653,10 +682,6 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
         cpu_percent = cached_metrics["cpu_percent"]
         cpu_count = cached_metrics["cpu_count"]
         mem = cached_metrics["mem"]
-        
-        # Add diagnostic info
-        stats_file_exists = STATS_FILE.exists()
-        stats_file_size = STATS_FILE.stat().st_size if stats_file_exists else 0
         
         # Calculate average requests per minute (based on last 5 minutes)
         requests_per_minute = round(len(stats["last_minute_requests"]) / 5, 2) if stats["last_minute_requests"] else 0
@@ -676,8 +701,14 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
                 "memory_used_gb": round(mem.used / 1024 / 1024 / 1024, 2),
                 "memory_available_gb": round(mem.available / 1024 / 1024 / 1024, 2)
             },
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "_diagnostic": {
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        
+        # Add diagnostic info only in development mode
+        if os.getenv("ENVIRONMENT", "production").lower() == "development":
+            stats_file_exists = STATS_FILE.exists()
+            stats_file_size = STATS_FILE.stat().st_size if stats_file_exists else 0
+            result["_diagnostic"] = {
                 "stats_file_exists": stats_file_exists,
                 "stats_file_path": str(STATS_FILE),
                 "stats_file_size": stats_file_size,
@@ -686,7 +717,6 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
                 "raw_request_times_count": len(stats.get("request_times", [])),
                 "raw_last_minute_count": len(stats.get("last_minute_requests", []))
             }
-        }
         
         logger.info(f"Stats response: total_requests={total_requests}, file_exists={stats_file_exists}, file_size={stats_file_size}")
         return result
