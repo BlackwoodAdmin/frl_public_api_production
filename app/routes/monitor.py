@@ -4242,11 +4242,21 @@ async def get_log_detail_page(log_hash: str, request: Request):
         async function loadLogDetails() {{
             try {{
                 const response = await fetch('/monitor/log/{log_hash}');
+                
+                if (!response.ok) {{
+                    throw new Error(`HTTP ${{response.status}}: ${{response.statusText}}`);
+                }}
+                
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {{
+                    throw new Error('Server returned non-JSON response. Authentication may have failed.');
+                }}
+                
                 const data = await response.json();
                 
                 if (data.error) {{
                     document.getElementById('log-details').innerHTML = 
-                        '<div class="error">Error: ' + data.error + '</div>';
+                        '<div class="error">Error: ' + escapeHtml(data.error) + '</div>';
                     return;
                 }}
                 
@@ -4320,8 +4330,9 @@ async def get_log_detail_page(log_hash: str, request: Request):
                 
                 document.getElementById('log-details').innerHTML = html;
             }} catch (error) {{
+                console.error('Error loading log details:', error);
                 document.getElementById('log-details').innerHTML = 
-                    '<div class="error">Error loading log details: ' + error.message + '</div>';
+                    '<div class="error">Error loading log details: ' + escapeHtml(error.message) + '</div>';
             }}
         }}
         
