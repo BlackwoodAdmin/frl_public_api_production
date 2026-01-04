@@ -1340,10 +1340,6 @@ async def get_login_page():
             
             <button type="submit" class="btn">Login</button>
         </form>
-        
-        <div class="info">
-            <strong>Note:</strong> Your browser may also prompt you with a login dialog when accessing protected pages. You can use either method to authenticate.
-        </div>
     </div>
     
     <script>
