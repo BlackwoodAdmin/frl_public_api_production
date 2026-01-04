@@ -55,7 +55,7 @@ cp .env.example .env
 nano .env
 ```
 
-Update the `.env` file with your actual database credentials:
+Update the `.env` file with your actual database credentials and monitoring dashboard credentials:
 ```
 DB_HOST=your_database_host
 DB_PORT=3306
@@ -63,9 +63,13 @@ DB_NAME=your_database_name
 DB_USER=your_database_user
 DB_PASSWORD=your_database_password
 DB_CHARSET=utf8mb4
+
+# Monitoring dashboard authentication
+DASHBOARD_USERNAME=your_username
+DASHBOARD_PASSWORD=your_password
 ```
 
-**Note:** The `.env` file is in `.gitignore` and will not be committed to GitHub. Make sure to configure it with your actual database credentials on the VPS.
+**Note:** The `.env` file is in `.gitignore` and will not be committed to GitHub. Make sure to configure it with your actual database credentials and dashboard credentials on the VPS.
 
 ## Step 6: Test Database Connection
 
@@ -165,4 +169,34 @@ Start Nginx:
 sudo systemctl enable nginx
 sudo systemctl start nginx
 ```
+
+## Step 12: Access Monitoring Dashboard
+
+The application includes a monitoring dashboard accessible at `/monitor/*`. 
+
+### Set Up Authentication
+
+The monitoring dashboard requires authentication. Credentials are configured in the authentication service. See [MONITORING.md](MONITORING.md) for details on authentication setup.
+
+### Access the Dashboard
+
+Once the application is running, access the monitoring dashboard at:
+
+```
+http://your-domain.com/monitor/login
+```
+
+Or if accessing locally:
+```
+http://localhost:8000/monitor/login
+```
+
+The dashboard provides:
+- Real-time system metrics (CPU, memory)
+- Worker process monitoring
+- Request statistics and error tracking
+- Application log viewing
+- Health status monitoring
+
+For detailed documentation on all monitoring features, see [MONITORING.md](MONITORING.md).
 

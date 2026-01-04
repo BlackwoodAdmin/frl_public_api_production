@@ -9,7 +9,23 @@ DEBUG=False
 LOG_LEVEL=INFO
 HOST=127.0.0.1
 PORT=8000
+
+# Logging configuration
+USE_JOURNALCTL=true
+LOG_FILE_PATH=/var/log/frl-python-api/app.log
+
+# Optional: Set to "development" for additional diagnostic output
+ENVIRONMENT=production
+
+# Dashboard authentication
+DASHBOARD_USERNAME=your_username
+DASHBOARD_PASSWORD=your_password
 ```
+
+**Logging Configuration:**
+- `USE_JOURNALCTL`: Set to "true" to use systemd journal for logs (recommended for production with systemd service)
+- `LOG_FILE_PATH`: Path to log file if not using journalctl (default: "/var/log/frl-python-api/app.log")
+- `ENVIRONMENT`: Set to "development" for development mode, "production" for production (affects diagnostic output)
 
 ## Running with Gunicorn (Recommended for Production)
 
@@ -151,6 +167,36 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 4 --no-access-log
 
 ## Monitoring
 
+### Monitoring Dashboard
+
+The application includes a web-based monitoring dashboard accessible at `/monitor/*`. 
+
+**Access the dashboard:**
+```
+http://your-domain.com/monitor/login
+```
+
+**Features:**
+- Real-time system metrics (CPU, memory usage)
+- Worker process monitoring and details
+- Request statistics and error tracking (only 5xx server errors counted)
+- Application log viewing with filtering and detail pages
+- Health status monitoring
+
+**Authentication:**
+- HTML endpoints require authentication (Basic Auth)
+- JSON endpoints do not require authentication
+- Credentials are configured in the authentication service
+- See [MONITORING.md](MONITORING.md) for authentication setup
+
+**Request Logging:**
+- All requests are logged at INFO level (visible in logs page)
+- Errors (status >= 400) are logged at WARNING level
+- Request statistics are tracked automatically via middleware
+- Error rate includes only 5xx server errors (4xx client errors are logged but not counted)
+
+### Command Line Monitoring
+
 Check logs:
 ```bash
 # Systemd service logs
@@ -164,5 +210,7 @@ Check status:
 ```bash
 sudo systemctl status frl-python-api
 ```
+
+For detailed monitoring documentation, see [MONITORING.md](MONITORING.md).
 
 
