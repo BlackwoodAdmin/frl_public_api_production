@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from fastapi import APIRouter, Request, Depends, HTTPException, status
-    from fastapi.responses import HTMLResponse, JSONResponse
+    from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
     from fastapi.security import HTTPBasic, HTTPBasicCredentials
     from starlette.middleware.base import BaseHTTPMiddleware
     from typing import List, Dict, Any, Optional
@@ -58,6 +58,34 @@ async def verify_dashboard_access(credentials: HTTPBasicCredentials = Depends(se
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Authentication error"
         )
+
+def check_auth_for_html(request: Request):
+    """Check authentication for HTML endpoints, returns (username, None) if authenticated, (None, RedirectResponse) if not."""
+    import base64
+    from app.services.auth import validate_dashboard_credentials
+    
+    try:
+        # Extract Authorization header
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Basic "):
+            return None, RedirectResponse(url="/monitor/login", status_code=302)
+        
+        # Decode Basic Auth credentials
+        encoded_credentials = auth_header.split(" ")[1]
+        try:
+            decoded_credentials = base64.b64decode(encoded_credentials).decode("utf-8")
+            username, password = decoded_credentials.split(":", 1)
+        except (ValueError, UnicodeDecodeError):
+            return None, RedirectResponse(url="/monitor/login", status_code=302)
+        
+        # Validate credentials
+        if not validate_dashboard_credentials(username, password):
+            return None, RedirectResponse(url="/monitor/login", status_code=302)
+        
+        return username, None
+    except Exception as e:
+        logger.error(f"Error in HTML dashboard authentication: {e}")
+        return None, RedirectResponse(url="/monitor/login", status_code=302)
 
 # File-based stats storage (shared across workers)
 STATS_FILE = Path("/var/run/frl-python-api/stats.json")
@@ -1404,8 +1432,11 @@ async def get_login_page():
 
 
 @router.get("/dashboard/page", response_class=HTMLResponse)
-async def get_dashboard_page(username: str = Depends(verify_dashboard_access)):
+async def get_dashboard_page(request: Request):
     """HTML dashboard for monitoring Gunicorn workers."""
+    username, redirect = check_auth_for_html(request)
+    if redirect:
+        return redirect
     html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -1859,8 +1890,11 @@ async def get_dashboard_page(username: str = Depends(verify_dashboard_access)):
 
 
 @router.get("/worker/{pid}/page", response_class=HTMLResponse)
-async def get_worker_detail_page(pid: int, username: str = Depends(verify_dashboard_access)):
+async def get_worker_detail_page(pid: int, request: Request):
     """HTML page for viewing detailed worker process information."""
+    username, redirect = check_auth_for_html(request)
+    if redirect:
+        return redirect
     html_content = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -2248,8 +2282,11 @@ async def get_worker_detail_page(pid: int, username: str = Depends(verify_dashbo
 
 
 @router.get("/workers/page", response_class=HTMLResponse)
-async def get_workers_page(username: str = Depends(verify_dashboard_access)):
+async def get_workers_page(request: Request):
     """HTML page for viewing worker processes."""
+    username, redirect = check_auth_for_html(request)
+    if redirect:
+        return redirect
     html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -2592,8 +2629,11 @@ async def get_workers_page(username: str = Depends(verify_dashboard_access)):
 
 
 @router.get("/stats/page", response_class=HTMLResponse)
-async def get_stats_page(username: str = Depends(verify_dashboard_access)):
+async def get_stats_page(request: Request):
     """HTML page for viewing request statistics."""
+    username, redirect = check_auth_for_html(request)
+    if redirect:
+        return redirect
     html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -2882,8 +2922,11 @@ async def get_stats_page(username: str = Depends(verify_dashboard_access)):
 
 
 @router.get("/health/page", response_class=HTMLResponse)
-async def get_health_page(username: str = Depends(verify_dashboard_access)):
+async def get_health_page(request: Request):
     """HTML page for viewing system health."""
+    username, redirect = check_auth_for_html(request)
+    if redirect:
+        return redirect
     html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -3245,8 +3288,11 @@ async def get_health_page(username: str = Depends(verify_dashboard_access)):
 
 
 @router.get("/logs/page", response_class=HTMLResponse)
-async def get_logs_page(username: str = Depends(verify_dashboard_access)):
+async def get_logs_page(request: Request):
     """HTML page for viewing application logs."""
+    username, redirect = check_auth_for_html(request)
+    if redirect:
+        return redirect
     html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -3667,8 +3713,11 @@ async def get_logs_page(username: str = Depends(verify_dashboard_access)):
 
 
 @router.get("/worker/{pid}/logs/page", response_class=HTMLResponse)
-async def get_worker_logs_page(pid: int, username: str = Depends(verify_dashboard_access)):
+async def get_worker_logs_page(pid: int, request: Request):
     """HTML page for viewing worker-specific logs."""
+    username, redirect = check_auth_for_html(request)
+    if redirect:
+        return redirect
     html_content = f"""
 <!DOCTYPE html>
 <html lang="en">
