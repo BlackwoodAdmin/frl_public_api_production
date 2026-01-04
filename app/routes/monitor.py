@@ -725,7 +725,7 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
                 "raw_last_minute_count": len(stats.get("last_minute_requests", []))
             }
         
-        logger.info(f"Stats response: total_requests={total_requests}, file_exists={stats_file_exists}, file_size={stats_file_size}")
+        logger.info(f"Stats response: total_requests={total_requests}")
         return result
     except Exception as e:
         logger.error(f"Error getting stats: {e}")
