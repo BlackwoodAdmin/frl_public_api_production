@@ -780,8 +780,8 @@ async def get_dashboard():
     """Get dashboard data (combined stats and workers)."""
     try:
         # Get stats and workers data
-        stats_data = await get_stats(username)
-        workers_data = await get_workers(username)
+        stats_data = await get_stats()
+        workers_data = await get_workers()
         
         return {
             "stats": stats_data,
