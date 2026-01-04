@@ -4309,7 +4309,7 @@ async def get_log_detail_page(log_hash: str, request: Request):
                 html += '<div class="detail-item">';
                 html += '<div class="detail-label">Raw Message</div>';
                 html += '<div class="message-box" id="raw-message">' + escapeHtml(data.raw_message || data.message || '') + '</div>';
-                html += '<button class="copy-button" onclick="copyToClipboard(''raw-message'')">Copy Raw Message</button>';
+                html += '<button class="copy-button" onclick="copyToClipboard(\\'raw-message\\')">Copy Raw Message</button>';
                 html += '</div>';
                 
                 // Traceback Section (if exists)
@@ -4317,7 +4317,7 @@ async def get_log_detail_page(log_hash: str, request: Request):
                     html += '<div class="detail-item">';
                     html += '<div class="detail-label">Traceback</div>';
                     html += '<div class="traceback-box" id="traceback-content">' + escapeHtml(data.traceback) + '</div>';
-                    html += '<button class="copy-button" onclick="copyToClipboard(''traceback-content'')">Copy Traceback</button>';
+                    html += '<button class="copy-button" onclick="copyToClipboard(\\'traceback-content\\')">Copy Traceback</button>';
                     html += '</div>';
                 }}
                 
