@@ -1543,7 +1543,7 @@ async def get_login_page():
                 <input type="password" id="password" name="password" required autocomplete="current-password">
             </div>
             
-            <button type="submit" class="btn">Login</button>
+            <button type="button" id="login-button" class="btn">Login</button>
         </form>
     </div>
     
@@ -1551,17 +1551,8 @@ async def get_login_page():
         // Immediate test - this should always appear if JavaScript is running
         console.log('[LOGIN DEBUG] ===== LOGIN PAGE SCRIPT LOADED =====');
         
-        try {
-            const loginForm = document.getElementById('login-form');
-            console.log('[LOGIN DEBUG] Login form element found:', loginForm !== null);
-            
-            if (!loginForm) {
-                console.error('[LOGIN DEBUG] ERROR: Login form element not found!');
-            } else {
-                console.log('[LOGIN DEBUG] Attaching submit event listener to login form');
-                loginForm.addEventListener('submit', async function(e) {
-                    console.log('[LOGIN DEBUG] ===== FORM SUBMIT EVENT FIRED =====');
-                    e.preventDefault();
+        async function handleLogin() {
+            console.log('[LOGIN DEBUG] ===== LOGIN HANDLER CALLED =====');
             
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
@@ -1625,10 +1616,32 @@ async def get_login_page():
                 errorDiv.classList.add('show');
                 console.error('Login error:', error);
             }
-                });
+        }
+        
+        try {
+            const loginButton = document.getElementById('login-button');
+            const loginForm = document.getElementById('login-form');
+            console.log('[LOGIN DEBUG] Login button element found:', loginButton !== null);
+            console.log('[LOGIN DEBUG] Login form element found:', loginForm !== null);
+            
+            if (!loginButton) {
+                console.error('[LOGIN DEBUG] ERROR: Login button element not found!');
+            } else {
+                console.log('[LOGIN DEBUG] Attaching click event listener to login button');
+                loginButton.addEventListener('click', handleLogin);
+                
+                // Also handle form submit as fallback
+                if (loginForm) {
+                    console.log('[LOGIN DEBUG] Also attaching submit event listener to login form');
+                    loginForm.addEventListener('submit', function(e) {
+                        console.log('[LOGIN DEBUG] ===== FORM SUBMIT EVENT FIRED =====');
+                        e.preventDefault();
+                        handleLogin();
+                    });
+                }
             }
         } catch (error) {
-            console.error('[LOGIN DEBUG] ERROR: Failed to attach login form handler:', error);
+            console.error('[LOGIN DEBUG] ERROR: Failed to attach login handler:', error);
             console.error('[LOGIN DEBUG] Error details:', error.name, error.message, error.stack);
         }
         
