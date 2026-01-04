@@ -7,7 +7,8 @@ import hashlib
 logger = logging.getLogger(__name__)
 
 try:
-    from fastapi import APIRouter, Request, HTTPException, status
+    from fastapi import APIRouter, Request, HTTPException, status, Depends
+    from fastapi.security import HTTPBasic, HTTPBasicCredentials
     from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
     from starlette.middleware.base import BaseHTTPMiddleware
     from typing import List, Dict, Any, Optional
@@ -35,33 +36,33 @@ except Exception as e:
 
 router = APIRouter()
 
-def check_auth_for_html(request: Request):
-    """Check authentication for HTML endpoints, returns (username, None) if authenticated, (None, RedirectResponse) if not."""
-    import base64
+# HTTP Basic Authentication security instance
+security = HTTPBasic()
+
+def verify_dashboard_credentials(credentials: HTTPBasicCredentials = Depends(security)):
+    """Verify dashboard credentials using HTTP Basic Authentication.
+    
+    This dependency function is used by protected HTML endpoints to authenticate users.
+    It triggers the browser's native authentication dialog when credentials are missing or invalid.
+    
+    Args:
+        credentials: HTTP Basic Auth credentials from the security dependency
+        
+    Returns:
+        str: Username if credentials are valid
+        
+    Raises:
+        HTTPException: 401 with WWW-Authenticate header if credentials are invalid
+    """
     from app.services.auth import validate_dashboard_credentials
     
-    try:
-        # Extract Authorization header
-        auth_header = request.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Basic "):
-            return None, RedirectResponse(url="/monitor/login", status_code=302)
-        
-        # Decode Basic Auth credentials
-        encoded_credentials = auth_header.split(" ")[1]
-        try:
-            decoded_credentials = base64.b64decode(encoded_credentials).decode("utf-8")
-            username, password = decoded_credentials.split(":", 1)
-        except (ValueError, UnicodeDecodeError):
-            return None, RedirectResponse(url="/monitor/login", status_code=302)
-        
-        # Validate credentials
-        if not validate_dashboard_credentials(username, password):
-            return None, RedirectResponse(url="/monitor/login", status_code=302)
-        
-        return username, None
-    except Exception as e:
-        logger.error(f"Error in HTML dashboard authentication: {e}")
-        return None, RedirectResponse(url="/monitor/login", status_code=302)
+    if not validate_dashboard_credentials(credentials.username, credentials.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
 
 # File-based stats storage (shared across workers)
 STATS_FILE = Path("/var/run/frl-python-api/stats.json")
@@ -1395,195 +1396,13 @@ async def get_log_details(log_hash: str):
         }
 
 
-@router.get("/login", response_class=HTMLResponse)
-async def get_login_page():
-    """Login page for dashboard access."""
-    html_content = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Login - FRL Python API</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        .login-container {
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            padding: 40px;
-            width: 100%;
-            max-width: 400px;
-        }
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 28px;
-            text-align: center;
-        }
-        .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-            text-align: center;
-            font-size: 14px;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
-            font-size: 14px;
-        }
-        input[type="text"],
-        input[type="password"] {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 6px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-        input[type="text"]:focus,
-        input[type="password"]:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        .btn {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        .btn:active {
-            transform: translateY(0);
-        }
-        .error {
-            background: #fee;
-            color: #c33;
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            font-size: 14px;
-            display: none;
-        }
-        .error.show {
-            display: block;
-        }
-        .info {
-            background: #e3f2fd;
-            color: #1976d2;
-            padding: 12px;
-            border-radius: 6px;
-            margin-top: 20px;
-            font-size: 12px;
-            line-height: 1.6;
-        }
-    </style>
-</head>
-<body>
-    <div class="login-container">
-        <h1>Dashboard Login</h1>
-        <p class="subtitle">FRL Python API Monitoring</p>
-        
-        <div id="error-message" class="error"></div>
-        
-        <form id="login-form">
-            <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" required autocomplete="username">
-            </div>
-            
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" required autocomplete="current-password">
-            </div>
-            
-            <button type="submit" class="btn">Login</button>
-        </form>
-    </div>
-    
-    <script>
-        document.getElementById('login-form').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const errorDiv = document.getElementById('error-message');
-            
-            // Clear previous errors
-            errorDiv.classList.remove('show');
-            errorDiv.textContent = '';
-            
-            // Create basic auth header
-            const credentials = btoa(username + ':' + password);
-            
-            try {
-                // Test authentication by making a request to a protected HTML endpoint
-                const response = await fetch('/monitor/dashboard/page', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': 'Basic ' + credentials
-                    }
-                });
-                
-                if (response.ok) {
-                    // Authentication successful - redirect to dashboard
-                    // Store credentials in sessionStorage for future requests
-                    sessionStorage.setItem('authCredentials', credentials);
-                    window.location.href = '/monitor/dashboard/page';
-                } else if (response.status === 401) {
-                    // Authentication failed
-                    errorDiv.textContent = 'Invalid username or password. Please try again.';
-                    errorDiv.classList.add('show');
-                } else {
-                    errorDiv.textContent = 'An error occurred. Please try again.';
-                    errorDiv.classList.add('show');
-                }
-            } catch (error) {
-                errorDiv.textContent = 'Network error. Please check your connection and try again.';
-                errorDiv.classList.add('show');
-                console.error('Login error:', error);
-            }
-        });
-        
-        // Auto-focus username field
-        document.getElementById('username').focus();
-    </script>
-</body>
-</html>
-    """
-    return HTMLResponse(content=html_content)
-
-
 @router.get("/logout", response_class=HTMLResponse)
 async def get_logout_page():
-    """Logout page that clears session and redirects to login."""
+    """Logout information page.
+    
+    Note: Browser-native HTTP Basic Authentication cannot be logged out programmatically.
+    Users must close their browser or clear saved credentials to log out.
+    """
     html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -1591,14 +1410,67 @@ async def get_logout_page():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Logout - FRL Python API</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .logout-container {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 500px;
+            text-align: center;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        .info {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
-    <script>
-        // Clear sessionStorage
-        sessionStorage.removeItem('authCredentials');
-        // Redirect to login page
-        window.location.href = '/monitor/login';
-    </script>
+    <div class="logout-container">
+        <h1>Logout</h1>
+        <p>Browser-native HTTP Basic Authentication cannot be logged out programmatically.</p>
+        <p>To log out, you must:</p>
+        <ul style="text-align: left; display: inline-block; color: #666;">
+            <li>Close your browser completely, or</li>
+            <li>Clear your browser's saved credentials for this site</li>
+        </ul>
+        <div class="info">
+            <strong>Note:</strong> The browser will continue to send your credentials automatically until you clear them or close the browser.
+        </div>
+        <p style="margin-top: 20px;">
+            <a href="/monitor/dashboard/page">Return to Dashboard</a>
+        </p>
+    </div>
 </body>
 </html>
     """
@@ -1606,11 +1478,8 @@ async def get_logout_page():
 
 
 @router.get("/dashboard/page", response_class=HTMLResponse)
-async def get_dashboard_page(request: Request):
+async def get_dashboard_page(username: str = Depends(verify_dashboard_credentials)):
     """HTML dashboard for monitoring Gunicorn workers."""
-    username, redirect = check_auth_for_html(request)
-    if redirect:
-        return redirect
     html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -2083,11 +1952,8 @@ async def get_dashboard_page(request: Request):
 
 
 @router.get("/worker/{pid}/page", response_class=HTMLResponse)
-async def get_worker_detail_page(pid: int, request: Request):
+async def get_worker_detail_page(pid: int, username: str = Depends(verify_dashboard_credentials)):
     """HTML page for viewing detailed worker process information."""
-    username, redirect = check_auth_for_html(request)
-    if redirect:
-        return redirect
     html_content = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -2498,11 +2364,8 @@ async def get_worker_detail_page(pid: int, request: Request):
 
 
 @router.get("/workers/page", response_class=HTMLResponse)
-async def get_workers_page(request: Request):
+async def get_workers_page(username: str = Depends(verify_dashboard_credentials)):
     """HTML page for viewing worker processes."""
-    username, redirect = check_auth_for_html(request)
-    if redirect:
-        return redirect
     html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -2868,11 +2731,8 @@ async def get_workers_page(request: Request):
 
 
 @router.get("/stats/page", response_class=HTMLResponse)
-async def get_stats_page(request: Request):
+async def get_stats_page(username: str = Depends(verify_dashboard_credentials)):
     """HTML page for viewing request statistics."""
-    username, redirect = check_auth_for_html(request)
-    if redirect:
-        return redirect
     html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -3180,11 +3040,8 @@ async def get_stats_page(request: Request):
 
 
 @router.get("/health/page", response_class=HTMLResponse)
-async def get_health_page(request: Request):
+async def get_health_page(username: str = Depends(verify_dashboard_credentials)):
     """HTML page for viewing system health."""
-    username, redirect = check_auth_for_html(request)
-    if redirect:
-        return redirect
     html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -3561,11 +3418,8 @@ async def get_health_page(request: Request):
 
 
 @router.get("/logs/page", response_class=HTMLResponse)
-async def get_logs_page(request: Request):
+async def get_logs_page(username: str = Depends(verify_dashboard_credentials)):
     """HTML page for viewing application logs."""
-    username, redirect = check_auth_for_html(request)
-    if redirect:
-        return redirect
     html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -4081,11 +3935,8 @@ async def get_logs_page(request: Request):
 
 
 @router.get("/log/{log_hash}/page", response_class=HTMLResponse)
-async def get_log_detail_page(log_hash: str, request: Request):
+async def get_log_detail_page(log_hash: str, username: str = Depends(verify_dashboard_credentials)):
     """HTML page for viewing detailed log entry information."""
-    username, redirect = check_auth_for_html(request)
-    if redirect:
-        return redirect
     
     html_content = f"""
 <!DOCTYPE html>
@@ -4561,11 +4412,8 @@ async def get_log_detail_page(log_hash: str, request: Request):
 
 
 @router.get("/worker/{pid}/logs/page", response_class=HTMLResponse)
-async def get_worker_logs_page(pid: int, request: Request):
+async def get_worker_logs_page(pid: int, username: str = Depends(verify_dashboard_credentials)):
     """HTML page for viewing worker-specific logs."""
-    username, redirect = check_auth_for_html(request)
-    if redirect:
-        return redirect
     html_content = f"""
 <!DOCTYPE html>
 <html lang="en">
