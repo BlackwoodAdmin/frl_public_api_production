@@ -4348,7 +4348,7 @@ async def get_log_detail_page(log_hash: str, request: Request):
                 }}
                 html += '<div class="metadata-item">';
                 html += '<div class="metadata-label">Log Hash</div>';
-                html += '<div class="metadata-value" style="font-family: monospace; font-size: 12px;">' + escapeHtml(data.log_hash || '{log_hash}') + '</div>';
+                html += '<div class="metadata-value" style="font-family: monospace; font-size: 12px;">' + escapeHtml(data.log_hash || 'N/A') + '</div>';
                 html += '</div>';
                 html += '</div>';
                 html += '</div>';
