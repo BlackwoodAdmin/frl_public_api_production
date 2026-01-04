@@ -3625,6 +3625,16 @@ async def get_logs_page(request: Request):
             color: #858585;
             margin-right: 10px;
         }
+        .log-entry .log-link {
+            color: #ff0000;
+            text-decoration: underline;
+        }
+        .log-entry .log-link:hover {
+            color: #2196F3;
+        }
+        .log-entry .log-link:visited {
+            color: #87CEEB;
+        }
         .log-level {
             display: inline-block;
             padding: 2px 6px;
@@ -3776,9 +3786,7 @@ async def get_logs_page(request: Request):
                     </span>
                     <span class="log-level ${level}">${level}</span>
                     ${module ? `<span style="color: #858585;">${module}</span>` : ''}
-                    <span class="log-message">
-                        <a href="/monitor/log/${hash}/page" class="log-link">${escapeHtml(message)}</a>
-                    </span>
+                    <span class="log-message">${escapeHtml(message)}</span>
                 </div>
             `;
         }
