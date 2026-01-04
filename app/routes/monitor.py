@@ -612,20 +612,20 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
         cpu_count = psutil.cpu_count()
         mem = psutil.virtual_memory()
         
-        # Track CPU readings and calculate 3-second average
+        # Track CPU readings and calculate 1-second average
         if "cpu_readings" not in stats:
             stats["cpu_readings"] = []
         
-        # Clean old readings (older than 3 seconds)
+        # Clean old readings (older than 1 second)
         stats["cpu_readings"] = [
             [t, cpu] for t, cpu in stats["cpu_readings"]
-            if current_time - t < 3
+            if current_time - t < 1
         ]
         
         # Add current reading
         stats["cpu_readings"].append([current_time, cpu_percent])
         
-        # Calculate average of readings from last 3 seconds
+        # Calculate average of readings from last 1 second
         if stats["cpu_readings"]:
             avg_cpu_percent = sum(cpu for _, cpu in stats["cpu_readings"]) / len(stats["cpu_readings"])
         else:
