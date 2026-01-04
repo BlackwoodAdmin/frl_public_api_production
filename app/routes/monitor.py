@@ -1538,7 +1538,7 @@ async def get_login_page(error: Optional[str] = Query(None)):
         
         {error_html}
         
-        <form id="login-form" method="POST" action="/monitor/login">
+        <form id="login-form" method="POST" action="/monitor/login" enctype="application/x-www-form-urlencoded">
             <div class="form-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" required autocomplete="username">
