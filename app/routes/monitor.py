@@ -1406,7 +1406,7 @@ async def get_login_page():
                     // Authentication successful - redirect to dashboard
                     // Store credentials in sessionStorage for future requests
                     sessionStorage.setItem('authCredentials', credentials);
-                    window.location.href = '/monitor/dashboard';
+                    window.location.href = '/monitor/dashboard/page';
                 } else if (response.status === 401) {
                     // Authentication failed
                     errorDiv.textContent = 'Invalid username or password. Please try again.';
