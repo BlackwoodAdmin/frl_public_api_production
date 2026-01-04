@@ -386,13 +386,20 @@ class StatsTrackingMiddleware(BaseHTTPMiddleware):
             if len(stats["request_times"]) > 100:
                 stats["request_times"] = stats["request_times"][-100:]
             
-            # Track errors (status code >= 400)
-            if response.status_code >= 400:
+            # Track errors (only 5xx server errors, not 4xx client errors)
+            if response.status_code >= 500:
                 stats["errors"] += 1
             
             logger.debug(f"Updated stats: total_requests={stats['total_requests']}, errors={stats['errors']}, response_time={response_time:.3f}s, status={response.status_code}")
         
         _update_stats(update_stats)
+        
+        # Log request at INFO level (visible in logs page)
+        logger.info(f"{request.method} {request.url.path} - {response.status_code} - {response_time:.3f}s")
+        
+        # Log errors at WARNING level for visibility
+        if response.status_code >= 400:
+            logger.warning(f"Request error: {request.method} {request.url.path} - Status {response.status_code} - {response_time:.3f}s")
         
         return response
 
