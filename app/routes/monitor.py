@@ -7,7 +7,7 @@ import hashlib
 logger = logging.getLogger(__name__)
 
 try:
-    from fastapi import APIRouter, Request, HTTPException, status, Form, Query
+    from fastapi import APIRouter, Request, HTTPException, status
     from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
     from starlette.middleware.base import BaseHTTPMiddleware
     from typing import List, Dict, Any, Optional
@@ -21,8 +21,6 @@ try:
     import threading
     from datetime import datetime
     from pathlib import Path
-    import base64
-    from urllib.parse import quote
 except Exception as e:
     logger.error(f"Failed to import standard libraries: {e}")
     logger.error(traceback.format_exc())
@@ -42,46 +40,27 @@ def check_auth_for_html(request: Request):
     import base64
     from app.services.auth import validate_dashboard_credentials
     
-    logger.debug("check_auth_for_html: Authentication check started")
-    
     try:
         # Extract Authorization header
         auth_header = request.headers.get("Authorization")
-        logger.debug(f"check_auth_for_html: Authorization header present: {auth_header is not None}")
-        
         if not auth_header or not auth_header.startswith("Basic "):
-            if not auth_header:
-                logger.debug("check_auth_for_html: Authorization header is missing")
-            elif not auth_header.startswith("Basic "):
-                logger.debug(f"check_auth_for_html: Authorization header does not start with 'Basic ': {auth_header[:20]}...")
             return None, RedirectResponse(url="/monitor/login", status_code=302)
         
         # Decode Basic Auth credentials
         encoded_credentials = auth_header.split(" ")[1]
-        logger.debug(f"check_auth_for_html: Encoded credentials length: {len(encoded_credentials)}")
-        
         try:
             decoded_credentials = base64.b64decode(encoded_credentials).decode("utf-8")
             username, password = decoded_credentials.split(":", 1)
-            logger.debug(f"check_auth_for_html: Credentials decoded successfully. Username: {username}, Password: **** (masked)")
-        except (ValueError, UnicodeDecodeError) as decode_error:
-            logger.warning(f"check_auth_for_html: Failed to decode credentials: {decode_error}")
+        except (ValueError, UnicodeDecodeError):
             return None, RedirectResponse(url="/monitor/login", status_code=302)
         
         # Validate credentials
-        logger.debug(f"check_auth_for_html: Calling validate_dashboard_credentials for username: {username}")
-        validation_result = validate_dashboard_credentials(username, password)
-        logger.debug(f"check_auth_for_html: Validation result: {validation_result}")
-        
-        if not validation_result:
-            logger.warning(f"check_auth_for_html: Credential validation failed for username: {username}")
+        if not validate_dashboard_credentials(username, password):
             return None, RedirectResponse(url="/monitor/login", status_code=302)
         
-        logger.info(f"check_auth_for_html: Authentication successful for username: {username}")
         return username, None
     except Exception as e:
-        logger.error(f"check_auth_for_html: Error in HTML dashboard authentication: {e}")
-        logger.error(f"check_auth_for_html: Exception traceback: {traceback.format_exc()}")
+        logger.error(f"Error in HTML dashboard authentication: {e}")
         return None, RedirectResponse(url="/monitor/login", status_code=302)
 
 # File-based stats storage (shared across workers)
@@ -1417,13 +1396,9 @@ async def get_log_details(log_hash: str):
 
 
 @router.get("/login", response_class=HTMLResponse)
-async def get_login_page(error: Optional[str] = Query(None)):
+async def get_login_page():
     """Login page for dashboard access."""
-    error_html = ""
-    if error:
-        error_html = f'<div class="error show">{error}</div>'
-    
-    html_content = f"""
+    html_content = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1536,9 +1511,9 @@ async def get_login_page(error: Optional[str] = Query(None)):
         <h1>Dashboard Login</h1>
         <p class="subtitle">FRL Python API Monitoring</p>
         
-        {error_html}
+        <div id="error-message" class="error"></div>
         
-        <form id="login-form" method="POST" action="/monitor/login" enctype="application/x-www-form-urlencoded">
+        <form id="login-form">
             <div class="form-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" required autocomplete="username">
@@ -1552,81 +1527,58 @@ async def get_login_page(error: Optional[str] = Query(None)):
             <button type="submit" class="btn">Login</button>
         </form>
     </div>
+    
+    <script>
+        document.getElementById('login-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('error-message');
+            
+            // Clear previous errors
+            errorDiv.classList.remove('show');
+            errorDiv.textContent = '';
+            
+            // Create basic auth header
+            const credentials = btoa(username + ':' + password);
+            
+            try {
+                // Test authentication by making a request to a protected HTML endpoint
+                const response = await fetch('/monitor/dashboard/page', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Basic ' + credentials
+                    }
+                });
+                
+                if (response.ok) {
+                    // Authentication successful - redirect to dashboard
+                    // Store credentials in sessionStorage for future requests
+                    sessionStorage.setItem('authCredentials', credentials);
+                    window.location.href = '/monitor/dashboard/page';
+                } else if (response.status === 401) {
+                    // Authentication failed
+                    errorDiv.textContent = 'Invalid username or password. Please try again.';
+                    errorDiv.classList.add('show');
+                } else {
+                    errorDiv.textContent = 'An error occurred. Please try again.';
+                    errorDiv.classList.add('show');
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Network error. Please check your connection and try again.';
+                errorDiv.classList.add('show');
+                console.error('Login error:', error);
+            }
+        });
+        
+        // Auto-focus username field
+        document.getElementById('username').focus();
+    </script>
 </body>
 </html>
     """
     return HTMLResponse(content=html_content)
-
-
-@router.post("/login", response_class=HTMLResponse)
-async def post_login_page(request: Request, username: Optional[str] = Form(None), password: Optional[str] = Form(None)):
-    """Handle login form submission."""
-    try:
-        from app.services.auth import validate_dashboard_credentials
-        
-        # If Form parameters are None, try to parse form data manually
-        if username is None or password is None:
-            try:
-                form_data = await request.form()
-                username = username or form_data.get("username")
-                password = password or form_data.get("password")
-            except Exception as form_error:
-                logger.error(f"post_login_page: Failed to parse form data: {form_error}")
-                error_msg = quote("Invalid form data. Please try again.")
-                return RedirectResponse(url=f"/monitor/login?error={error_msg}", status_code=302)
-        
-        if not username or not password:
-            logger.warning("post_login_page: Missing username or password")
-            error_msg = quote("Username and password are required.")
-            return RedirectResponse(url=f"/monitor/login?error={error_msg}", status_code=302)
-        
-        logger.debug(f"post_login_page: Login attempt for username: {username}")
-        
-        # Validate credentials
-        if validate_dashboard_credentials(username, password):
-            logger.info(f"post_login_page: Authentication successful for username: {username}")
-            
-            # Create base64 encoded credentials
-            credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
-            
-            # Escape credentials for JavaScript (replace single quotes and backslashes)
-            credentials_escaped = credentials.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")
-            
-            # Return HTML page that sets sessionStorage and redirects (JavaScript runs on page load, not event handler)
-            html_content = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logging in...</title>
-</head>
-<body>
-    <script>
-        // This script runs on page load (not in an event handler), so it should work even with CSP restrictions
-        console.log('[LOGIN DEBUG] Login success page loaded');
-        const credentials = '{credentials_escaped}';
-        console.log('[LOGIN DEBUG] Storing credentials in sessionStorage');
-        sessionStorage.setItem('authCredentials', credentials);
-        console.log('[LOGIN DEBUG] Redirecting to dashboard...');
-        window.location.href = '/monitor/dashboard/page';
-    </script>
-    <p>Logging in...</p>
-</body>
-</html>
-            """
-            return HTMLResponse(content=html_content)
-        else:
-            logger.warning(f"post_login_page: Authentication failed for username: {username}")
-            # Redirect to login page with error
-            error_msg = quote("Invalid username or password. Please try again.")
-            return RedirectResponse(url=f"/monitor/login?error={error_msg}", status_code=302)
-    except Exception as e:
-        logger.error(f"post_login_page: Error processing login: {e}")
-        logger.error(traceback.format_exc())
-        # Return error page
-        error_msg = quote("An error occurred during login. Please try again.")
-        return RedirectResponse(url=f"/monitor/login?error={error_msg}", status_code=302)
 
 
 @router.get("/logout", response_class=HTMLResponse)
