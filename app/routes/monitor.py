@@ -4249,18 +4249,29 @@ async def get_log_detail_page(log_hash: str, request: Request):
     <script>
         async function loadLogDetails() {{
             try {{
-                const response = await fetch('/monitor/log/{log_hash}');
+                const url = '/monitor/log/{log_hash}';
+                console.log('Fetching log details from:', url);
+                
+                const response = await fetch(url);
+                
+                console.log('Response status:', response.status, response.statusText);
+                console.log('Response headers:', response.headers.get('content-type'));
                 
                 if (!response.ok) {{
+                    const errorText = await response.text();
+                    console.error('Response error text:', errorText);
                     throw new Error(`HTTP ${{response.status}}: ${{response.statusText}}`);
                 }}
                 
                 const contentType = response.headers.get('content-type');
                 if (!contentType || !contentType.includes('application/json')) {{
+                    const responseText = await response.text();
+                    console.error('Non-JSON response received:', responseText.substring(0, 200));
                     throw new Error('Server returned non-JSON response. Authentication may have failed.');
                 }}
                 
                 const data = await response.json();
+                console.log('Log details data received:', data);
                 
                 if (data.error) {{
                     document.getElementById('log-details').innerHTML = 
