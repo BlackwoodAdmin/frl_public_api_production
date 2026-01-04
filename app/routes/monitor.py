@@ -1561,19 +1561,23 @@ async def get_login_page(error: Optional[str] = Query(None)):
 @router.post("/login", response_class=HTMLResponse)
 async def post_login_page(username: str = Form(...), password: str = Form(...)):
     """Handle login form submission."""
-    from app.services.auth import validate_dashboard_credentials
-    
-    logger.debug(f"post_login_page: Login attempt for username: {username}")
-    
-    # Validate credentials
-    if validate_dashboard_credentials(username, password):
-        logger.info(f"post_login_page: Authentication successful for username: {username}")
+    try:
+        from app.services.auth import validate_dashboard_credentials
         
-        # Create base64 encoded credentials
-        credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
+        logger.debug(f"post_login_page: Login attempt for username: {username}")
         
-        # Return HTML page that sets sessionStorage and redirects (JavaScript runs on page load, not event handler)
-        html_content = f"""
+        # Validate credentials
+        if validate_dashboard_credentials(username, password):
+            logger.info(f"post_login_page: Authentication successful for username: {username}")
+            
+            # Create base64 encoded credentials
+            credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
+            
+            # Escape credentials for JavaScript (replace single quotes and backslashes)
+            credentials_escaped = credentials.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")
+            
+            # Return HTML page that sets sessionStorage and redirects (JavaScript runs on page load, not event handler)
+            html_content = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1585,7 +1589,7 @@ async def post_login_page(username: str = Form(...), password: str = Form(...)):
     <script>
         // This script runs on page load (not in an event handler), so it should work even with CSP restrictions
         console.log('[LOGIN DEBUG] Login success page loaded');
-        const credentials = '{credentials}';
+        const credentials = '{credentials_escaped}';
         console.log('[LOGIN DEBUG] Storing credentials in sessionStorage');
         sessionStorage.setItem('authCredentials', credentials);
         console.log('[LOGIN DEBUG] Redirecting to dashboard...');
@@ -1594,12 +1598,18 @@ async def post_login_page(username: str = Form(...), password: str = Form(...)):
     <p>Logging in...</p>
 </body>
 </html>
-        """
-        return HTMLResponse(content=html_content)
-    else:
-        logger.warning(f"post_login_page: Authentication failed for username: {username}")
-        # Redirect to login page with error
-        error_msg = quote("Invalid username or password. Please try again.")
+            """
+            return HTMLResponse(content=html_content)
+        else:
+            logger.warning(f"post_login_page: Authentication failed for username: {username}")
+            # Redirect to login page with error
+            error_msg = quote("Invalid username or password. Please try again.")
+            return RedirectResponse(url=f"/monitor/login?error={error_msg}", status_code=302)
+    except Exception as e:
+        logger.error(f"post_login_page: Error processing login: {e}")
+        logger.error(traceback.format_exc())
+        # Return error page
+        error_msg = quote("An error occurred during login. Please try again.")
         return RedirectResponse(url=f"/monitor/login?error={error_msg}", status_code=302)
 
 
