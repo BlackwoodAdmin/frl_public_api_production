@@ -33,19 +33,6 @@ except Exception as e:
     logger.error(traceback.format_exc())
     raise
 
-try:
-    from app.routes.monitor_components import (
-        get_nav_menu_css,
-        get_nav_menu_html,
-        get_system_metrics_css,
-        get_system_metrics_html,
-        get_system_metrics_js
-    )
-except Exception as e:
-    logger.error(f"Failed to import monitor_components: {e}")
-    logger.error(traceback.format_exc())
-    raise
-
 router = APIRouter()
 
 # HTTP Basic Authentication for dashboard
@@ -1419,7 +1406,7 @@ async def get_login_page():
 @router.get("/dashboard/page", response_class=HTMLResponse)
 async def get_dashboard_page(username: str = Depends(verify_dashboard_access)):
     """HTML dashboard for monitoring Gunicorn workers."""
-    html_content = f"""
+    html_content = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1569,8 +1556,93 @@ async def get_dashboard_page(username: str = Depends(verify_dashboard_access)):
             color: #666;
             font-size: 12px;
         }
-        {get_nav_menu_css()}
-        {get_system_metrics_css()}
+        .system-metrics {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .system-metrics h2 {
+            color: #2c3e50;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .metric-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.9s ease;
+        }
+        .progress-fill.warning {
+            background: #ff9800;
+        }
+        .progress-fill.danger {
+            background: #f44336;
+        }
+        .nav-menu {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .nav-menu ul {
+            list-style: none;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 0;
+            padding: 0;
+        }
+        .nav-menu li {
+            margin: 0;
+        }
+        .nav-menu a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }
+        .nav-menu a:hover {
+            background-color: #f0f0f0;
+        }
+        .nav-menu a.active {
+            background-color: #2c3e50;
+            color: white;
+        }
         .worker-link {
             color: #2c3e50;
             text-decoration: none;
@@ -1583,8 +1655,36 @@ async def get_dashboard_page(username: str = Depends(verify_dashboard_access)):
 </head>
 <body>
     <div class="container">
-        {get_nav_menu_html('dashboard')}
-        {get_system_metrics_html()}
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="/monitor/dashboard/page" class="active">Dashboard</a></li>
+                <li><a href="/monitor/workers/page">Workers</a></li>
+                <li><a href="/monitor/health/page">Health</a></li>
+                <li><a href="/monitor/logs/page">Logs</a></li>
+            </ul>
+        </nav>
+        
+        <div class="system-metrics" id="system-metrics">
+            <h2>System Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Usage</div>
+                    <div class="metric-value" id="memory-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
+                </div>
+            </div>
+        </div>
+        
         <header>
             <h1>Gunicorn Worker Monitor</h1>
             <div class="refresh-indicator">
@@ -1859,14 +1959,126 @@ async def get_worker_detail_page(pid: int, username: str = Depends(verify_dashbo
             border-radius: 4px;
             margin-bottom: 20px;
         }}
-        {get_nav_menu_css()}
-        {get_system_metrics_css()}
+        .nav-menu {{
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }}
+        .nav-menu ul {{
+            list-style: none;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 0;
+            padding: 0;
+        }}
+        .nav-menu li {{
+            margin: 0;
+        }}
+        .nav-menu a {{
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }}
+        .nav-menu a:hover {{
+            background-color: #f0f0f0;
+        }}
+        .nav-menu a.active {{
+            background-color: #2c3e50;
+            color: white;
+        }}
+        .system-metrics {{
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }}
+        .system-metrics h2 {{
+            color: #2c3e50;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }}
+        .metrics-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }}
+        .metric-item {{
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }}
+        .metric-label {{
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }}
+        .metric-value {{
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }}
+        .progress-bar {{
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }}
+        .progress-fill {{
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.9s ease;
+        }}
+        .progress-fill.warning {{
+            background: #ff9800;
+        }}
+        .progress-fill.danger {{
+            background: #f44336;
+        }}
     </style>
 </head>
 <body>
     <div class="container">
-        {get_nav_menu_html()}
-        {get_system_metrics_html()}
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="/monitor/dashboard/page">Dashboard</a></li>
+                <li><a href="/monitor/workers/page">Workers</a></li>
+                <li><a href="/monitor/health/page">Health</a></li>
+                <li><a href="/monitor/logs/page">Logs</a></li>
+            </ul>
+        </nav>
+        
+        <div class="system-metrics" id="system-metrics">
+            <h2>System Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Usage</div>
+                    <div class="metric-value" id="memory-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
+                </div>
+            </div>
+        </div>
         
         <a href="/monitor/dashboard/page" class="back-link">← Back to Dashboard</a>
         
@@ -1989,7 +2201,35 @@ async def get_worker_detail_page(pid: int, username: str = Depends(verify_dashbo
             return `${{secs}}s`;
         }}
         
-        {get_system_metrics_js()}
+        async function fetchSystemMetrics() {{
+            try {{
+                const response = await fetch('/monitor/stats');
+                const data = await response.json();
+                
+                if (data.system) {{
+                    const cpuPercent = data.system.cpu_percent;
+                    const memPercent = data.system.memory_percent;
+                    
+                    document.getElementById('cpu-percent').textContent = cpuPercent.toFixed(1) + '%';
+                    const cpuProgress = document.getElementById('cpu-progress');
+                    cpuProgress.style.width = cpuPercent + '%';
+                    cpuProgress.className = 'progress-fill' + 
+                        (cpuPercent > 80 ? ' danger' : cpuPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-percent').textContent = memPercent.toFixed(1) + '%';
+                    const memProgress = document.getElementById('memory-progress');
+                    memProgress.style.width = memPercent + '%';
+                    memProgress.className = 'progress-fill' + 
+                        (memPercent > 80 ? ' danger' : memPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-details').textContent = 
+                        data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.memory_total_gb.toFixed(2) + ' GB';
+                }}
+            }} catch (error) {{
+                // Silently fail - don't break the page if system metrics fail
+            }}
+        }}
         
         // Load on page load
         fetchSystemMetrics();
@@ -2010,7 +2250,7 @@ async def get_worker_detail_page(pid: int, username: str = Depends(verify_dashbo
 @router.get("/workers/page", response_class=HTMLResponse)
 async def get_workers_page(username: str = Depends(verify_dashboard_access)):
     """HTML page for viewing worker processes."""
-    html_content = f"""
+    html_content = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2033,8 +2273,93 @@ async def get_workers_page(username: str = Depends(verify_dashboard_access)):
             max-width: 1400px;
             margin: 0 auto;
         }
-        {get_nav_menu_css()}
-        {get_system_metrics_css()}
+        .nav-menu {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .nav-menu ul {
+            list-style: none;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 0;
+            padding: 0;
+        }
+        .nav-menu li {
+            margin: 0;
+        }
+        .nav-menu a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }
+        .nav-menu a:hover {
+            background-color: #f0f0f0;
+        }
+        .nav-menu a.active {
+            background-color: #2c3e50;
+            color: white;
+        }
+        .system-metrics {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .system-metrics h2 {
+            color: #2c3e50;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .metric-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.9s ease;
+        }
+        .progress-fill.warning {
+            background: #ff9800;
+        }
+        .progress-fill.danger {
+            background: #f44336;
+        }
         .workers-section {
             background: white;
             padding: 20px;
@@ -2114,8 +2439,35 @@ async def get_workers_page(username: str = Depends(verify_dashboard_access)):
 </head>
 <body>
     <div class="container">
-        {get_nav_menu_html('workers')}
-        {get_system_metrics_html()}
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="/monitor/dashboard/page">Dashboard</a></li>
+                <li><a href="/monitor/workers/page" class="active">Workers</a></li>
+                <li><a href="/monitor/health/page">Health</a></li>
+                <li><a href="/monitor/logs/page">Logs</a></li>
+            </ul>
+        </nav>
+        
+        <div class="system-metrics" id="system-metrics">
+            <h2>System Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Usage</div>
+                    <div class="metric-value" id="memory-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
+                </div>
+            </div>
+        </div>
         
         <div class="workers-section">
             <h2>Worker Processes</h2>
@@ -2193,7 +2545,35 @@ async def get_workers_page(username: str = Depends(verify_dashboard_access)):
             }
         }
         
-        {get_system_metrics_js()}
+        async function fetchSystemMetrics() {
+            try {
+                const response = await fetch('/monitor/stats');
+                const data = await response.json();
+                
+                if (data.system) {
+                    const cpuPercent = data.system.cpu_percent;
+                    const memPercent = data.system.memory_percent;
+                    
+                    document.getElementById('cpu-percent').textContent = cpuPercent.toFixed(1) + '%';
+                    const cpuProgress = document.getElementById('cpu-progress');
+                    cpuProgress.style.width = cpuPercent + '%';
+                    cpuProgress.className = 'progress-fill' + 
+                        (cpuPercent > 80 ? ' danger' : cpuPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-percent').textContent = memPercent.toFixed(1) + '%';
+                    const memProgress = document.getElementById('memory-progress');
+                    memProgress.style.width = memPercent + '%';
+                    memProgress.className = 'progress-fill' + 
+                        (memPercent > 80 ? ' danger' : memPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-details').textContent = 
+                        data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.memory_total_gb.toFixed(2) + ' GB';
+                }
+            } catch (error) {
+                // Silently fail - don't break the page if system metrics fail
+            }
+        }
         
         // Initial load
         fetchSystemMetrics();
@@ -2214,7 +2594,7 @@ async def get_workers_page(username: str = Depends(verify_dashboard_access)):
 @router.get("/stats/page", response_class=HTMLResponse)
 async def get_stats_page(username: str = Depends(verify_dashboard_access)):
     """HTML page for viewing request statistics."""
-    html_content = f"""
+    html_content = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2237,8 +2617,93 @@ async def get_stats_page(username: str = Depends(verify_dashboard_access)):
             max-width: 1400px;
             margin: 0 auto;
         }
-        {get_nav_menu_css()}
-        {get_system_metrics_css()}
+        .nav-menu {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .nav-menu ul {
+            list-style: none;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 0;
+            padding: 0;
+        }
+        .nav-menu li {
+            margin: 0;
+        }
+        .nav-menu a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }
+        .nav-menu a:hover {
+            background-color: #f0f0f0;
+        }
+        .nav-menu a.active {
+            background-color: #2c3e50;
+            color: white;
+        }
+        .system-metrics {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .system-metrics h2 {
+            color: #2c3e50;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .metric-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s ease;
+        }
+        .progress-fill.warning {
+            background: #ff9800;
+        }
+        .progress-fill.danger {
+            background: #f44336;
+        }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -2282,11 +2747,37 @@ async def get_stats_page(username: str = Depends(verify_dashboard_access)):
 </head>
 <body>
     <div class="container">
-        {get_nav_menu_html('health')}
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="/monitor/dashboard/page">Dashboard</a></li>
+                <li><a href="/monitor/workers/page">Workers</a></li>
+                <li><a href="/monitor/health/page">Health</a></li>
+                <li><a href="/monitor/logs/page">Logs</a></li>
+            </ul>
+        </nav>
         
         <div id="error-container"></div>
         
-        {get_system_metrics_html()}
+        <div class="system-metrics" id="system-metrics">
+            <h2>System Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Usage</div>
+                    <div class="metric-value" id="memory-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
+                </div>
+            </div>
+        </div>
         
         <div class="stats-grid" id="stats-grid">
             <div class="stat-card">
@@ -2393,7 +2884,7 @@ async def get_stats_page(username: str = Depends(verify_dashboard_access)):
 @router.get("/health/page", response_class=HTMLResponse)
 async def get_health_page(username: str = Depends(verify_dashboard_access)):
     """HTML page for viewing system health."""
-    html_content = f"""
+    html_content = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2756,7 +3247,7 @@ async def get_health_page(username: str = Depends(verify_dashboard_access)):
 @router.get("/logs/page", response_class=HTMLResponse)
 async def get_logs_page(username: str = Depends(verify_dashboard_access)):
     """HTML page for viewing application logs."""
-    html_content = f"""
+    html_content = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2779,8 +3270,93 @@ async def get_logs_page(username: str = Depends(verify_dashboard_access)):
             max-width: 1600px;
             margin: 0 auto;
         }
-        {get_nav_menu_css()}
-        {get_system_metrics_css()}
+        .nav-menu {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .nav-menu ul {
+            list-style: none;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 0;
+            padding: 0;
+        }
+        .nav-menu li {
+            margin: 0;
+        }
+        .nav-menu a {
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }
+        .nav-menu a:hover {
+            background-color: #f0f0f0;
+        }
+        .nav-menu a.active {
+            background-color: #2c3e50;
+            color: white;
+        }
+        .system-metrics {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .system-metrics h2 {
+            color: #2c3e50;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .metric-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.9s ease;
+        }
+        .progress-fill.warning {
+            background: #ff9800;
+        }
+        .progress-fill.danger {
+            background: #f44336;
+        }
         .logs-controls {
             background: white;
             padding: 15px 20px;
@@ -2890,8 +3466,35 @@ async def get_logs_page(username: str = Depends(verify_dashboard_access)):
 </head>
 <body>
     <div class="container">
-        {get_nav_menu_html('logs')}
-        {get_system_metrics_html()}
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="/monitor/dashboard/page">Dashboard</a></li>
+                <li><a href="/monitor/workers/page">Workers</a></li>
+                <li><a href="/monitor/health/page">Health</a></li>
+                <li><a href="/monitor/logs/page" class="active">Logs</a></li>
+            </ul>
+        </nav>
+        
+        <div class="system-metrics" id="system-metrics">
+            <h2>System Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Usage</div>
+                    <div class="metric-value" id="memory-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
+                </div>
+            </div>
+        </div>
         
         <div class="logs-controls">
             <label>
@@ -3023,7 +3626,35 @@ async def get_logs_page(username: str = Depends(verify_dashboard_access)):
         
         document.getElementById('auto-refresh').addEventListener('change', toggleAutoRefresh);
         
-        {get_system_metrics_js()}
+        async function fetchSystemMetrics() {
+            try {
+                const response = await fetch('/monitor/stats');
+                const data = await response.json();
+                
+                if (data.system) {
+                    const cpuPercent = data.system.cpu_percent;
+                    const memPercent = data.system.memory_percent;
+                    
+                    document.getElementById('cpu-percent').textContent = cpuPercent.toFixed(1) + '%';
+                    const cpuProgress = document.getElementById('cpu-progress');
+                    cpuProgress.style.width = cpuPercent + '%';
+                    cpuProgress.className = 'progress-fill' + 
+                        (cpuPercent > 80 ? ' danger' : cpuPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-percent').textContent = memPercent.toFixed(1) + '%';
+                    const memProgress = document.getElementById('memory-progress');
+                    memProgress.style.width = memPercent + '%';
+                    memProgress.className = 'progress-fill' + 
+                        (memPercent > 80 ? ' danger' : memPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-details').textContent = 
+                        data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.memory_total_gb.toFixed(2) + ' GB';
+                }
+            } catch (error) {
+                // Silently fail - don't break the page if system metrics fail
+            }
+        }
         
         // Initial load
         fetchSystemMetrics();
@@ -3483,7 +4114,35 @@ async def get_worker_logs_page(pid: int, username: str = Depends(verify_dashboar
         
         document.getElementById('auto-refresh').addEventListener('change', toggleAutoRefresh);
         
-        {get_system_metrics_js()}
+        async function fetchSystemMetrics() {{
+            try {{
+                const response = await fetch('/monitor/stats');
+                const data = await response.json();
+                
+                if (data.system) {{
+                    const cpuPercent = data.system.cpu_percent;
+                    const memPercent = data.system.memory_percent;
+                    
+                    document.getElementById('cpu-percent').textContent = cpuPercent.toFixed(1) + '%';
+                    const cpuProgress = document.getElementById('cpu-progress');
+                    cpuProgress.style.width = cpuPercent + '%';
+                    cpuProgress.className = 'progress-fill' + 
+                        (cpuPercent > 80 ? ' danger' : cpuPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-percent').textContent = memPercent.toFixed(1) + '%';
+                    const memProgress = document.getElementById('memory-progress');
+                    memProgress.style.width = memPercent + '%';
+                    memProgress.className = 'progress-fill' + 
+                        (memPercent > 80 ? ' danger' : memPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-details').textContent = 
+                        data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.memory_total_gb.toFixed(2) + ' GB';
+                }}
+            }} catch (error) {{
+                // Silently fail - don't break the page if system metrics fail
+            }}
+        }}
         
         // Initial load
         fetchSystemMetrics();
