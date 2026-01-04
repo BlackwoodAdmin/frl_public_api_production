@@ -1,6 +1,7 @@
 """Monitoring endpoints for Gunicorn workers and system health."""
 import logging
 import traceback
+import hashlib
 
 # Get logger early
 logger = logging.getLogger(__name__)
@@ -490,6 +491,30 @@ def _get_gunicorn_processes_uncached():
             pass
     
     return processes, master_pid
+
+
+def _generate_log_hash(timestamp: str, message: str, module: Optional[str] = None) -> str:
+    """Generate a hash identifier for a log entry.
+    
+    Uses SHA256 hash of timestamp + message (and module if available) to create
+    a unique identifier for log entries.
+    
+    Args:
+        timestamp: Log timestamp string
+        message: Log message string
+        module: Optional module name
+        
+    Returns:
+        Hex digest of the hash (64 characters)
+    """
+    # Combine timestamp and message for hash
+    hash_input = f"{timestamp}|{message}"
+    if module:
+        hash_input = f"{timestamp}|{module}|{message}"
+    
+    # Generate SHA256 hash
+    hash_obj = hashlib.sha256(hash_input.encode('utf-8'))
+    return hash_obj.hexdigest()
 
 
 def _parse_log_line(line: str) -> Dict[str, str]:
@@ -1206,6 +1231,152 @@ async def get_worker_logs(pid: int, limit: int = 1000, level: Optional[str] = No
             "error": str(e),
             "logs": [],
             "pid": pid
+        }
+
+
+def _extract_traceback(message: str) -> Optional[str]:
+    """Extract traceback from log message if present.
+    
+    Looks for Python traceback patterns in the message and returns
+    the traceback portion if found.
+    
+    Args:
+        message: Full log message
+        
+    Returns:
+        Traceback string if found, None otherwise
+    """
+    if not message:
+        return None
+    
+    # Look for "Traceback (most recent call last):" pattern
+    traceback_start = message.find("Traceback (most recent call last):")
+    if traceback_start == -1:
+        # Also check for just "Traceback:"
+        traceback_start = message.find("Traceback:")
+        if traceback_start == -1:
+            return None
+    
+    # Return everything from traceback start to end
+    return message[traceback_start:].strip()
+
+
+def _extract_metadata_from_message(message: str) -> Dict[str, Any]:
+    """Extract metadata from log message if available.
+    
+    Attempts to extract PID, file paths, line numbers, and other
+    metadata from log messages.
+    
+    Args:
+        message: Log message string
+        
+    Returns:
+        Dictionary with extracted metadata fields
+    """
+    metadata = {}
+    
+    if not message:
+        return metadata
+    
+    # Try to extract PID (common patterns: "PID:12345" or "[12345]")
+    import re
+    pid_match = re.search(r'(?:PID[:\s]+|\[)(\d+)(?:\]|$)', message)
+    if pid_match:
+        try:
+            metadata['pid'] = int(pid_match.group(1))
+        except ValueError:
+            pass
+    
+    # Try to extract file path and line number (pattern: "File \"path\", line 123")
+    file_match = re.search(r'File\s+"([^"]+)",\s*line\s+(\d+)', message)
+    if file_match:
+        metadata['file_path'] = file_match.group(1)
+        try:
+            metadata['line_number'] = int(file_match.group(2))
+        except ValueError:
+            pass
+    
+    return metadata
+
+
+@router.get("/log/{log_hash}", response_class=JSONResponse)
+async def get_log_details(log_hash: str):
+    """Get detailed information for a specific log entry by hash.
+    
+    Searches recent logs to find the log entry matching the hash.
+    Note: Since logs can rotate, this may not always find the exact log.
+    
+    Args:
+        log_hash: SHA256 hash of the log entry (timestamp + message)
+        
+    Returns:
+        JSON object with log details including traceback and metadata
+    """
+    try:
+        # Search recent logs (use a larger limit to increase chances of finding the log)
+        limit = 5000  # Search more logs to increase likelihood of finding the entry
+        all_logs_response = await get_logs(limit=limit, level=None)
+        
+        if all_logs_response.get("error"):
+            return {
+                "error": all_logs_response.get("error"),
+                "log_hash": log_hash
+            }
+        
+        logs = all_logs_response.get("logs", [])
+        
+        # Find log entry matching the hash
+        matching_log = None
+        for log in logs:
+            timestamp = log.get("timestamp", "")
+            message = log.get("message", "")
+            module = log.get("module")
+            
+            # Generate hash for this log entry
+            entry_hash = _generate_log_hash(timestamp, message, module)
+            
+            if entry_hash == log_hash:
+                matching_log = log
+                break
+        
+        if not matching_log:
+            return {
+                "error": f"Log entry not found (hash: {log_hash}). The log may have rotated or the entry is no longer in recent logs.",
+                "log_hash": log_hash,
+                "searched_logs": len(logs)
+            }
+        
+        # Extract traceback and metadata
+        message = matching_log.get("message", "")
+        traceback_text = _extract_traceback(message)
+        metadata = _extract_metadata_from_message(message)
+        
+        # Build detailed response
+        result = {
+            "log_hash": log_hash,
+            "timestamp": matching_log.get("timestamp", ""),
+            "level": matching_log.get("level", ""),
+            "message": message,
+            "raw_message": message,  # For copying
+            "module": matching_log.get("module"),
+            "source": all_logs_response.get("source", ""),
+            "metadata": metadata
+        }
+        
+        if traceback_text:
+            result["traceback"] = traceback_text
+        
+        # Add PID if available in the log entry itself
+        if "pid" in matching_log:
+            result["metadata"]["pid"] = matching_log["pid"]
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error getting log details: {e}")
+        return {
+            "error": str(e),
+            "log_hash": log_hash
         }
 
 
@@ -3573,20 +3744,81 @@ async def get_logs_page(request: Request):
     <script>
         let autoRefreshInterval = null;
         
+        async function generateLogHash(timestamp, message, module) {
+            // Combine timestamp and message for hash (matching Python implementation)
+            let hashInput = timestamp + '|' + message;
+            if (module) {
+                hashInput = timestamp + '|' + module + '|' + message;
+            }
+            
+            // Generate SHA256 hash using Web Crypto API
+            const encoder = new TextEncoder();
+            const data = encoder.encode(hashInput);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex;
+        }
+        
+        async function formatLogEntryAsync(log) {
+            const timestamp = log.timestamp || '';
+            const level = (log.level || 'INFO').toUpperCase();
+            const message = log.message || '';
+            const module = log.module ? `[${log.module}]` : '';
+            
+            // Generate hash for this log entry
+            const hash = await generateLogHash(timestamp, message, log.module || null);
+            
+            return `
+                <div class="log-entry">
+                    <span class="log-timestamp">
+                        <a href="/monitor/log/${hash}/page" class="log-link">${timestamp}</a>
+                    </span>
+                    <span class="log-level ${level}">${level}</span>
+                    ${module ? `<span style="color: #858585;">${module}</span>` : ''}
+                    <span class="log-message">
+                        <a href="/monitor/log/${hash}/page" class="log-link">${escapeHtml(message)}</a>
+                    </span>
+                </div>
+            `;
+        }
+        
         function formatLogEntry(log) {
             const timestamp = log.timestamp || '';
             const level = (log.level || 'INFO').toUpperCase();
             const message = log.message || '';
             const module = log.module ? `[${log.module}]` : '';
             
+            // Generate hash synchronously using a simple approach (store hash in data attribute)
+            // We'll generate the hash when the log is rendered
+            const hashInput = timestamp + '|' + (module ? module.replace(/[\[\]]/g, '') + '|' : '') + message;
+            let logHash = '';
+            
+            // Use a synchronous hash generation for immediate display
+            // Store the hash input in a data attribute and generate hash asynchronously
+            const hashPromise = generateLogHash(timestamp, message, log.module);
+            
             return `
-                <div class="log-entry">
-                    <span class="log-timestamp">${timestamp}</span>
+                <div class="log-entry" data-hash-input="${escapeHtml(hashInput)}">
+                    <span class="log-timestamp">
+                        <a href="#" class="log-link" data-timestamp="${escapeHtml(timestamp)}" data-message="${escapeHtml(message)}" data-module="${escapeHtml(log.module || '')}" onclick="event.preventDefault(); handleLogClick(this); return false;">${timestamp}</a>
+                    </span>
                     <span class="log-level ${level}">${level}</span>
                     ${module ? `<span style="color: #858585;">${module}</span>` : ''}
-                    <span class="log-message">${escapeHtml(message)}</span>
+                    <span class="log-message">
+                        <a href="#" class="log-link" data-timestamp="${escapeHtml(timestamp)}" data-message="${escapeHtml(message)}" data-module="${escapeHtml(log.module || '')}" onclick="event.preventDefault(); handleLogClick(this); return false;">${escapeHtml(message)}</a>
+                    </span>
                 </div>
             `;
+        }
+        
+        async function handleLogClick(element) {
+            const timestamp = element.getAttribute('data-timestamp');
+            const message = element.getAttribute('data-message');
+            const module = element.getAttribute('data-module');
+            
+            const hash = await generateLogHash(timestamp, message, module || null);
+            window.location.href = '/monitor/log/' + hash + '/page';
         }
         
         function escapeHtml(text) {
@@ -3631,10 +3863,12 @@ async def get_logs_page(request: Request):
                     return;
                 }
                 
-                let html = '';
-                data.logs.forEach(log => {
-                    html += formatLogEntry(log);
+                // Generate hashes and format log entries asynchronously
+                const logHtmlPromises = data.logs.map(async (log) => {
+                    return await formatLogEntryAsync(log);
                 });
+                const logHtmls = await Promise.all(logHtmlPromises);
+                const html = logHtmls.join('');
                 
                 document.getElementById('logs-container').innerHTML = html;
                 document.getElementById('error-container').innerHTML = '';
@@ -3698,6 +3932,453 @@ async def get_logs_page(request: Request):
         // Initial load
         fetchSystemMetrics();
         fetchLogs();
+    </script>
+</body>
+</html>
+    """
+    return HTMLResponse(content=html_content)
+
+
+@router.get("/log/{log_hash}/page", response_class=HTMLResponse)
+async def get_log_detail_page(log_hash: str, request: Request):
+    """HTML page for viewing detailed log entry information."""
+    username, redirect = check_auth_for_html(request)
+    if redirect:
+        return redirect
+    
+    html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Details - Gunicorn Monitor</title>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            padding: 20px;
+        }}
+        .container {{
+            max-width: 1400px;
+            margin: 0 auto;
+        }}
+        .back-link {{
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+        }}
+        .back-link:hover {{
+            text-decoration: underline;
+        }}
+        .nav-menu {{
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }}
+        .nav-menu ul {{
+            list-style: none;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 0;
+            padding: 0;
+        }}
+        .nav-menu li {{
+            margin: 0;
+        }}
+        .nav-menu a {{
+            color: #2c3e50;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            display: inline-block;
+        }}
+        .nav-menu a:hover {{
+            background-color: #f0f0f0;
+        }}
+        .nav-menu a.active {{
+            background-color: #2c3e50;
+            color: white;
+        }}
+        .system-metrics {{
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }}
+        .system-metrics h2 {{
+            color: #2c3e50;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }}
+        .metrics-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }}
+        .metric-item {{
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }}
+        .metric-label {{
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }}
+        .metric-value {{
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }}
+        .progress-bar {{
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }}
+        .progress-fill {{
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.9s ease;
+        }}
+        .progress-fill.warning {{
+            background: #ff9800;
+        }}
+        .progress-fill.danger {{
+            background: #f44336;
+        }}
+        .detail-section {{
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }}
+        .detail-section h2 {{
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }}
+        .detail-header {{
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }}
+        .detail-timestamp {{
+            font-size: 16px;
+            color: #666;
+            font-family: monospace;
+        }}
+        .level-badge {{
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }}
+        .level-badge.ERROR {{
+            background: #f44336;
+            color: white;
+        }}
+        .level-badge.WARNING {{
+            background: #ff9800;
+            color: white;
+        }}
+        .level-badge.INFO {{
+            background: #2196F3;
+            color: white;
+        }}
+        .level-badge.DEBUG {{
+            background: #9e9e9e;
+            color: white;
+        }}
+        .detail-item {{
+            margin-bottom: 20px;
+        }}
+        .detail-label {{
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }}
+        .detail-value {{
+            font-size: 14px;
+            color: #2c3e50;
+            line-height: 1.6;
+            word-wrap: break-word;
+        }}
+        .message-box {{
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #2c3e50;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }}
+        .traceback-box {{
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-x: auto;
+        }}
+        .metadata-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }}
+        .metadata-item {{
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }}
+        .metadata-label {{
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }}
+        .metadata-value {{
+            font-size: 14px;
+            font-weight: 600;
+            color: #2c3e50;
+        }}
+        .loading {{
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }}
+        .error {{
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }}
+        .copy-button {{
+            padding: 6px 12px;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 10px;
+        }}
+        .copy-button:hover {{
+            background: #34495e;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="/monitor/dashboard/page">Dashboard</a></li>
+                <li><a href="/monitor/workers/page">Workers</a></li>
+                <li><a href="/monitor/health/page">Health</a></li>
+                <li><a href="/monitor/logs/page" class="active">Logs</a></li>
+                <li><a href="/monitor/logout">Logout</a></li>
+            </ul>
+        </nav>
+        
+        <div class="system-metrics" id="system-metrics">
+            <h2>System Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">CPU Usage</div>
+                    <div class="metric-value" id="cpu-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="cpu-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Memory Usage</div>
+                    <div class="metric-value" id="memory-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <a href="/monitor/logs/page" class="back-link">← Back to Logs</a>
+        
+        <div id="log-details" class="loading">Loading log details...</div>
+    </div>
+    
+    <script>
+        async function loadLogDetails() {{
+            try {{
+                const response = await fetch('/monitor/log/{log_hash}');
+                const data = await response.json();
+                
+                if (data.error) {{
+                    document.getElementById('log-details').innerHTML = 
+                        '<div class="error">Error: ' + data.error + '</div>';
+                    return;
+                }}
+                
+                let html = '';
+                
+                // Header Section
+                html += '<div class="detail-section">';
+                html += '<div class="detail-header">';
+                html += '<span class="level-badge ' + (data.level || 'INFO') + '">' + (data.level || 'INFO') + '</span>';
+                html += '<span class="detail-timestamp">' + (data.timestamp || 'N/A') + '</span>';
+                if (data.module) {{
+                    html += '<span style="color: #666; font-size: 14px;">[' + data.module + ']</span>';
+                }}
+                html += '</div>';
+                
+                // Message Section
+                html += '<div class="detail-item">';
+                html += '<div class="detail-label">Message</div>';
+                html += '<div class="message-box">' + escapeHtml(data.message || '') + '</div>';
+                html += '</div>';
+                
+                // Raw Message Section
+                html += '<div class="detail-item">';
+                html += '<div class="detail-label">Raw Message</div>';
+                html += '<div class="message-box" id="raw-message">' + escapeHtml(data.raw_message || data.message || '') + '</div>';
+                html += '<button class="copy-button" onclick="copyToClipboard(''raw-message'')">Copy Raw Message</button>';
+                html += '</div>';
+                
+                // Traceback Section (if exists)
+                if (data.traceback) {{
+                    html += '<div class="detail-item">';
+                    html += '<div class="detail-label">Traceback</div>';
+                    html += '<div class="traceback-box" id="traceback-content">' + escapeHtml(data.traceback) + '</div>';
+                    html += '<button class="copy-button" onclick="copyToClipboard(''traceback-content'')">Copy Traceback</button>';
+                    html += '</div>';
+                }}
+                
+                // Metadata Section
+                if (data.metadata && Object.keys(data.metadata).length > 0) {{
+                    html += '<div class="detail-item">';
+                    html += '<div class="detail-label">Metadata</div>';
+                    html += '<div class="metadata-grid">';
+                    for (const [key, value] of Object.entries(data.metadata)) {{
+                        html += '<div class="metadata-item">';
+                        html += '<div class="metadata-label">' + escapeHtml(key) + '</div>';
+                        html += '<div class="metadata-value">' + escapeHtml(String(value)) + '</div>';
+                        html += '</div>';
+                    }}
+                    html += '</div>';
+                    html += '</div>';
+                }}
+                
+                // Additional Info
+                html += '<div class="detail-item">';
+                html += '<div class="detail-label">Additional Information</div>';
+                html += '<div class="metadata-grid">';
+                if (data.source) {{
+                    html += '<div class="metadata-item">';
+                    html += '<div class="metadata-label">Source</div>';
+                    html += '<div class="metadata-value">' + escapeHtml(data.source) + '</div>';
+                    html += '</div>';
+                }}
+                html += '<div class="metadata-item">';
+                html += '<div class="metadata-label">Log Hash</div>';
+                html += '<div class="metadata-value" style="font-family: monospace; font-size: 12px;">' + escapeHtml(data.log_hash || '{log_hash}') + '</div>';
+                html += '</div>';
+                html += '</div>';
+                html += '</div>';
+                
+                html += '</div>';
+                
+                document.getElementById('log-details').innerHTML = html;
+            }} catch (error) {{
+                document.getElementById('log-details').innerHTML = 
+                    '<div class="error">Error loading log details: ' + error.message + '</div>';
+            }}
+        }}
+        
+        function escapeHtml(text) {{
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }}
+        
+        function copyToClipboard(elementId) {{
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            navigator.clipboard.writeText(text).then(() => {{
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                setTimeout(() => {{
+                    button.textContent = originalText;
+                }}, 2000);
+            }}).catch(err => {{
+                console.error('Failed to copy:', err);
+            }});
+        }}
+        
+        async function fetchSystemMetrics() {{
+            try {{
+                const response = await fetch('/monitor/stats');
+                const data = await response.json();
+                
+                if (data.system) {{
+                    const cpuPercent = data.system.cpu_percent;
+                    const memPercent = data.system.memory_percent;
+                    
+                    document.getElementById('cpu-percent').textContent = cpuPercent.toFixed(1) + '%';
+                    const cpuProgress = document.getElementById('cpu-progress');
+                    cpuProgress.style.width = cpuPercent + '%';
+                    cpuProgress.className = 'progress-fill' + 
+                        (cpuPercent > 80 ? ' danger' : cpuPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-percent').textContent = memPercent.toFixed(1) + '%';
+                    const memProgress = document.getElementById('memory-progress');
+                    memProgress.style.width = memPercent + '%';
+                    memProgress.className = 'progress-fill' + 
+                        (memPercent > 80 ? ' danger' : memPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('memory-details').textContent = 
+                        data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.memory_total_gb.toFixed(2) + ' GB';
+                }}
+            }} catch (error) {{
+                // Silently fail - don't break the page if system metrics fail
+            }}
+        }}
+        
+        // Initial load
+        fetchSystemMetrics();
+        loadLogDetails();
     </script>
 </body>
 </html>
