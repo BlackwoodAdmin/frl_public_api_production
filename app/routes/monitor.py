@@ -612,28 +612,6 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
         cpu_count = psutil.cpu_count()
         mem = psutil.virtual_memory()
         
-        # Track CPU readings and calculate 1-second average
-        if "cpu_readings" not in stats:
-            stats["cpu_readings"] = []
-        
-        # Clean old readings (older than 1 second)
-        stats["cpu_readings"] = [
-            [t, cpu] for t, cpu in stats["cpu_readings"]
-            if current_time - t < 1
-        ]
-        
-        # Add current reading
-        stats["cpu_readings"].append([current_time, cpu_percent])
-        
-        # Calculate average of readings from last 1 second
-        if stats["cpu_readings"]:
-            avg_cpu_percent = sum(cpu for _, cpu in stats["cpu_readings"]) / len(stats["cpu_readings"])
-        else:
-            avg_cpu_percent = cpu_percent
-        
-        # Save updated stats with cleaned cpu_readings
-        _save_stats(stats)
-        
         # Add diagnostic info
         stats_file_exists = STATS_FILE.exists()
         stats_file_size = STATS_FILE.stat().st_size if stats_file_exists else 0
@@ -649,7 +627,7 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
             "active_workers": active_workers,
             "uptime_seconds": int(current_time - stats["start_time"]),
             "system": {
-                "cpu_percent": round(avg_cpu_percent, 2),
+                "cpu_percent": round(cpu_percent, 2),
                 "cpu_count": cpu_count,
                 "memory_percent": round(mem.percent, 2),
                 "memory_total_gb": round(mem.total / 1024 / 1024 / 1024, 2),
@@ -1588,7 +1566,7 @@ async def get_dashboard(username: str = Depends(verify_dashboard_access)):
             <h1>Gunicorn Worker Monitor</h1>
             <div class="refresh-indicator">
                 <div class="refresh-dot"></div>
-                <span>Auto-refreshing every 1 second</span>
+                <span>Auto-refreshing every 0.1 seconds</span>
             </div>
         </header>
         
@@ -1748,8 +1726,8 @@ async def get_dashboard(username: str = Depends(verify_dashboard_access)):
         // Initial load
         refresh();
         
-        // Auto-refresh every 1 second
-        setInterval(refresh, 1000);
+        // Auto-refresh every 0.1 seconds
+        setInterval(refresh, 100);
     </script>
 </body>
 </html>
