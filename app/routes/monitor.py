@@ -1431,6 +1431,30 @@ async def get_login_page():
     return HTMLResponse(content=html_content)
 
 
+@router.get("/logout", response_class=HTMLResponse)
+async def get_logout_page():
+    """Logout page that clears session and redirects to login."""
+    html_content = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logout - FRL Python API</title>
+</head>
+<body>
+    <script>
+        // Clear sessionStorage
+        sessionStorage.removeItem('authCredentials');
+        // Redirect to login page
+        window.location.href = '/monitor/login';
+    </script>
+</body>
+</html>
+    """
+    return HTMLResponse(content=html_content)
+
+
 @router.get("/dashboard/page", response_class=HTMLResponse)
 async def get_dashboard_page(request: Request):
     """HTML dashboard for monitoring Gunicorn workers."""
@@ -1692,6 +1716,7 @@ async def get_dashboard_page(request: Request):
                 <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
+                <li><a href="/monitor/logout">Logout</a></li>
             </ul>
         </nav>
         
@@ -2090,6 +2115,7 @@ async def get_worker_detail_page(pid: int, request: Request):
                 <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
+                <li><a href="/monitor/logout">Logout</a></li>
             </ul>
         </nav>
         
@@ -2482,6 +2508,7 @@ async def get_workers_page(request: Request):
                 <li><a href="/monitor/workers/page" class="active">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
+                <li><a href="/monitor/logout">Logout</a></li>
             </ul>
         </nav>
         
@@ -2793,6 +2820,7 @@ async def get_stats_page(request: Request):
                 <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
+                <li><a href="/monitor/logout">Logout</a></li>
             </ul>
         </nav>
         
@@ -3142,6 +3170,7 @@ async def get_health_page(request: Request):
                 <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page" class="active">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
+                <li><a href="/monitor/logout">Logout</a></li>
             </ul>
         </nav>
         
@@ -3968,6 +3997,7 @@ async def get_worker_logs_page(pid: int, request: Request):
                 <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
+                <li><a href="/monitor/logout">Logout</a></li>
             </ul>
         </nav>
         
