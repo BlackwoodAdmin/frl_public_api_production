@@ -22,9 +22,6 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     
-    # Monitoring dashboard settings
-    system_metrics_refresh_rate_ms: int = 500  # Refresh rate in milliseconds for system metrics on HTML pages
-    
     class Config:
         env_file = ".env"
         case_sensitive = False

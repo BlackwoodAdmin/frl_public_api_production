@@ -28,9 +28,8 @@ except Exception as e:
 
 try:
     from app.database import db
-    from app.config import settings
 except Exception as e:
-    logger.error(f"Failed to import app.database or app.config: {e}")
+    logger.error(f"Failed to import app.database: {e}")
     logger.error(traceback.format_exc())
     raise
 
@@ -1597,8 +1596,7 @@ async def get_dashboard_page(request: Request):
     username, redirect = check_auth_for_html(request)
     if redirect:
         return redirect
-    refresh_rate = settings.system_metrics_refresh_rate_ms
-    html_content = f"""
+    html_content = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2042,8 +2040,8 @@ async def get_dashboard_page(request: Request):
         // Initial load
         refresh();
         
-        // Auto-refresh every {refresh_rate} milliseconds
-        setInterval(refresh, {refresh_rate});
+        // Auto-refresh every 0.5 seconds
+        setInterval(refresh, 500);
     </script>
 </body>
 </html>
@@ -2057,7 +2055,6 @@ async def get_worker_detail_page(pid: int, request: Request):
     username, redirect = check_auth_for_html(request)
     if redirect:
         return redirect
-    refresh_rate = settings.system_metrics_refresh_rate_ms
     html_content = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -2433,10 +2430,10 @@ async def get_worker_detail_page(pid: int, request: Request):
         fetchSystemMetrics();
         loadWorkerDetails();
         
-        // Auto-refresh system metrics every {refresh_rate} milliseconds (matching dashboard)
+        // Auto-refresh system metrics every 0.5 seconds (matching dashboard)
         setInterval(() => {{
             fetchSystemMetrics();
-        }}, {refresh_rate});
+        }}, 500);
         
         // Auto-refresh worker details every 5 seconds
         setInterval(() => {{
@@ -2455,8 +2452,7 @@ async def get_workers_page(request: Request):
     username, redirect = check_auth_for_html(request)
     if redirect:
         return redirect
-    refresh_rate = settings.system_metrics_refresh_rate_ms
-    html_content = f"""
+    html_content = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2786,15 +2782,15 @@ async def get_workers_page(request: Request):
         fetchSystemMetrics();
         fetchWorkers();
         
-        // Auto-refresh system metrics every {refresh_rate} milliseconds (matching dashboard)
-        setInterval(() => {{
+        // Auto-refresh system metrics every 0.5 seconds (matching dashboard)
+        setInterval(() => {
             fetchSystemMetrics();
-        }}, {refresh_rate});
+        }, 500);
         
         // Auto-refresh workers every 5 seconds
-        setInterval(() => {{
+        setInterval(() => {
             fetchWorkers();
-        }}, 5000);
+        }, 5000);
     </script>
 </body>
 </html>
@@ -2808,8 +2804,7 @@ async def get_stats_page(request: Request):
     username, redirect = check_auth_for_html(request)
     if redirect:
         return redirect
-    refresh_rate = settings.system_metrics_refresh_rate_ms
-    html_content = f"""
+    html_content = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3088,8 +3083,8 @@ async def get_stats_page(request: Request):
         // Initial load
         fetchStats();
         
-        // Auto-refresh every {refresh_rate} milliseconds (matching dashboard)
-        setInterval(fetchStats, {refresh_rate});
+        // Auto-refresh every 0.5 seconds (matching dashboard)
+        setInterval(fetchStats, 500);
     </script>
 </body>
 </html>
@@ -3103,8 +3098,7 @@ async def get_health_page(request: Request):
     username, redirect = check_auth_for_html(request)
     if redirect:
         return redirect
-    refresh_rate = settings.system_metrics_refresh_rate_ms
-    html_content = f"""
+    html_content = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3453,15 +3447,15 @@ async def get_health_page(request: Request):
         fetchSystemMetrics();
         fetchHealth();
         
-        // Auto-refresh system metrics every {refresh_rate} milliseconds (matching dashboard)
-        setInterval(() => {{
+        // Auto-refresh system metrics every 0.5 seconds (matching dashboard)
+        setInterval(() => {
             fetchSystemMetrics();
-        }}, {refresh_rate});
+        }, 500);
         
         // Auto-refresh health every 5 seconds
-        setInterval(() => {{
+        setInterval(() => {
             fetchHealth();
-        }}, 5000);
+        }, 5000);
     </script>
 </body>
 </html>
@@ -3475,8 +3469,7 @@ async def get_logs_page(request: Request):
     username, redirect = check_auth_for_html(request)
     if redirect:
         return redirect
-    refresh_rate = settings.system_metrics_refresh_rate_ms
-    html_content = f"""
+    html_content = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3960,10 +3953,10 @@ async def get_logs_page(request: Request):
         fetchSystemMetrics();
         fetchLogs();
         
-        // Auto-refresh system metrics every {refresh_rate} milliseconds (matching dashboard)
-        setInterval(() => {{
+        // Auto-refresh system metrics every 0.5 seconds (matching dashboard)
+        setInterval(() => {
             fetchSystemMetrics();
-        }}, {refresh_rate});
+        }, 500);
     </script>
 </body>
 </html>
@@ -3977,7 +3970,7 @@ async def get_log_detail_page(log_hash: str, request: Request):
     username, redirect = check_auth_for_html(request)
     if redirect:
         return redirect
-    refresh_rate = settings.system_metrics_refresh_rate_ms
+    
     html_content = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -4439,7 +4432,6 @@ async def get_worker_logs_page(pid: int, request: Request):
     username, redirect = check_auth_for_html(request)
     if redirect:
         return redirect
-    refresh_rate = settings.system_metrics_refresh_rate_ms
     html_content = f"""
 <!DOCTYPE html>
 <html lang="en">
