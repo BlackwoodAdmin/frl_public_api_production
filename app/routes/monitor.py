@@ -632,13 +632,15 @@ def _get_cached_system_metrics():
             cpu_percent = psutil.cpu_percent(interval=0)
         cpu_count = psutil.cpu_count()
         mem = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
         
         # Cache the metrics
         _system_metrics_cache["data"] = {
             "active_workers": active_workers,
             "cpu_percent": cpu_percent,
             "cpu_count": cpu_count,
-            "mem": mem
+            "mem": mem,
+            "disk": disk
         }
         _system_metrics_cache["timestamp"] = current_time
         
@@ -717,6 +719,7 @@ async def get_stats():
         cpu_percent = cached_metrics["cpu_percent"]
         cpu_count = cached_metrics["cpu_count"]
         mem = cached_metrics["mem"]
+        disk = cached_metrics["disk"]
         
         # Calculate average requests per minute (based on last 5 minutes)
         requests_per_minute = round(len(stats["last_minute_requests"]) / 5, 2) if stats["last_minute_requests"] else 0
@@ -735,7 +738,11 @@ async def get_stats():
                 "memory_percent": round(mem.percent, 2),
                 "memory_total_gb": round(mem.total / 1024 / 1024 / 1024, 2),
                 "memory_used_gb": round(mem.used / 1024 / 1024 / 1024, 2),
-                "memory_available_gb": round(mem.available / 1024 / 1024 / 1024, 2)
+                "memory_available_gb": round(mem.available / 1024 / 1024 / 1024, 2),
+                "disk_percent": round(disk.percent, 2),
+                "disk_total_gb": round(disk.total / 1024 / 1024 / 1024, 2),
+                "disk_used_gb": round(disk.used / 1024 / 1024 / 1024, 2),
+                "disk_free_gb": round(disk.free / 1024 / 1024 / 1024, 2)
             },
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
@@ -1881,6 +1888,14 @@ async def get_dashboard_page(request: Request):
                     </div>
                     <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
                 </div>
+                <div class="metric-item">
+                    <div class="metric-label">Disk Usage</div>
+                    <div class="metric-value" id="disk-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="disk-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="disk-details">-</div>
+                </div>
             </div>
         </div>
         
@@ -1995,6 +2010,17 @@ async def get_dashboard_page(request: Request):
                     document.getElementById('memory-details').textContent = 
                         stats.system.memory_used_gb.toFixed(2) + ' GB / ' + 
                         stats.system.memory_total_gb.toFixed(2) + ' GB';
+                    
+                    const diskPercent = stats.system.disk_percent;
+                    document.getElementById('disk-percent').textContent = diskPercent.toFixed(1) + '%';
+                    const diskProgress = document.getElementById('disk-progress');
+                    diskProgress.style.width = diskPercent + '%';
+                    diskProgress.className = 'progress-fill' + 
+                        (diskPercent > 80 ? ' danger' : diskPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('disk-details').textContent = 
+                        stats.system.disk_used_gb.toFixed(2) + ' GB / ' + 
+                        stats.system.disk_total_gb.toFixed(2) + ' GB';
                 }
                 
                 // Handle workers data
@@ -2280,6 +2306,14 @@ async def get_worker_detail_page(pid: int, request: Request):
                     </div>
                     <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
                 </div>
+                <div class="metric-item">
+                    <div class="metric-label">Disk Usage</div>
+                    <div class="metric-value" id="disk-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="disk-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="disk-details">-</div>
+                </div>
             </div>
         </div>
         
@@ -2428,6 +2462,17 @@ async def get_worker_detail_page(pid: int, request: Request):
                     document.getElementById('memory-details').textContent = 
                         data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
                         data.system.memory_total_gb.toFixed(2) + ' GB';
+                    
+                    const diskPercent = data.system.disk_percent;
+                    document.getElementById('disk-percent').textContent = diskPercent.toFixed(1) + '%';
+                    const diskProgress = document.getElementById('disk-progress');
+                    diskProgress.style.width = diskPercent + '%';
+                    diskProgress.className = 'progress-fill' + 
+                        (diskPercent > 80 ? ' danger' : diskPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('disk-details').textContent = 
+                        data.system.disk_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.disk_total_gb.toFixed(2) + ' GB';
                 }}
             }} catch (error) {{
                 // Silently fail - don't break the page if system metrics fail
@@ -2677,6 +2722,14 @@ async def get_workers_page(request: Request):
                     </div>
                     <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
                 </div>
+                <div class="metric-item">
+                    <div class="metric-label">Disk Usage</div>
+                    <div class="metric-value" id="disk-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="disk-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="disk-details">-</div>
+                </div>
             </div>
         </div>
         
@@ -2780,6 +2833,17 @@ async def get_workers_page(request: Request):
                     document.getElementById('memory-details').textContent = 
                         data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
                         data.system.memory_total_gb.toFixed(2) + ' GB';
+                    
+                    const diskPercent = data.system.disk_percent;
+                    document.getElementById('disk-percent').textContent = diskPercent.toFixed(1) + '%';
+                    const diskProgress = document.getElementById('disk-progress');
+                    diskProgress.style.width = diskPercent + '%';
+                    diskProgress.className = 'progress-fill' + 
+                        (diskPercent > 80 ? ' danger' : diskPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('disk-details').textContent = 
+                        data.system.disk_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.disk_total_gb.toFixed(2) + ' GB';
                 }
             } catch (error) {
                 // Silently fail - don't break the page if system metrics fail
@@ -3079,6 +3143,17 @@ async def get_stats_page(request: Request):
                     document.getElementById('memory-details').textContent = 
                         data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
                         data.system.memory_total_gb.toFixed(2) + ' GB';
+                    
+                    const diskPercent = data.system.disk_percent;
+                    document.getElementById('disk-percent').textContent = diskPercent.toFixed(1) + '%';
+                    const diskProgress = document.getElementById('disk-progress');
+                    diskProgress.style.width = diskPercent + '%';
+                    diskProgress.className = 'progress-fill' + 
+                        (diskPercent > 80 ? ' danger' : diskPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('disk-details').textContent = 
+                        data.system.disk_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.disk_total_gb.toFixed(2) + ' GB';
                 }
                 
                 document.getElementById('error-container').innerHTML = '';
@@ -3445,6 +3520,17 @@ async def get_health_page(request: Request):
                     document.getElementById('memory-details').textContent = 
                         data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
                         data.system.memory_total_gb.toFixed(2) + ' GB';
+                    
+                    const diskPercent = data.system.disk_percent;
+                    document.getElementById('disk-percent').textContent = diskPercent.toFixed(1) + '%';
+                    const diskProgress = document.getElementById('disk-progress');
+                    diskProgress.style.width = diskPercent + '%';
+                    diskProgress.className = 'progress-fill' + 
+                        (diskPercent > 80 ? ' danger' : diskPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('disk-details').textContent = 
+                        data.system.disk_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.disk_total_gb.toFixed(2) + ' GB';
                 }
             } catch (error) {
                 // Silently fail - don't break the page if system metrics fail
@@ -3733,6 +3819,14 @@ async def get_logs_page(request: Request):
                         <div class="progress-fill" id="memory-progress" style="width: 0%"></div>
                     </div>
                     <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Disk Usage</div>
+                    <div class="metric-value" id="disk-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="disk-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="disk-details">-</div>
                 </div>
             </div>
         </div>
@@ -4264,6 +4358,14 @@ async def get_log_detail_page(log_hash: str, request: Request):
                     </div>
                     <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
                 </div>
+                <div class="metric-item">
+                    <div class="metric-label">Disk Usage</div>
+                    <div class="metric-value" id="disk-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="disk-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="disk-details">-</div>
+                </div>
             </div>
         </div>
         
@@ -4713,6 +4815,14 @@ async def get_worker_logs_page(pid: int, request: Request):
                     </div>
                     <div style="font-size: 12px; color: #666; margin-top: 5px;" id="memory-details">-</div>
                 </div>
+                <div class="metric-item">
+                    <div class="metric-label">Disk Usage</div>
+                    <div class="metric-value" id="disk-percent">-</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="disk-progress" style="width: 0%"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;" id="disk-details">-</div>
+                </div>
             </div>
         </div>
         
@@ -4911,6 +5021,17 @@ async def get_worker_logs_page(pid: int, request: Request):
                     document.getElementById('memory-details').textContent = 
                         data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
                         data.system.memory_total_gb.toFixed(2) + ' GB';
+                    
+                    const diskPercent = data.system.disk_percent;
+                    document.getElementById('disk-percent').textContent = diskPercent.toFixed(1) + '%';
+                    const diskProgress = document.getElementById('disk-progress');
+                    diskProgress.style.width = diskPercent + '%';
+                    diskProgress.className = 'progress-fill' + 
+                        (diskPercent > 80 ? ' danger' : diskPercent > 60 ? ' warning' : '');
+                    
+                    document.getElementById('disk-details').textContent = 
+                        data.system.disk_used_gb.toFixed(2) + ' GB / ' + 
+                        data.system.disk_total_gb.toFixed(2) + ' GB';
                 }}
             }} catch (error) {{
                 // Silently fail - don't break the page if system metrics fail
