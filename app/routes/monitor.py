@@ -7,7 +7,7 @@ import hashlib
 logger = logging.getLogger(__name__)
 
 try:
-    from fastapi import APIRouter, Request, HTTPException, status
+    from fastapi import APIRouter, Request, HTTPException, status, Form, Query
     from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
     from starlette.middleware.base import BaseHTTPMiddleware
     from typing import List, Dict, Any, Optional
@@ -21,6 +21,8 @@ try:
     import threading
     from datetime import datetime
     from pathlib import Path
+    import base64
+    from urllib.parse import quote
 except Exception as e:
     logger.error(f"Failed to import standard libraries: {e}")
     logger.error(traceback.format_exc())
@@ -1415,9 +1417,13 @@ async def get_log_details(log_hash: str):
 
 
 @router.get("/login", response_class=HTMLResponse)
-async def get_login_page():
+async def get_login_page(error: Optional[str] = Query(None)):
     """Login page for dashboard access."""
-    html_content = """
+    error_html = ""
+    if error:
+        error_html = f'<div class="error show">{error}</div>'
+    
+    html_content = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1530,9 +1536,9 @@ async def get_login_page():
         <h1>Dashboard Login</h1>
         <p class="subtitle">FRL Python API Monitoring</p>
         
-        <div id="error-message" class="error"></div>
+        {error_html}
         
-        <form id="login-form">
+        <form id="login-form" method="POST" action="/monitor/login">
             <div class="form-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" required autocomplete="username">
@@ -1543,101 +1549,58 @@ async def get_login_page():
                 <input type="password" id="password" name="password" required autocomplete="current-password">
             </div>
             
-            <button type="button" id="login-button" class="btn" onclick="handleLogin()">Login</button>
+            <button type="submit" class="btn">Login</button>
         </form>
     </div>
-    
-    <script>
-        // Immediate test - this should always appear if JavaScript is running
-        console.log('[LOGIN DEBUG] ===== LOGIN PAGE SCRIPT LOADED =====');
-        
-        async function handleLogin() {
-            console.log('[LOGIN DEBUG] ===== LOGIN HANDLER CALLED =====');
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const errorDiv = document.getElementById('error-message');
-            
-            // Debug: Log login attempt (mask password)
-            console.log('[LOGIN DEBUG] Login attempt started');
-            console.log('[LOGIN DEBUG] Username:', username);
-            console.log('[LOGIN DEBUG] Password: **** (masked)');
-            
-            // Clear previous errors
-            errorDiv.classList.remove('show');
-            errorDiv.textContent = '';
-            
-            // Create basic auth header
-            const credentials = btoa(username + ':' + password);
-            console.log('[LOGIN DEBUG] Credentials encoded (base64 length:', credentials.length + ')');
-            
-            try {
-                const requestUrl = '/monitor/dashboard/page';
-                const requestMethod = 'GET';
-                console.log('[LOGIN DEBUG] Making fetch request:', requestMethod, requestUrl);
-                
-                // Test authentication by making a request to a protected HTML endpoint
-                const response = await fetch(requestUrl, {
-                    method: requestMethod,
-                    headers: {
-                        'Authorization': 'Basic ' + credentials
-                    }
-                });
-                
-                console.log('[LOGIN DEBUG] Response received');
-                console.log('[LOGIN DEBUG] Response status:', response.status);
-                console.log('[LOGIN DEBUG] Response statusText:', response.statusText);
-                console.log('[LOGIN DEBUG] Response ok:', response.ok);
-                
-                if (response.ok) {
-                    // Authentication successful - redirect to dashboard
-                    console.log('[LOGIN DEBUG] Authentication successful');
-                    // Store credentials in sessionStorage for future requests
-                    sessionStorage.setItem('authCredentials', credentials);
-                    console.log('[LOGIN DEBUG] Credentials stored in sessionStorage');
-                    console.log('[LOGIN DEBUG] Redirecting to dashboard...');
-                    window.location.href = '/monitor/dashboard/page';
-                } else if (response.status === 401) {
-                    // Authentication failed
-                    console.log('[LOGIN DEBUG] Authentication failed: 401 Unauthorized');
-                    errorDiv.textContent = 'Invalid username or password. Please try again.';
-                    errorDiv.classList.add('show');
-                } else {
-                    console.log('[LOGIN DEBUG] Unexpected response status:', response.status);
-                    errorDiv.textContent = 'An error occurred. Please try again.';
-                    errorDiv.classList.add('show');
-                }
-            } catch (error) {
-                console.error('[LOGIN DEBUG] Exception caught during login:', error);
-                console.error('[LOGIN DEBUG] Error name:', error.name);
-                console.error('[LOGIN DEBUG] Error message:', error.message);
-                console.error('[LOGIN DEBUG] Error stack:', error.stack);
-                errorDiv.textContent = 'Network error. Please check your connection and try again.';
-                errorDiv.classList.add('show');
-                console.error('Login error:', error);
-            }
-        }
-        
-        // Make handleLogin globally available for onclick handler
-        window.handleLogin = handleLogin;
-        console.log('[LOGIN DEBUG] handleLogin function registered globally');
-        
-        // Auto-focus username field
-        try {
-            const usernameField = document.getElementById('username');
-            if (usernameField) {
-                usernameField.focus();
-            } else {
-                console.warn('[LOGIN DEBUG] Username field not found for auto-focus');
-            }
-        } catch (error) {
-            console.error('[LOGIN DEBUG] ERROR: Failed to focus username field:', error);
-        }
-    </script>
 </body>
 </html>
     """
     return HTMLResponse(content=html_content)
+
+
+@router.post("/login", response_class=HTMLResponse)
+async def post_login_page(username: str = Form(...), password: str = Form(...)):
+    """Handle login form submission."""
+    from app.services.auth import validate_dashboard_credentials
+    
+    logger.debug(f"post_login_page: Login attempt for username: {username}")
+    
+    # Validate credentials
+    if validate_dashboard_credentials(username, password):
+        logger.info(f"post_login_page: Authentication successful for username: {username}")
+        
+        # Create base64 encoded credentials
+        credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
+        
+        # Return HTML page that sets sessionStorage and redirects (JavaScript runs on page load, not event handler)
+        html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logging in...</title>
+</head>
+<body>
+    <script>
+        // This script runs on page load (not in an event handler), so it should work even with CSP restrictions
+        console.log('[LOGIN DEBUG] Login success page loaded');
+        const credentials = '{credentials}';
+        console.log('[LOGIN DEBUG] Storing credentials in sessionStorage');
+        sessionStorage.setItem('authCredentials', credentials);
+        console.log('[LOGIN DEBUG] Redirecting to dashboard...');
+        window.location.href = '/monitor/dashboard/page';
+    </script>
+    <p>Logging in...</p>
+</body>
+</html>
+        """
+        return HTMLResponse(content=html_content)
+    else:
+        logger.warning(f"post_login_page: Authentication failed for username: {username}")
+        # Redirect to login page with error
+        error_msg = quote("Invalid username or password. Please try again.")
+        return RedirectResponse(url=f"/monitor/login?error={error_msg}", status_code=302)
 
 
 @router.get("/logout", response_class=HTMLResponse)
