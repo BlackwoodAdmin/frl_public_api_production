@@ -5,7 +5,7 @@ The FRL Python API includes a comprehensive monitoring dashboard for tracking sy
 ## Overview
 
 The monitoring dashboard provides:
-- Real-time system metrics (CPU, memory usage)
+- Real-time system metrics (CPU, memory, disk usage)
 - Worker process monitoring and details
 - Request statistics and error tracking
 - Application log viewing with filtering
@@ -51,7 +51,7 @@ The `validate_dashboard_credentials()` function in `app/services/auth.py` valida
 ### Main Dashboard (`/monitor/dashboard/page`)
 
 The main dashboard provides an overview of:
-- System metrics (CPU usage, memory usage)
+- System metrics (CPU usage, memory usage, disk usage)
 - Request statistics (total requests, requests per minute, average response time, error rate)
 - Active workers count
 - Application uptime
@@ -100,7 +100,7 @@ System health monitoring:
 - Database connectivity status
 - Worker availability status
 - Worker count and master PID
-- System metrics (CPU, memory)
+- System metrics (CPU, memory, disk)
 
 ### Logs Page (`/monitor/logs/page`)
 
@@ -110,7 +110,7 @@ Application log viewer:
 - Adjustable limit (100, 500, 1000, 5000)
 - Auto-scroll and auto-refresh options
 - Click on log timestamps to view detailed log entry information
-- System metrics display
+- System metrics display (CPU, memory, disk)
 
 ### Log Details (`/monitor/log/{log_hash}/page`)
 
@@ -119,7 +119,7 @@ Detailed view of a specific log entry:
 - Raw log message (for copying)
 - Traceback extraction (if present)
 - Metadata (PID, file path, line number, source, log hash)
-- System metrics display
+- System metrics display (CPU, memory, disk)
 
 **Features:**
 - Copy raw message button
@@ -135,7 +135,7 @@ Request statistics and performance metrics:
 - Error rate (only 5xx server errors)
 - Active workers
 - Uptime
-- System metrics (CPU, memory)
+- System metrics (CPU, memory, disk)
 
 ## JSON API Endpoints
 
@@ -161,7 +161,11 @@ Returns combined dashboard data including stats and workers.
       "memory_percent": 45.2,
       "memory_total_gb": 8.0,
       "memory_used_gb": 3.6,
-      "memory_available_gb": 4.4
+      "memory_available_gb": 4.4,
+      "disk_percent": 62.5,
+      "disk_total_gb": 100.0,
+      "disk_used_gb": 62.5,
+      "disk_free_gb": 37.5
     }
   },
   "workers": {
@@ -222,7 +226,11 @@ Returns request statistics and system metrics.
     "memory_percent": 45.2,
     "memory_total_gb": 8.0,
     "memory_used_gb": 3.6,
-    "memory_available_gb": 4.4
+    "memory_available_gb": 4.4,
+    "disk_percent": 62.5,
+    "disk_total_gb": 100.0,
+    "disk_used_gb": 62.5,
+    "disk_free_gb": 37.5
   },
   "timestamp": "2026-01-04T12:00:00Z"
 }
@@ -337,6 +345,11 @@ error_rate = errors / total_requests
 ### Memory Usage
 - Real-time memory usage percentage
 - Total, used, and available memory in GB
+- Updates every 0.5 seconds on dashboard pages
+
+### Disk Usage
+- Real-time disk usage percentage
+- Total, used, and free disk space in GB
 - Updates every 0.5 seconds on dashboard pages
 
 ## Logging Configuration

@@ -189,6 +189,7 @@ frl-python-api/
 ### System Metrics
 - CPU usage monitoring
 - Memory usage monitoring
+- Disk usage monitoring
 - Worker process monitoring
 - System health checks
 
