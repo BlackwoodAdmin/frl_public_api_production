@@ -115,6 +115,7 @@ try:
                 "last_minute_requests": [],
                 "last_reset_time": time.time(),
                 "app_session_id": None,  # Will be set on first load based on master PID
+                "cpu_readings": [],
             }
             with open(STATS_FILE, 'w') as f:
                 json.dump(initial_stats, f)
@@ -155,6 +156,9 @@ def _load_stats() -> Dict[str, Any]:
                 needs_migration = True
             if "app_session_id" not in stats:
                 stats["app_session_id"] = None  # Will trigger reset below
+                needs_migration = True
+            if "cpu_readings" not in stats:
+                stats["cpu_readings"] = []
                 needs_migration = True
             
             if needs_migration:
@@ -204,6 +208,7 @@ def _load_stats() -> Dict[str, Any]:
                                 stats["total_requests"] = 0
                                 stats["request_times"] = []
                                 stats["last_minute_requests"] = []
+                                stats["cpu_readings"] = []
                                 stats["last_reset_time"] = current_time
                                 stats["start_time"] = current_time
                                 stats["app_session_id"] = current_master_pid
@@ -265,6 +270,7 @@ def _load_stats() -> Dict[str, Any]:
                         "last_minute_requests": [],
                         "last_reset_time": time.time(),
                         "app_session_id": None,  # Will be set on first load based on master PID
+                        "cpu_readings": [],
                     }
                     
                     # Create file
@@ -284,6 +290,7 @@ def _load_stats() -> Dict[str, Any]:
             "last_minute_requests": [],
             "last_reset_time": time.time(),
             "app_session_id": None,  # Will be set on first load based on master PID
+            "cpu_readings": [],
         }
 
 
@@ -605,6 +612,28 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
         cpu_count = psutil.cpu_count()
         mem = psutil.virtual_memory()
         
+        # Track CPU readings and calculate 3-second average
+        if "cpu_readings" not in stats:
+            stats["cpu_readings"] = []
+        
+        # Clean old readings (older than 3 seconds)
+        stats["cpu_readings"] = [
+            [t, cpu] for t, cpu in stats["cpu_readings"]
+            if current_time - t < 3
+        ]
+        
+        # Add current reading
+        stats["cpu_readings"].append([current_time, cpu_percent])
+        
+        # Calculate average of readings from last 3 seconds
+        if stats["cpu_readings"]:
+            avg_cpu_percent = sum(cpu for _, cpu in stats["cpu_readings"]) / len(stats["cpu_readings"])
+        else:
+            avg_cpu_percent = cpu_percent
+        
+        # Save updated stats with cleaned cpu_readings
+        _save_stats(stats)
+        
         # Add diagnostic info
         stats_file_exists = STATS_FILE.exists()
         stats_file_size = STATS_FILE.stat().st_size if stats_file_exists else 0
@@ -620,7 +649,7 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
             "active_workers": active_workers,
             "uptime_seconds": int(current_time - stats["start_time"]),
             "system": {
-                "cpu_percent": round(cpu_percent, 2),
+                "cpu_percent": round(avg_cpu_percent, 2),
                 "cpu_count": cpu_count,
                 "memory_percent": round(mem.percent, 2),
                 "memory_total_gb": round(mem.total / 1024 / 1024 / 1024, 2),
