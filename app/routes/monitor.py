@@ -1417,9 +1417,11 @@ async def get_log_details(log_hash: str):
 @router.get("/login", response_class=HTMLResponse)
 async def get_login_page():
     """Login page for dashboard access."""
-    # Add CSP header to allow inline scripts for login page
+    # Add CSP header to allow inline scripts and eval for login page
+    # Note: 'unsafe-eval' is needed even though we don't use eval() directly,
+    # as some browser features or libraries may use it internally
     headers = {
-        "Content-Security-Policy": "script-src 'unsafe-inline' 'self'; default-src 'self'; style-src 'unsafe-inline' 'self';"
+        "Content-Security-Policy": "script-src 'unsafe-inline' 'unsafe-eval' 'self'; default-src 'self'; style-src 'unsafe-inline' 'self';"
     }
     html_content = """
 <!DOCTYPE html>
