@@ -2430,9 +2430,13 @@ async def get_worker_detail_page(pid: int, request: Request):
         fetchSystemMetrics();
         loadWorkerDetails();
         
-        // Auto-refresh every 5 seconds
+        // Auto-refresh system metrics every 0.5 seconds (matching dashboard)
         setInterval(() => {{
             fetchSystemMetrics();
+        }}, 500);
+        
+        // Auto-refresh worker details every 5 seconds
+        setInterval(() => {{
             loadWorkerDetails();
         }}, 5000);
     </script>
@@ -2778,9 +2782,13 @@ async def get_workers_page(request: Request):
         fetchSystemMetrics();
         fetchWorkers();
         
-        // Auto-refresh every 5 seconds
+        // Auto-refresh system metrics every 0.5 seconds (matching dashboard)
         setInterval(() => {
             fetchSystemMetrics();
+        }, 500);
+        
+        // Auto-refresh workers every 5 seconds
+        setInterval(() => {
             fetchWorkers();
         }, 5000);
     </script>
@@ -3075,8 +3083,8 @@ async def get_stats_page(request: Request):
         // Initial load
         fetchStats();
         
-        // Auto-refresh every 5 seconds
-        setInterval(fetchStats, 5000);
+        // Auto-refresh every 0.5 seconds (matching dashboard)
+        setInterval(fetchStats, 500);
     </script>
 </body>
 </html>
@@ -3439,9 +3447,13 @@ async def get_health_page(request: Request):
         fetchSystemMetrics();
         fetchHealth();
         
-        // Auto-refresh every 5 seconds
+        // Auto-refresh system metrics every 0.5 seconds (matching dashboard)
         setInterval(() => {
             fetchSystemMetrics();
+        }, 500);
+        
+        // Auto-refresh health every 5 seconds
+        setInterval(() => {
             fetchHealth();
         }, 5000);
     </script>
@@ -3941,10 +3953,10 @@ async def get_logs_page(request: Request):
         fetchSystemMetrics();
         fetchLogs();
         
-        // Auto-refresh every 5 seconds
+        // Auto-refresh system metrics every 0.5 seconds (matching dashboard)
         setInterval(() => {
             fetchSystemMetrics();
-        }, 5000);
+        }, 500);
     </script>
 </body>
 </html>
@@ -4403,10 +4415,10 @@ async def get_log_detail_page(log_hash: str, request: Request):
         fetchSystemMetrics();
         loadLogDetails();
         
-        // Auto-refresh every 5 seconds
+        // Auto-refresh system metrics every 0.5 seconds (matching dashboard)
         setInterval(() => {{
             fetchSystemMetrics();
-        }}, 5000);
+        }}, 500);
     </script>
 </body>
 </html>
@@ -4901,10 +4913,10 @@ async def get_worker_logs_page(pid: int, request: Request):
         fetchWorkerInfo();
         fetchLogs();
         
-        // Auto-refresh every 5 seconds
+        // Auto-refresh system metrics every 0.5 seconds (matching dashboard)
         setInterval(() => {{
             fetchSystemMetrics();
-        }}, 5000);
+        }}, 500);
     </script>
 </body>
 </html>
