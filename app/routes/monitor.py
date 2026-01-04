@@ -1863,7 +1863,6 @@ async def get_dashboard_page(request: Request):
         <nav class="nav-menu">
             <ul>
                 <li><a href="/monitor/dashboard/page" class="active">Dashboard</a></li>
-                <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
                 <li><a href="/monitor/logout">Logout</a></li>
@@ -2281,7 +2280,6 @@ async def get_worker_detail_page(pid: int, request: Request):
         <nav class="nav-menu">
             <ul>
                 <li><a href="/monitor/dashboard/page">Dashboard</a></li>
-                <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
                 <li><a href="/monitor/logout">Logout</a></li>
@@ -2697,7 +2695,6 @@ async def get_workers_page(request: Request):
         <nav class="nav-menu">
             <ul>
                 <li><a href="/monitor/dashboard/page">Dashboard</a></li>
-                <li><a href="/monitor/workers/page" class="active">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
                 <li><a href="/monitor/logout">Logout</a></li>
@@ -3032,7 +3029,6 @@ async def get_stats_page(request: Request):
         <nav class="nav-menu">
             <ul>
                 <li><a href="/monitor/dashboard/page">Dashboard</a></li>
-                <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
                 <li><a href="/monitor/logout">Logout</a></li>
@@ -3401,7 +3397,6 @@ async def get_health_page(request: Request):
         <nav class="nav-menu">
             <ul>
                 <li><a href="/monitor/dashboard/page">Dashboard</a></li>
-                <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page" class="active">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
                 <li><a href="/monitor/logout">Logout</a></li>
@@ -3804,7 +3799,6 @@ async def get_logs_page(request: Request):
         <nav class="nav-menu">
             <ul>
                 <li><a href="/monitor/dashboard/page">Dashboard</a></li>
-                <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page" class="active">Logs</a></li>
             </ul>
@@ -4352,7 +4346,6 @@ async def get_log_detail_page(log_hash: str, request: Request):
         <nav class="nav-menu">
             <ul>
                 <li><a href="/monitor/dashboard/page">Dashboard</a></li>
-                <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page" class="active">Logs</a></li>
                 <li><a href="/monitor/logout">Logout</a></li>
@@ -4820,7 +4813,6 @@ async def get_worker_logs_page(pid: int, request: Request):
         <nav class="nav-menu">
             <ul>
                 <li><a href="/monitor/dashboard/page">Dashboard</a></li>
-                <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
                 <li><a href="/monitor/logout">Logout</a></li>
