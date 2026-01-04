@@ -40,27 +40,46 @@ def check_auth_for_html(request: Request):
     import base64
     from app.services.auth import validate_dashboard_credentials
     
+    logger.debug("check_auth_for_html: Authentication check started")
+    
     try:
         # Extract Authorization header
         auth_header = request.headers.get("Authorization")
+        logger.debug(f"check_auth_for_html: Authorization header present: {auth_header is not None}")
+        
         if not auth_header or not auth_header.startswith("Basic "):
+            if not auth_header:
+                logger.debug("check_auth_for_html: Authorization header is missing")
+            elif not auth_header.startswith("Basic "):
+                logger.debug(f"check_auth_for_html: Authorization header does not start with 'Basic ': {auth_header[:20]}...")
             return None, RedirectResponse(url="/monitor/login", status_code=302)
         
         # Decode Basic Auth credentials
         encoded_credentials = auth_header.split(" ")[1]
+        logger.debug(f"check_auth_for_html: Encoded credentials length: {len(encoded_credentials)}")
+        
         try:
             decoded_credentials = base64.b64decode(encoded_credentials).decode("utf-8")
             username, password = decoded_credentials.split(":", 1)
-        except (ValueError, UnicodeDecodeError):
+            logger.debug(f"check_auth_for_html: Credentials decoded successfully. Username: {username}, Password: **** (masked)")
+        except (ValueError, UnicodeDecodeError) as decode_error:
+            logger.warning(f"check_auth_for_html: Failed to decode credentials: {decode_error}")
             return None, RedirectResponse(url="/monitor/login", status_code=302)
         
         # Validate credentials
-        if not validate_dashboard_credentials(username, password):
+        logger.debug(f"check_auth_for_html: Calling validate_dashboard_credentials for username: {username}")
+        validation_result = validate_dashboard_credentials(username, password)
+        logger.debug(f"check_auth_for_html: Validation result: {validation_result}")
+        
+        if not validation_result:
+            logger.warning(f"check_auth_for_html: Credential validation failed for username: {username}")
             return None, RedirectResponse(url="/monitor/login", status_code=302)
         
+        logger.info(f"check_auth_for_html: Authentication successful for username: {username}")
         return username, None
     except Exception as e:
-        logger.error(f"Error in HTML dashboard authentication: {e}")
+        logger.error(f"check_auth_for_html: Error in HTML dashboard authentication: {e}")
+        logger.error(f"check_auth_for_html: Exception traceback: {traceback.format_exc()}")
         return None, RedirectResponse(url="/monitor/login", status_code=302)
 
 # File-based stats storage (shared across workers)
@@ -1536,36 +1555,60 @@ async def get_login_page():
             const password = document.getElementById('password').value;
             const errorDiv = document.getElementById('error-message');
             
+            // Debug: Log login attempt (mask password)
+            console.log('[LOGIN DEBUG] Login attempt started');
+            console.log('[LOGIN DEBUG] Username:', username);
+            console.log('[LOGIN DEBUG] Password: **** (masked)');
+            
             // Clear previous errors
             errorDiv.classList.remove('show');
             errorDiv.textContent = '';
             
             // Create basic auth header
             const credentials = btoa(username + ':' + password);
+            console.log('[LOGIN DEBUG] Credentials encoded (base64 length:', credentials.length + ')');
             
             try {
+                const requestUrl = '/monitor/dashboard/page';
+                const requestMethod = 'GET';
+                console.log('[LOGIN DEBUG] Making fetch request:', requestMethod, requestUrl);
+                
                 // Test authentication by making a request to a protected HTML endpoint
-                const response = await fetch('/monitor/dashboard/page', {
-                    method: 'GET',
+                const response = await fetch(requestUrl, {
+                    method: requestMethod,
                     headers: {
                         'Authorization': 'Basic ' + credentials
                     }
                 });
                 
+                console.log('[LOGIN DEBUG] Response received');
+                console.log('[LOGIN DEBUG] Response status:', response.status);
+                console.log('[LOGIN DEBUG] Response statusText:', response.statusText);
+                console.log('[LOGIN DEBUG] Response ok:', response.ok);
+                
                 if (response.ok) {
                     // Authentication successful - redirect to dashboard
+                    console.log('[LOGIN DEBUG] Authentication successful');
                     // Store credentials in sessionStorage for future requests
                     sessionStorage.setItem('authCredentials', credentials);
+                    console.log('[LOGIN DEBUG] Credentials stored in sessionStorage');
+                    console.log('[LOGIN DEBUG] Redirecting to dashboard...');
                     window.location.href = '/monitor/dashboard/page';
                 } else if (response.status === 401) {
                     // Authentication failed
+                    console.log('[LOGIN DEBUG] Authentication failed: 401 Unauthorized');
                     errorDiv.textContent = 'Invalid username or password. Please try again.';
                     errorDiv.classList.add('show');
                 } else {
+                    console.log('[LOGIN DEBUG] Unexpected response status:', response.status);
                     errorDiv.textContent = 'An error occurred. Please try again.';
                     errorDiv.classList.add('show');
                 }
             } catch (error) {
+                console.error('[LOGIN DEBUG] Exception caught during login:', error);
+                console.error('[LOGIN DEBUG] Error name:', error.name);
+                console.error('[LOGIN DEBUG] Error message:', error.message);
+                console.error('[LOGIN DEBUG] Error stack:', error.stack);
                 errorDiv.textContent = 'Network error. Please check your connection and try again.';
                 errorDiv.classList.add('show');
                 console.error('Login error:', error);
