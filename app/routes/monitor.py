@@ -1548,7 +1548,18 @@ async def get_login_page():
     </div>
     
     <script>
-        document.getElementById('login-form').addEventListener('submit', async function(e) {
+        // Immediate test - this should always appear if JavaScript is running
+        console.log('[LOGIN DEBUG] ===== LOGIN PAGE SCRIPT LOADED =====');
+        
+        try {
+            const loginForm = document.getElementById('login-form');
+            console.log('[LOGIN DEBUG] Login form element found:', loginForm !== null);
+            
+            if (!loginForm) {
+                console.error('[LOGIN DEBUG] ERROR: Login form element not found!');
+            } else {
+                console.log('[LOGIN DEBUG] Attaching submit event listener to login form');
+                loginForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const username = document.getElementById('username').value;
@@ -1613,10 +1624,24 @@ async def get_login_page():
                 errorDiv.classList.add('show');
                 console.error('Login error:', error);
             }
-        });
+                });
+            }
+        } catch (error) {
+            console.error('[LOGIN DEBUG] ERROR: Failed to attach login form handler:', error);
+            console.error('[LOGIN DEBUG] Error details:', error.name, error.message, error.stack);
+        }
         
         // Auto-focus username field
-        document.getElementById('username').focus();
+        try {
+            const usernameField = document.getElementById('username');
+            if (usernameField) {
+                usernameField.focus();
+            } else {
+                console.warn('[LOGIN DEBUG] Username field not found for auto-focus');
+            }
+        } catch (error) {
+            console.error('[LOGIN DEBUG] ERROR: Failed to focus username field:', error);
+        }
     </script>
 </body>
 </html>
