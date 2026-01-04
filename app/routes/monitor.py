@@ -3940,6 +3940,11 @@ async def get_logs_page(request: Request):
         // Initial load
         fetchSystemMetrics();
         fetchLogs();
+        
+        // Auto-refresh every 5 seconds
+        setInterval(() => {
+            fetchSystemMetrics();
+        }, 5000);
     </script>
 </body>
 </html>
@@ -4397,6 +4402,11 @@ async def get_log_detail_page(log_hash: str, request: Request):
         // Initial load
         fetchSystemMetrics();
         loadLogDetails();
+        
+        // Auto-refresh every 5 seconds
+        setInterval(() => {{
+            fetchSystemMetrics();
+        }}, 5000);
     </script>
 </body>
 </html>
@@ -4890,6 +4900,11 @@ async def get_worker_logs_page(pid: int, request: Request):
         fetchSystemMetrics();
         fetchWorkerInfo();
         fetchLogs();
+        
+        // Auto-refresh every 5 seconds
+        setInterval(() => {{
+            fetchSystemMetrics();
+        }}, 5000);
     </script>
 </body>
 </html>
