@@ -4248,38 +4248,19 @@ async def get_log_detail_page(log_hash: str, request: Request):
     
     <script>
         async function loadLogDetails() {{
-            console.log('loadLogDetails() function called');
-            const url = '/monitor/log/{log_hash}';
-            console.log('Fetch URL:', url);
-            console.log('About to call fetch...');
-            
             try {{
-                console.log('Starting fetch request to:', url);
-                const response = await fetch(url);
-                console.log('Fetch completed. Response status:', response.status, response.statusText);
-                console.log('Response ok?', response.ok);
-                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+                const response = await fetch('/monitor/log/{log_hash}');
                 
                 if (!response.ok) {{
-                    console.error('Response not OK. Status:', response.status);
-                    const errorText = await response.text();
-                    console.error('Response error text:', errorText);
                     throw new Error(`HTTP ${{response.status}}: ${{response.statusText}}`);
                 }}
                 
                 const contentType = response.headers.get('content-type');
-                console.log('Content-Type:', contentType);
                 if (!contentType || !contentType.includes('application/json')) {{
-                    console.error('Non-JSON content type detected');
-                    const responseText = await response.text();
-                    console.error('Non-JSON response received (first 500 chars):', responseText.substring(0, 500));
-                    throw new Error('Server returned non-JSON response. Content-Type: ' + contentType);
+                    throw new Error('Server returned non-JSON response. Authentication may have failed.');
                 }}
                 
-                console.log('Parsing JSON response...');
                 const data = await response.json();
-                console.log('JSON parsed successfully. Data keys:', Object.keys(data));
-                console.log('Log details data:', data);
                 
                 if (data.error) {{
                     document.getElementById('log-details').innerHTML = 
@@ -4356,29 +4337,11 @@ async def get_log_detail_page(log_hash: str, request: Request):
                 html += '</div>';
                 
                 document.getElementById('log-details').innerHTML = html;
-                console.log('Log details HTML successfully inserted into DOM');
             }} catch (error) {{
-                console.error('=== ERROR IN loadLogDetails() ===');
-                console.error('Error type:', error.constructor.name);
-                console.error('Error message:', error.message);
-                console.error('Error stack:', error.stack);
-                console.error('Full error object:', error);
-                
-                const errorHtml = '<div class="error">Error loading log details: ' + escapeHtml(error.message) + '</div>';
-                console.log('Setting error HTML:', errorHtml);
-                
-                const logDetailsElement = document.getElementById('log-details');
-                if (logDetailsElement) {{
-                    logDetailsElement.innerHTML = errorHtml;
-                    console.log('Error message inserted into DOM');
-                }} else {{
-                    console.error('ERROR: log-details element not found in DOM!');
-                }}
+                document.getElementById('log-details').innerHTML = 
+                    '<div class="error">Error loading log details: ' + escapeHtml(error.message) + '</div>';
             }}
         }}
-        
-        console.log('loadLogDetails function defined. About to call it...');
-        console.log('DOM ready state:', document.readyState);
         
         function escapeHtml(text) {{
             const div = document.createElement('div');
@@ -4432,13 +4395,8 @@ async def get_log_detail_page(log_hash: str, request: Request):
         }}
         
         // Initial load
-        console.log('Starting initial page load functions...');
         fetchSystemMetrics();
-        console.log('Calling loadLogDetails() now...');
-        loadLogDetails().catch(err => {{
-            console.error('Unhandled error in loadLogDetails():', err);
-        }});
-        console.log('Initial load functions called');
+        loadLogDetails();
     </script>
 </body>
 </html>
