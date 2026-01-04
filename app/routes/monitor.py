@@ -4247,8 +4247,6 @@ async def get_log_detail_page(log_hash: str, request: Request):
     </div>
     
     <script>
-        console.log('Script loaded. Log hash from URL: {log_hash}');
-        
         async function loadLogDetails() {{
             console.log('loadLogDetails() function called');
             const url = '/monitor/log/{log_hash}';
