@@ -1560,7 +1560,8 @@ async def get_login_page():
             } else {
                 console.log('[LOGIN DEBUG] Attaching submit event listener to login form');
                 loginForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
+                    console.log('[LOGIN DEBUG] ===== FORM SUBMIT EVENT FIRED =====');
+                    e.preventDefault();
             
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
