@@ -205,8 +205,8 @@ def _load_stats() -> Dict[str, Any]:
                                 stats["request_times"] = []
                                 stats["last_minute_requests"] = []
                                 stats["last_reset_time"] = current_time
+                                stats["start_time"] = current_time
                                 stats["app_session_id"] = current_master_pid
-                                # Keep start_time unchanged (for uptime calculation)
                                 
                                 # Save reset stats
                                 with open(STATS_FILE, 'w') as f:
