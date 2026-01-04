@@ -1417,6 +1417,10 @@ async def get_log_details(log_hash: str):
 @router.get("/login", response_class=HTMLResponse)
 async def get_login_page():
     """Login page for dashboard access."""
+    # Add CSP header to allow inline scripts for login page
+    headers = {
+        "Content-Security-Policy": "script-src 'unsafe-inline' 'self'; default-src 'self'; style-src 'unsafe-inline' 'self';"
+    }
     html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -1647,7 +1651,7 @@ async def get_login_page():
 </body>
 </html>
     """
-    return HTMLResponse(content=html_content)
+    return HTMLResponse(content=html_content, headers=headers)
 
 
 @router.get("/logout", response_class=HTMLResponse)
