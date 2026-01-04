@@ -18,6 +18,7 @@ try:
     import fcntl
     import subprocess
     import shutil
+    import threading
     from datetime import datetime
     from pathlib import Path
 except Exception as e:
@@ -61,6 +62,14 @@ async def verify_dashboard_access(credentials: HTTPBasicCredentials = Depends(se
 # File-based stats storage (shared across workers)
 STATS_FILE = Path("/var/run/frl-python-api/stats.json")
 STATS_LOCK_FILE = Path("/var/run/frl-python-api/stats.lock")
+
+# Cache for system metrics (reduces file I/O and process enumeration)
+_system_metrics_cache = {
+    "data": None,
+    "timestamp": 0,
+    "lock": threading.Lock()
+}
+SYSTEM_METRICS_CACHE_TTL = 0.5  # Cache for 0.5 seconds
 
 # Log file configuration
 LOG_FILE_PATH = os.getenv("LOG_FILE_PATH", "/var/log/frl-python-api/app.log")
@@ -541,17 +550,55 @@ def _extract_journalctl_log_level(line: str) -> str:
     return _extract_log_level(line)
 
 
+def _get_cached_system_metrics():
+    """Get system metrics with caching to reduce file I/O and process enumeration."""
+    current_time = time.time()
+    
+    with _system_metrics_cache["lock"]:
+        # Check if cache is valid
+        if (_system_metrics_cache["data"] is not None and 
+            current_time - _system_metrics_cache["timestamp"] < SYSTEM_METRICS_CACHE_TTL):
+            return _system_metrics_cache["data"]
+        
+        # Cache expired or missing - refresh it
+        # Get active workers
+        workers, _ = _get_gunicorn_processes()
+        active_workers = len([w for w in workers if w.get('status') == 'running'])
+        
+        # Get system CPU and memory usage
+        # Establish baseline for cpu_percent (non-blocking call)
+        psutil.cpu_percent(interval=None)
+        # Get cached CPU percentage (non-blocking)
+        cpu_percent = psutil.cpu_percent(interval=0)
+        cpu_count = psutil.cpu_count()
+        mem = psutil.virtual_memory()
+        
+        # Cache the metrics
+        _system_metrics_cache["data"] = {
+            "active_workers": active_workers,
+            "cpu_percent": cpu_percent,
+            "cpu_count": cpu_count,
+            "mem": mem
+        }
+        _system_metrics_cache["timestamp"] = current_time
+        
+        return _system_metrics_cache["data"]
+
+
 @router.get("/workers", response_class=JSONResponse)
 async def get_workers(username: str = Depends(verify_dashboard_access)):
     """Get Gunicorn worker process information."""
     try:
         workers, master_pid = _get_gunicorn_processes()
         
-        # Update CPU percentages (needs a small delay for accurate reading)
+        # Update CPU percentages (non-blocking)
         for worker in workers:
             try:
                 proc = psutil.Process(worker['pid'])
-                worker['cpu_percent'] = proc.cpu_percent(interval=0.1)
+                # Establish baseline (non-blocking)
+                proc.cpu_percent(interval=None)
+                # Get cached CPU percentage (non-blocking)
+                worker['cpu_percent'] = proc.cpu_percent(interval=0)
                 mem_info = proc.memory_info()
                 worker['memory_mb'] = round(mem_info.rss / 1024 / 1024, 2)
             except (psutil.NoSuchProcess, psutil.AccessDenied):
@@ -600,17 +647,12 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
         total_requests = stats["total_requests"]
         error_rate = stats["errors"] / total_requests if total_requests > 0 else 0
         
-        # Get active workers
-        workers, _ = _get_gunicorn_processes()
-        active_workers = len([w for w in workers if w.get('status') == 'running'])
-        
-        # Get system CPU and memory usage
-        # Establish baseline for cpu_percent (non-blocking call)
-        psutil.cpu_percent(interval=None)
-        # Get cached CPU percentage (non-blocking)
-        cpu_percent = psutil.cpu_percent(interval=0)
-        cpu_count = psutil.cpu_count()
-        mem = psutil.virtual_memory()
+        # Get cached system metrics (reduces file I/O and process enumeration)
+        cached_metrics = _get_cached_system_metrics()
+        active_workers = cached_metrics["active_workers"]
+        cpu_percent = cached_metrics["cpu_percent"]
+        cpu_count = cached_metrics["cpu_count"]
+        mem = cached_metrics["mem"]
         
         # Add diagnostic info
         stats_file_exists = STATS_FILE.exists()
@@ -1566,7 +1608,7 @@ async def get_dashboard(username: str = Depends(verify_dashboard_access)):
             <h1>Gunicorn Worker Monitor</h1>
             <div class="refresh-indicator">
                 <div class="refresh-dot"></div>
-                <span>Auto-refreshing every 0.1 seconds</span>
+                <span>Auto-refreshing every 0.5 seconds</span>
             </div>
         </header>
         
@@ -1726,8 +1768,8 @@ async def get_dashboard(username: str = Depends(verify_dashboard_access)):
         // Initial load
         refresh();
         
-        // Auto-refresh every 0.1 seconds
-        setInterval(refresh, 100);
+        // Auto-refresh every 0.5 seconds
+        setInterval(refresh, 500);
     </script>
 </body>
 </html>
