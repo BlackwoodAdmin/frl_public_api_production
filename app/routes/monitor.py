@@ -67,7 +67,8 @@ STATS_LOCK_FILE = Path("/var/run/frl-python-api/stats.lock")
 _system_metrics_cache = {
     "data": None,
     "timestamp": 0,
-    "lock": threading.Lock()
+    "lock": threading.Lock(),
+    "cpu_baseline_set": False  # Track if CPU baseline has been established
 }
 SYSTEM_METRICS_CACHE_TTL = 0.5  # Cache for 0.5 seconds
 
@@ -591,10 +592,16 @@ def _get_cached_system_metrics():
         active_workers = len([w for w in workers if w.get('status') == 'running'])
         
         # Get system CPU and memory usage
-        # Establish baseline for cpu_percent (non-blocking call)
-        psutil.cpu_percent(interval=None)
-        # Get cached CPU percentage (non-blocking)
-        cpu_percent = psutil.cpu_percent(interval=0)
+        # For first call, use small interval to establish measurement
+        # For subsequent calls, use cached value (interval=0)
+        if not _system_metrics_cache["cpu_baseline_set"]:
+            # First call: establish baseline with small measurement
+            psutil.cpu_percent(interval=None)  # Reset internal counter
+            cpu_percent = psutil.cpu_percent(interval=0.1)  # Measure over 0.1s
+            _system_metrics_cache["cpu_baseline_set"] = True
+        else:
+            # Subsequent calls: use cached value (non-blocking)
+            cpu_percent = psutil.cpu_percent(interval=0)
         cpu_count = psutil.cpu_count()
         mem = psutil.virtual_memory()
         
