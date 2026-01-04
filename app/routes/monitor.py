@@ -607,8 +607,8 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
         # Get system CPU and memory usage
         # Establish baseline for cpu_percent (non-blocking call)
         psutil.cpu_percent(interval=None)
-        # Get actual CPU percentage (blocks for 0.1s to measure)
-        cpu_percent = psutil.cpu_percent(interval=0.1)
+        # Get cached CPU percentage (non-blocking)
+        cpu_percent = psutil.cpu_percent(interval=0)
         cpu_count = psutil.cpu_count()
         mem = psutil.virtual_memory()
         
