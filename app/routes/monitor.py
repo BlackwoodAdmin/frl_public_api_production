@@ -747,6 +747,50 @@ async def get_stats(username: str = Depends(verify_dashboard_access)):
         }
 
 
+@router.get("/dashboard", response_class=JSONResponse)
+async def get_dashboard(username: str = Depends(verify_dashboard_access)):
+    """Get dashboard data (combined stats and workers)."""
+    try:
+        # Get stats and workers data
+        stats_data = await get_stats(username)
+        workers_data = await get_workers(username)
+        
+        return {
+            "stats": stats_data,
+            "workers": workers_data,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+    except Exception as e:
+        logger.error(f"Error getting dashboard data: {e}")
+        return {
+            "error": str(e),
+            "stats": {
+                "error": str(e),
+                "total_requests": 0,
+                "requests_per_minute": 0,
+                "average_response_time_ms": 0,
+                "error_rate": 0,
+                "active_workers": 0,
+                "uptime_seconds": 0,
+                "system": {
+                    "cpu_percent": 0,
+                    "cpu_count": 0,
+                    "memory_percent": 0,
+                    "memory_total_gb": 0,
+                    "memory_used_gb": 0,
+                    "memory_available_gb": 0
+                }
+            },
+            "workers": {
+                "error": str(e),
+                "master_pid": None,
+                "total_workers": 0,
+                "workers": []
+            },
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+
+
 @router.get("/worker/{pid}", response_class=JSONResponse)
 async def get_worker_details(pid: int, username: str = Depends(verify_dashboard_access)):
     """Get detailed information about a specific worker process."""
@@ -1359,8 +1403,8 @@ async def get_login_page():
     return HTMLResponse(content=html_content)
 
 
-@router.get("/dashboard", response_class=HTMLResponse)
-async def get_dashboard(username: str = Depends(verify_dashboard_access)):
+@router.get("/dashboard/page", response_class=HTMLResponse)
+async def get_dashboard_page(username: str = Depends(verify_dashboard_access)):
     """HTML dashboard for monitoring Gunicorn workers."""
     html_content = """
 <!DOCTYPE html>
@@ -1613,7 +1657,7 @@ async def get_dashboard(username: str = Depends(verify_dashboard_access)):
     <div class="container">
         <nav class="nav-menu">
             <ul>
-                <li><a href="/monitor/dashboard" class="active">Dashboard</a></li>
+                <li><a href="/monitor/dashboard/page" class="active">Dashboard</a></li>
                 <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
@@ -1702,56 +1746,9 @@ async def get_dashboard(username: str = Depends(verify_dashboard_access)):
             return mb.toFixed(2) + ' MB';
         }
         
-        async function fetchWorkers() {
+        async function fetchDashboard() {
             try {
-                const response = await fetch('/monitor/workers');
-                const data = await response.json();
-                
-                if (data.error) {
-                    document.getElementById('workers-container').innerHTML = 
-                        '<div class="error">Error: ' + data.error + '</div>';
-                    return;
-                }
-                
-                if (data.workers.length === 0) {
-                    document.getElementById('workers-container').innerHTML = 
-                        '<div class="loading">No workers found. Make sure Gunicorn is running.</div>';
-                    return;
-                }
-                
-                let html = '<table><thead><tr>';
-                html += '<th>PID</th>';
-                html += '<th>CPU %</th>';
-                html += '<th>Memory</th>';
-                html += '<th>Uptime</th>';
-                html += '<th>Status</th>';
-                html += '</tr></thead><tbody>';
-                
-                data.workers.forEach(worker => {
-                    html += '<tr>';
-                    html += '<td><a href="/monitor/worker/' + worker.pid + '/page" class="worker-link">' + worker.pid + '</a></td>';
-                    html += '<td>' + worker.cpu_percent.toFixed(2) + '%</td>';
-                    html += '<td>' + formatMemory(worker.memory_mb) + '</td>';
-                    html += '<td class="uptime">' + formatUptime(worker.uptime_seconds) + '</td>';
-                    html += '<td><span class="status-badge status-' + worker.status + '">' + worker.status + '</span></td>';
-                    html += '</tr>';
-                });
-                
-                html += '</tbody></table>';
-                html += '<div style="margin-top: 10px; color: #666; font-size: 12px;">';
-                html += 'Master PID: ' + (data.master_pid || 'N/A') + ' | Total Workers: ' + data.total_workers;
-                html += '</div>';
-                
-                document.getElementById('workers-container').innerHTML = html;
-            } catch (error) {
-                document.getElementById('workers-container').innerHTML = 
-                    '<div class="error">Error fetching workers: ' + error.message + '</div>';
-            }
-        }
-        
-        async function fetchStats() {
-            try {
-                const response = await fetch('/monitor/stats');
+                const response = await fetch('/monitor/dashboard');
                 const data = await response.json();
                 
                 if (data.error) {
@@ -1760,19 +1757,29 @@ async def get_dashboard(username: str = Depends(verify_dashboard_access)):
                     return;
                 }
                 
-                document.getElementById('total-requests').textContent = data.total_requests.toLocaleString();
-                document.getElementById('requests-per-minute').textContent = data.requests_per_minute;
+                const stats = data.stats || {};
+                const workers = data.workers || {};
+                
+                // Handle stats data
+                if (stats.error) {
+                    document.getElementById('error-container').innerHTML = 
+                        '<div class="error">Error: ' + stats.error + '</div>';
+                    return;
+                }
+                
+                document.getElementById('total-requests').textContent = stats.total_requests.toLocaleString();
+                document.getElementById('requests-per-minute').textContent = stats.requests_per_minute;
                 document.getElementById('avg-response-time').innerHTML = 
-                    data.average_response_time_ms.toFixed(2) + '<span class="stat-unit"> ms</span>';
+                    stats.average_response_time_ms.toFixed(2) + '<span class="stat-unit"> ms</span>';
                 document.getElementById('error-rate').innerHTML = 
-                    (data.error_rate * 100).toFixed(2) + '<span class="stat-unit">%</span>';
-                document.getElementById('active-workers').textContent = data.active_workers;
-                document.getElementById('uptime').textContent = formatUptime(data.uptime_seconds);
+                    (stats.error_rate * 100).toFixed(2) + '<span class="stat-unit">%</span>';
+                document.getElementById('active-workers').textContent = stats.active_workers;
+                document.getElementById('uptime').textContent = formatUptime(stats.uptime_seconds);
                 
                 // Update system metrics
-                if (data.system) {
-                    const cpuPercent = data.system.cpu_percent;
-                    const memPercent = data.system.memory_percent;
+                if (stats.system) {
+                    const cpuPercent = stats.system.cpu_percent;
+                    const memPercent = stats.system.memory_percent;
                     
                     document.getElementById('cpu-percent').textContent = cpuPercent.toFixed(1) + '%';
                     const cpuProgress = document.getElementById('cpu-progress');
@@ -1787,19 +1794,56 @@ async def get_dashboard(username: str = Depends(verify_dashboard_access)):
                         (memPercent > 80 ? ' danger' : memPercent > 60 ? ' warning' : '');
                     
                     document.getElementById('memory-details').textContent = 
-                        data.system.memory_used_gb.toFixed(2) + ' GB / ' + 
-                        data.system.memory_total_gb.toFixed(2) + ' GB';
+                        stats.system.memory_used_gb.toFixed(2) + ' GB / ' + 
+                        stats.system.memory_total_gb.toFixed(2) + ' GB';
                 }
                 
+                // Handle workers data
+                if (workers.error) {
+                    document.getElementById('workers-container').innerHTML = 
+                        '<div class="error">Error: ' + workers.error + '</div>';
+                    return;
+                }
+                
+                if (!workers.workers || workers.workers.length === 0) {
+                    document.getElementById('workers-container').innerHTML = 
+                        '<div class="loading">No workers found. Make sure Gunicorn is running.</div>';
+                    return;
+                }
+                
+                let html = '<table><thead><tr>';
+                html += '<th>PID</th>';
+                html += '<th>CPU %</th>';
+                html += '<th>Memory</th>';
+                html += '<th>Uptime</th>';
+                html += '<th>Status</th>';
+                html += '</tr></thead><tbody>';
+                
+                workers.workers.forEach(worker => {
+                    html += '<tr>';
+                    html += '<td><a href="/monitor/worker/' + worker.pid + '/page" class="worker-link">' + worker.pid + '</a></td>';
+                    html += '<td>' + worker.cpu_percent.toFixed(2) + '%</td>';
+                    html += '<td>' + formatMemory(worker.memory_mb) + '</td>';
+                    html += '<td class="uptime">' + formatUptime(worker.uptime_seconds) + '</td>';
+                    html += '<td><span class="status-badge status-' + worker.status + '">' + worker.status + '</span></td>';
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table>';
+                html += '<div style="margin-top: 10px; color: #666; font-size: 12px;">';
+                html += 'Master PID: ' + (workers.master_pid || 'N/A') + ' | Total Workers: ' + workers.total_workers;
+                html += '</div>';
+                
+                document.getElementById('workers-container').innerHTML = html;
                 document.getElementById('error-container').innerHTML = '';
             } catch (error) {
                 document.getElementById('error-container').innerHTML = 
-                    '<div class="error">Error fetching stats: ' + error.message + '</div>';
+                    '<div class="error">Error fetching dashboard: ' + error.message + '</div>';
             }
         }
         
         async function refresh() {
-            await Promise.all([fetchWorkers(), fetchStats()]);
+            await fetchDashboard();
         }
         
         // Initial load
@@ -2008,7 +2052,7 @@ async def get_worker_detail_page(pid: int, username: str = Depends(verify_dashbo
     <div class="container">
         <nav class="nav-menu">
             <ul>
-                <li><a href="/monitor/dashboard">Dashboard</a></li>
+                <li><a href="/monitor/dashboard/page">Dashboard</a></li>
                 <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
@@ -2036,7 +2080,7 @@ async def get_worker_detail_page(pid: int, username: str = Depends(verify_dashbo
             </div>
         </div>
         
-        <a href="/monitor/dashboard" class="back-link">← Back to Dashboard</a>
+        <a href="/monitor/dashboard/page" class="back-link">← Back to Dashboard</a>
         
         <div id="worker-details" class="loading">Loading worker details...</div>
     </div>
@@ -2397,7 +2441,7 @@ async def get_workers_page(username: str = Depends(verify_dashboard_access)):
     <div class="container">
         <nav class="nav-menu">
             <ul>
-                <li><a href="/monitor/dashboard">Dashboard</a></li>
+                <li><a href="/monitor/dashboard/page">Dashboard</a></li>
                 <li><a href="/monitor/workers/page" class="active">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
@@ -2705,7 +2749,7 @@ async def get_stats_page(username: str = Depends(verify_dashboard_access)):
     <div class="container">
         <nav class="nav-menu">
             <ul>
-                <li><a href="/monitor/dashboard">Dashboard</a></li>
+                <li><a href="/monitor/dashboard/page">Dashboard</a></li>
                 <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
@@ -3051,7 +3095,7 @@ async def get_health_page(username: str = Depends(verify_dashboard_access)):
     <div class="container">
         <nav class="nav-menu">
             <ul>
-                <li><a href="/monitor/dashboard">Dashboard</a></li>
+                <li><a href="/monitor/dashboard/page">Dashboard</a></li>
                 <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page" class="active">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
@@ -3424,7 +3468,7 @@ async def get_logs_page(username: str = Depends(verify_dashboard_access)):
     <div class="container">
         <nav class="nav-menu">
             <ul>
-                <li><a href="/monitor/dashboard">Dashboard</a></li>
+                <li><a href="/monitor/dashboard/page">Dashboard</a></li>
                 <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page" class="active">Logs</a></li>
@@ -3871,7 +3915,7 @@ async def get_worker_logs_page(pid: int, username: str = Depends(verify_dashboar
     <div class="container">
         <nav class="nav-menu">
             <ul>
-                <li><a href="/monitor/dashboard">Dashboard</a></li>
+                <li><a href="/monitor/dashboard/page">Dashboard</a></li>
                 <li><a href="/monitor/workers/page">Workers</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
