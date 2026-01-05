@@ -419,18 +419,17 @@ img.align-left { max-width:100%!important;" }
         # #endregion
         
         if action_empty:
-            # For CMS sites with empty Action, generate footer HTML
+            # For CMS sites with empty Action, return empty content (CMS handles its own content)
             # #region agent log
             try:
                 import os
                 log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
                 with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:414","message":"Returning footer for CMS site with empty Action","data":{},"timestamp":int(__import__("time").time()*1000)})+"\n")
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:414","message":"Returning empty for CMS site with empty Action","data":{},"timestamp":int(__import__("time").time()*1000)})+"\n")
             except Exception:
                 pass
             # #endregion
-            footer_html = build_footer_wp(domainid, domain_category, domain_settings)
-            return HTMLResponse(content=footer_html)
+            return HTMLResponse(content="")
     
     # PHP Articles.php: if script_version >= 3 and wp_plugin != 1 and iswin != 1 and usepurl != 0
     # then call seo_automation_build_footer30 (similar to build_footer_wp)
@@ -504,6 +503,15 @@ img.align-left { max-width:100%!important;" }
     if action_empty and webworkscms != 1:
         # Generate footer HTML for non-CMS sites when Action is empty
         footer_html = build_footer_wp(domainid, domain_category, domain_settings)
+        # #region agent log
+        try:
+            import os
+            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"articles.py:504","message":"Returning footer for non-CMS site with empty Action","data":{},"timestamp":int(__import__("time").time()*1000)})+"\n")
+        except Exception:
+            pass
+        # #endregion
         return HTMLResponse(content=footer_html)
     
     # For other cases, return a basic response
