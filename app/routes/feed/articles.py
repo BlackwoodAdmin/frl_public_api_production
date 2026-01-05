@@ -286,13 +286,13 @@ async def articles_endpoint(
                     pass
                 # #endregion
                 
-                # Build CMS homepage - use article data if found, otherwise use cmspage ID directly
+                # Build CMS homepage - cmspage ID IS the homepage
+                # Use article data for keyword if found, but always use cmspage as the homepage ID
                 keyword_text = article.get('restitle', '') if article else ''
-                bubbleid = article.get('id', cmspage) if article else cmspage
                 
-                # Build the page using build_page_wp
+                # Build the page using build_page_wp - always use cmspage as the homepage ID
                 page_content = build_page_wp(
-                    bubbleid=bubbleid,
+                    bubbleid=cmspage,  # cmspage IS the homepage ID
                     domainid=domainid,
                     agent=agent or '',
                     keyword=keyword_text,
@@ -307,7 +307,7 @@ async def articles_endpoint(
                     import os
                     log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
                     with open(log_path, "a", encoding="utf-8") as f:
-                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:295","message":"Building CMS homepage","data":{"article_found":article is not None,"bubbleid":bubbleid,"cmspage":cmspage,"page_content_length":len(page_content) if page_content else 0},"timestamp":int(__import__("time").time()*1000)})+"\n")
+                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:293","message":"Building CMS homepage","data":{"article_found":article is not None,"cmspage":cmspage,"page_content_length":len(page_content) if page_content else 0},"timestamp":int(__import__("time").time()*1000)})+"\n")
                 except Exception:
                     pass
                 # #endregion
