@@ -279,7 +279,7 @@ async def articles_endpoint(
                 # #region agent log
                 try:
                     import os
-                    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+                    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
                     with open(log_path, "a", encoding="utf-8") as f:
                         f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:269","message":"Article lookup for CMS","data":{"cmspage":cmspage,"article_found":article is not None},"timestamp":int(__import__("time").time()*1000)})+"\n")
                 except Exception:
@@ -411,9 +411,9 @@ img.align-left { max-width:100%!important;" }
         # #region agent log
         try:
             import os
-            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
             with open(log_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:401","message":"CMS fallback check","data":{"action_empty":action_empty,"cms_exists":cms is not None,"cmsactive":cms.get('cmsactive') if cms else None},"timestamp":int(__import__("time").time()*1000)})+"\n")
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:401","message":"CMS fallback check","data":{"action_empty":action_empty,"cms_exists":cms is not None,"cmsactive":cms.get('cmsactive') if cms else None,"webworkscms":webworkscms},"timestamp":int(__import__("time").time()*1000)})+"\n")
         except Exception:
             pass
         # #endregion
@@ -423,9 +423,9 @@ img.align-left { max-width:100%!important;" }
             # #region agent log
             try:
                 import os
-                log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+                log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
                 with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:414","message":"Returning empty for CMS site with empty Action","data":{},"timestamp":int(__import__("time").time()*1000)})+"\n")
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:428","message":"Returning empty for CMS site with empty Action","data":{"webworkscms":webworkscms},"timestamp":int(__import__("time").time()*1000)})+"\n")
             except Exception:
                 pass
             # #endregion
@@ -502,13 +502,22 @@ img.align-left { max-width:100%!important;" }
     
     if action_empty and webworkscms != 1:
         # Generate footer HTML for non-CMS sites when Action is empty
+        # #region agent log
+        try:
+            import os
+            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"articles.py:503","message":"Generating footer for non-CMS site","data":{"webworkscms":webworkscms,"action_empty":action_empty},"timestamp":int(__import__("time").time()*1000)})+"\n")
+        except Exception:
+            pass
+        # #endregion
         footer_html = build_footer_wp(domainid, domain_category, domain_settings)
         # #region agent log
         try:
             import os
-            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
             with open(log_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"articles.py:504","message":"Returning footer for non-CMS site with empty Action","data":{},"timestamp":int(__import__("time").time()*1000)})+"\n")
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"articles.py:511","message":"Returning footer for non-CMS site with empty Action","data":{},"timestamp":int(__import__("time").time()*1000)})+"\n")
         except Exception:
             pass
         # #endregion
