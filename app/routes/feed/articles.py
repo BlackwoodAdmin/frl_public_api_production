@@ -273,32 +273,53 @@ async def articles_endpoint(
             cmspage = cms.get('cmspage')
             
             if cmspagetype == 1 and cmspage:
-                # Get article from bwp_bubblefeed
-                article_sql = "SELECT * FROM bwp_bubblefeed WHERE id = %s"
-                article = db.fetch_row(article_sql, (cmspage,))
+                # Determine which page ID to use:
+                # - If Action is set, use pageid (PageID) from request as the article ID
+                # - If Action is empty, use cmspage as the homepage ID
+                action_empty = not Action or (isinstance(Action, str) and Action.strip() == '')
+                
+                if action_empty:
+                    # Action is empty - use cmspage as the homepage
+                    page_id_to_use = cmspage
+                    # Get article from bwp_bubblefeed for keyword data
+                    article_sql = "SELECT * FROM bwp_bubblefeed WHERE id = %s"
+                    article = db.fetch_row(article_sql, (cmspage,))
+                else:
+                    # Action is set - use pageid (PageID) from request as the article ID
+                    if pageid:
+                        try:
+                            page_id_to_use = int(pageid)
+                        except (ValueError, TypeError):
+                            page_id_to_use = cmspage  # Fallback to cmspage if pageid is invalid
+                    else:
+                        page_id_to_use = cmspage  # Fallback to cmspage if pageid is not provided
+                    
+                    # Get article from bwp_bubblefeed using the pageid
+                    article_sql = "SELECT * FROM bwp_bubblefeed WHERE id = %s"
+                    article = db.fetch_row(article_sql, (page_id_to_use,))
+                
                 # #region agent log
                 try:
                     import os
                     log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
                     with open(log_path, "a", encoding="utf-8") as f:
-                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:269","message":"Article lookup for CMS","data":{"cmspage":cmspage,"article_found":article is not None},"timestamp":int(__import__("time").time()*1000)})+"\n")
+                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:275","message":"CMS page ID determination","data":{"action_empty":action_empty,"Action":str(Action) if Action else None,"pageid":str(pageid) if pageid else None,"page_id_to_use":page_id_to_use,"cmspage":cmspage,"article_found":article is not None},"timestamp":int(__import__("time").time()*1000)})+"\n")
                 except Exception:
                     pass
                 # #endregion
                 
-                # Build CMS homepage - cmspage ID IS the homepage
-                # Use article data for keyword if found, but always use cmspage as the homepage ID
+                # Use article data for keyword if found
                 keyword_text = article.get('restitle', '') if article else ''
                 
-                # Build the page using build_page_wp - always use cmspage as the homepage ID
+                # Build the page using build_page_wp
                 page_content = build_page_wp(
-                    bubbleid=cmspage,  # cmspage IS the homepage ID
+                    bubbleid=page_id_to_use,  # Use determined page ID (pageid if Action set, cmspage if Action empty)
                     domainid=domainid,
                     agent=agent or '',
                     keyword=keyword_text,
                     domain_data=domain_category,
                     domain_settings=domain_settings,
-                    artpageid=cmspage,
+                    artpageid=page_id_to_use,
                     artdomainid=domainid
                 )
                 
@@ -324,7 +345,7 @@ async def articles_endpoint(
                     domain_settings=domain_settings,
                     action='1',
                     keyword=keyword_text,
-                    pageid=cmspage,
+                    pageid=page_id_to_use,  # Use determined page ID
                     city=city or cty or '',
                     state=state or st or ''
                 )
