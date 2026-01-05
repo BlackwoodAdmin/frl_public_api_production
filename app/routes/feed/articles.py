@@ -189,6 +189,7 @@ async def articles_endpoint(
     
     if not domain_data:
         # PHP returns empty/404 for invalid domains
+        logger.warning(f"Articles.php: Invalid domain '{domain}' - not found in database")
         return HTMLResponse(content="<!-- Invalid Domain -->", status_code=404)
     
     domainid = domain_data['id']
@@ -203,6 +204,8 @@ async def articles_endpoint(
     domain_category = db.fetch_row(domain_full_sql, (domainid,))
     
     if not domain_category:
+        # This should rarely happen - domain exists but full query fails
+        logger.warning(f"Articles.php: Domain '{domain}' (id={domainid}) found but domain_category query returned no results")
         return HTMLResponse(content="<!-- Domain not found -->", status_code=404)
     
     # Check domain status
