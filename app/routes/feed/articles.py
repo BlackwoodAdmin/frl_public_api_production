@@ -286,67 +286,74 @@ async def articles_endpoint(
                     pass
                 # #endregion
                 
-                if article:
-                    # Redirect to Article.php with Action=1 and the article's restitle and PageID
-                    # PHP uses curl_get_file_contents, but we'll call the handler directly
-                    # Build the article page content
-                    keyword_slug = article.get('restitle', '').replace(' ', '-').lower()
-                    bubbleid = article.get('id', 0)
-                    
-                    # Build the page using build_page_wp
-                    page_content = build_page_wp(
-                        bubbleid=bubbleid,
-                        domainid=domainid,
-                        agent=agent or '',
-                        keyword=article.get('restitle', ''),
-                        domain_data=domain_category,
-                        domain_settings=domain_settings,
-                        artpageid=cmspage,
-                        artdomainid=domainid
-                    )
-                    
-                    # Get header and footer
-                    header_data = get_header_footer(domainid, domain_category.get('status'))
-                    header = header_data['header']
-                    footer = header_data['footer']
-                    
-                    # Build metaheader
-                    metaheader = build_metaheader(
-                        domainid=domainid,
-                        domain_data=domain_category,
-                        domain_settings=domain_settings,
-                        action='1',
-                        keyword=article.get('restitle', ''),
-                        pageid=cmspage,
-                        city=city or cty or '',
-                        state=state or st or ''
-                    )
-                    
-                    # Build canonical URL
-                    if domain_category.get('ishttps') == 1:
-                        canonical_url = 'https://'
-                    else:
-                        canonical_url = 'http://'
-                    if domain_category.get('usewww') == 1:
-                        canonical_url += 'www.' + domain_category.get('domain_name', '')
-                    else:
-                        canonical_url += domain_category.get('domain_name', '')
-                    canonical_url += '/'
-                    
-                    # Wrap content with header and footer
-                    full_page_html = wrap_content_with_header_footer(
-                        content=page_content,
-                        header=header,
-                        footer=footer,
-                        metaheader=metaheader,
-                        canonical_url=canonical_url,
-                        websitereferencesimple=False,
-                        wp_plugin=domain_category.get('wp_plugin', 0)
-                    )
-                    
-                    # PHP Articles.php includes feed-home.css.php at lines 255 and 471
-                    # Add feed-home.css.php CSS before </head> or at the end of <head>
-                    feed_home_css = '''<style type="text/css">
+                # Build CMS homepage - use article data if found, otherwise use cmspage ID directly
+                keyword_text = article.get('restitle', '') if article else ''
+                bubbleid = article.get('id', cmspage) if article else cmspage
+                
+                # Build the page using build_page_wp
+                page_content = build_page_wp(
+                    bubbleid=bubbleid,
+                    domainid=domainid,
+                    agent=agent or '',
+                    keyword=keyword_text,
+                    domain_data=domain_category,
+                    domain_settings=domain_settings,
+                    artpageid=cmspage,
+                    artdomainid=domainid
+                )
+                
+                # #region agent log
+                try:
+                    import os
+                    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
+                    with open(log_path, "a", encoding="utf-8") as f:
+                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:295","message":"Building CMS homepage","data":{"article_found":article is not None,"bubbleid":bubbleid,"cmspage":cmspage,"page_content_length":len(page_content) if page_content else 0},"timestamp":int(__import__("time").time()*1000)})+"\n")
+                except Exception:
+                    pass
+                # #endregion
+                
+                # Get header and footer
+                header_data = get_header_footer(domainid, domain_category.get('status'))
+                header = header_data['header']
+                footer = header_data['footer']
+                
+                # Build metaheader
+                metaheader = build_metaheader(
+                    domainid=domainid,
+                    domain_data=domain_category,
+                    domain_settings=domain_settings,
+                    action='1',
+                    keyword=keyword_text,
+                    pageid=cmspage,
+                    city=city or cty or '',
+                    state=state or st or ''
+                )
+                
+                # Build canonical URL
+                if domain_category.get('ishttps') == 1:
+                    canonical_url = 'https://'
+                else:
+                    canonical_url = 'http://'
+                if domain_category.get('usewww') == 1:
+                    canonical_url += 'www.' + domain_category.get('domain_name', '')
+                else:
+                    canonical_url += domain_category.get('domain_name', '')
+                canonical_url += '/'
+                
+                # Wrap content with header and footer
+                full_page_html = wrap_content_with_header_footer(
+                    content=page_content,
+                    header=header,
+                    footer=footer,
+                    metaheader=metaheader,
+                    canonical_url=canonical_url,
+                    websitereferencesimple=False,
+                    wp_plugin=domain_category.get('wp_plugin', 0)
+                )
+                
+                # PHP Articles.php includes feed-home.css.php at lines 255 and 471
+                # Add feed-home.css.php CSS before </head> or at the end of <head>
+                feed_home_css = '''<style type="text/css">
 ul.mdubgwi-footer-nav {margin:0 auto !important;padding: 0px !important;overflow:visible !important}
 
 #mdubgwi-hidden-button {  height:0px !important; width:0px !important;	 }
@@ -382,54 +389,32 @@ img.align-left { max-width:100%!important;" }
 .mdubgwi-sub-nav li:hover ul {display:block !important; visibility:visible !important;}
 </style>
 '''
-                    
-                    # Insert feed-home.css.php CSS before </head>
-                    if '</head>' in full_page_html:
-                        head_pos = full_page_html.lower().find('</head>')
-                        full_page_html = full_page_html[:head_pos] + feed_home_css + full_page_html[head_pos:]
-                    else:
-                        # If no </head> found, append to the end
-                        full_page_html += feed_home_css
-                    
-                    return HTMLResponse(content=full_page_html)
+                
+                # Insert feed-home.css.php CSS before </head>
+                if '</head>' in full_page_html:
+                    head_pos = full_page_html.lower().find('</head>')
+                    full_page_html = full_page_html[:head_pos] + feed_home_css + full_page_html[head_pos:]
+                else:
+                    # If no </head> found, append to the end
+                    full_page_html += feed_home_css
+                
+                # #region agent log
+                try:
+                    import os
+                    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
+                    with open(log_path, "a", encoding="utf-8") as f:
+                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:394","message":"Returning CMS homepage","data":{"full_page_length":len(full_page_html)},"timestamp":int(__import__("time").time()*1000)})+"\n")
+                except Exception:
+                    pass
+                # #endregion
+                
+                return HTMLResponse(content=full_page_html)
             
             elif cmspagetype == 5 and cmspage:
                 # Get article from bwp_blog_post (Action=5 - not yet implemented)
                 # For now, return a placeholder
                 return HTMLResponse(content="<!-- CMS Blog Post (Action=5) not yet implemented -->")
         
-        # For CMS sites with empty Action, if CMS conditions aren't met, return empty content
-        # CMS sites handle their own content, so we return empty when Action is empty
-        # Check if Action is empty
-        action_in_query = "Action" in request.query_params
-        action_from_query = request.query_params.get("Action")
-        action_empty = (
-            not Action or 
-            (isinstance(Action, str) and Action.strip() == '') or
-            (action_in_query and (action_from_query is None or action_from_query == ""))
-        )
-        # #region agent log
-        try:
-            import os
-            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:401","message":"CMS fallback check","data":{"action_empty":action_empty,"cms_exists":cms is not None,"cmsactive":cms.get('cmsactive') if cms else None,"webworkscms":webworkscms},"timestamp":int(__import__("time").time()*1000)})+"\n")
-        except Exception:
-            pass
-        # #endregion
-        
-        if action_empty:
-            # For CMS sites with empty Action, return empty content (CMS handles its own content)
-            # #region agent log
-            try:
-                import os
-                log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
-                with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:428","message":"Returning empty for CMS site with empty Action","data":{"webworkscms":webworkscms},"timestamp":int(__import__("time").time()*1000)})+"\n")
-            except Exception:
-                pass
-            # #endregion
-            return HTMLResponse(content="")
     
     # PHP Articles.php: if script_version >= 3 and wp_plugin != 1 and iswin != 1 and usepurl != 0
     # then call seo_automation_build_footer30 (similar to build_footer_wp)
