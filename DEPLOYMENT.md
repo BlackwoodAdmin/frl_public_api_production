@@ -21,7 +21,7 @@ sudo dnf install git -y
 
 ```bash
 # Clone your GitHub repository
-git clone https://github.com/Blackwoodproductions/frl_public_api_production.git
+git clone https://github.com/BlackwoodAdmin/frl_public_api_production.git
 cd frl_public_api_production
 ```
 
