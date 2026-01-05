@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from fastapi import APIRouter, Request, Query, HTTPException
-    from fastapi.responses import HTMLResponse
+    from fastapi.responses import HTMLResponse, PlainTextResponse
     from typing import Optional
 except Exception as e:
     logger.error(f"Failed to import FastAPI components: {e}")
@@ -168,6 +168,11 @@ async def articles_endpoint(
     # Check if Action is empty string from any source (GET query, POST form, POST JSON)
     if Action == "" or (isinstance(Action, str) and Action.strip() == ""):
         Action = None
+    
+    # Handle CheckFiles endpoint (case-insensitive) - public health check
+    # This must be checked before domain validation to allow public access
+    if Action and isinstance(Action, str) and Action.lower() == "checkfiles":
+        return PlainTextResponse(content="FRL CheckFiles OK")
     
     # PHP Articles.php requires domain and agent parameters
     if not domain:
