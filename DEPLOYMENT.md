@@ -97,7 +97,7 @@ DASHBOARD_PASSWORD=your_password
 
 ```bash
 # Test the connection (create a simple test script)
-python3 -c "from app.database import db; print('Database connected!')"
+python3 -c "from app.database import db; print('Database connected')"
 ```
 
 ## Step 7: Run the Application
