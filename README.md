@@ -151,7 +151,7 @@ pytest
 ## Project Structure
 
 ```
-frl-python-api/
+frl_public_api_production/
 ├── app/
 │   ├── main.py              # FastAPI application
 │   ├── config.py            # Configuration management

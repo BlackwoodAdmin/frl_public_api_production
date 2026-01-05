@@ -37,7 +37,7 @@
 
 2. **Navigate to the project directory:**
    ```bash
-   cd /var/www/frl-python-api
+   cd /var/www/frl_public_api_production
    ```
 
 3. **Activate the virtual environment:**

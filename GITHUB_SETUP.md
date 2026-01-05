@@ -13,7 +13,7 @@ git commit -m "Initial commit: FRL Python API project structure"
 
 1. Go to your GitHub account
 2. Click "New repository"
-3. Name it: `frl-python-api` (or your preferred name)
+3. Name it: `frl_public_api_production` (or your preferred name)
 4. Don't initialize with README (we already have one)
 5. Click "Create repository"
 
@@ -21,14 +21,12 @@ git commit -m "Initial commit: FRL Python API project structure"
 
 ```bash
 # Add your GitHub repository as remote
-git remote add origin https://github.com/YOUR_USERNAME/frl-python-api.git
+git remote add origin https://github.com/BlackwoodAdmin/frl_public_api_production.git
 
 # Push to GitHub
 git branch -M main
 git push -u origin main
 ```
-
-Replace `YOUR_USERNAME` with your actual GitHub username.
 
 ## Step 4: On Your VPS - Clone the Repository
 
@@ -37,7 +35,7 @@ Replace `YOUR_USERNAME` with your actual GitHub username.
 ssh user@your-vps-ip
 
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/frl-python-api.git
-cd frl-python-api
+git clone https://github.com/BlackwoodAdmin/frl_public_api_production.git
+cd frl_public_api_production
 ```
 

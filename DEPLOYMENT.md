@@ -21,8 +21,8 @@ sudo dnf install git -y
 
 ```bash
 # Clone your GitHub repository
-git clone https://github.com/YOUR_USERNAME/frl-python-api.git
-cd frl-python-api
+git clone https://github.com/BlackwoodAdmin/frl_public_api_production.git
+cd frl_public_api_production
 ```
 
 ## Step 3: Create Virtual Environment
@@ -114,9 +114,9 @@ After=network.target
 
 [Service]
 User=your_username
-WorkingDirectory=/home/your_username/frl-python-api
-Environment="PATH=/home/your_username/frl-python-api/venv/bin"
-ExecStart=/home/your_username/frl-python-api/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+WorkingDirectory=/home/your_username/frl_public_api_production
+Environment="PATH=/home/your_username/frl_public_api_production/venv/bin"
+ExecStart=/home/your_username/frl_public_api_production/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 Restart=always
 
 [Install]
