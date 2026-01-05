@@ -139,6 +139,65 @@ journalctl -u frl-python-api -p err --no-pager
 journalctl -t frl-python-api --no-pager
 ```
 
+## SSL/HTTPS Configuration
+
+For production deployments, it's essential to configure HTTPS/SSL to encrypt traffic between clients and your API server. This section provides a quick reference for SSL setup.
+
+### Quick Setup
+
+The recommended approach is to use Let's Encrypt with Certbot for free SSL certificates. For detailed step-by-step instructions, see [DEPLOYMENT.md](DEPLOYMENT.md) Step 12.
+
+**Quick commands:**
+
+```bash
+# Install Certbot
+sudo dnf install certbot python3-certbot-nginx -y
+
+# Obtain SSL certificate (replace with your domain)
+sudo certbot --nginx -d your-domain.com
+
+# Verify certificate renewal is set up
+sudo systemctl status certbot-renew.timer
+```
+
+### Important Notes
+
+1. **Domain DNS**: Ensure your domain's A record points to your VPS IP address before obtaining certificates
+2. **Firewall**: Ports 80 (HTTP) and 443 (HTTPS) must be open for certificate verification and HTTPS traffic
+3. **Automatic Renewal**: Certbot sets up automatic renewal, but verify it's working: `sudo systemctl list-timers | grep certbot`
+4. **Nginx Configuration**: Certbot automatically updates your Nginx configuration to:
+   - Redirect HTTP to HTTPS
+   - Use SSL certificates
+   - Enable HTTP/2
+
+### Nginx HTTPS Configuration
+
+After Certbot setup, your Nginx configuration should include:
+- HTTP server block that redirects to HTTPS
+- HTTPS server block with SSL certificates
+- Proper proxy headers including `X-Forwarded-Proto`
+
+### Testing SSL
+
+```bash
+# Check certificate status
+sudo certbot certificates
+
+# Test HTTPS endpoint
+curl -I https://your-domain.com
+
+# Test renewal (dry run)
+sudo certbot renew --dry-run
+```
+
+### Troubleshooting
+
+- **Certificate issues**: See [DEPLOYMENT.md](DEPLOYMENT.md) Step 12.6 for troubleshooting tips
+- **Renewal failures**: Check logs with `sudo journalctl -u certbot-renew.service`
+- **Nginx errors**: Verify configuration with `sudo nginx -t`
+
+For comprehensive SSL setup instructions, see [DEPLOYMENT.md](DEPLOYMENT.md) Step 12.
+
 ## Running with Uvicorn (Alternative)
 
 If you prefer to use Uvicorn directly (simpler but less robust):

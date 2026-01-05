@@ -141,6 +141,8 @@ sudo firewall-cmd --reload
 
 ## Step 11: Set Up Nginx (Optional but Recommended)
 
+This step sets up Nginx as a reverse proxy with HTTP only. After completing this step, proceed to Step 12 to configure HTTPS/SSL.
+
 ```bash
 # Install Nginx
 sudo dnf install nginx -y
@@ -149,7 +151,7 @@ sudo dnf install nginx -y
 sudo nano /etc/nginx/conf.d/frl-api.conf
 ```
 
-Add:
+Add initial HTTP-only configuration:
 ```nginx
 server {
     listen 80;
@@ -160,17 +162,159 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
 
-Start Nginx:
+Start and test Nginx:
 ```bash
 sudo systemctl enable nginx
 sudo systemctl start nginx
+sudo nginx -t  # Test configuration
 ```
 
-## Step 12: Access Monitoring Dashboard
+**Note:** After setting up SSL in Step 12, you'll need to update this configuration to include HTTPS and redirect HTTP to HTTPS.
+
+## Step 12: Set Up SSL/HTTPS with Let's Encrypt
+
+This step configures HTTPS using Let's Encrypt SSL certificates with Certbot. This is recommended for production deployments.
+
+### Prerequisites
+
+- Domain name pointing to your VPS IP address
+- Nginx installed and running (from Step 11)
+- Ports 80 and 443 open in firewall
+
+### Step 12.1: Install Certbot
+
+```bash
+# Install Certbot and Nginx plugin
+sudo dnf install certbot python3-certbot-nginx -y
+```
+
+### Step 12.2: Configure Firewall for HTTPS
+
+```bash
+# Allow HTTP (port 80) and HTTPS (port 443)
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-service=https
+sudo firewall-cmd --reload
+```
+
+### Step 12.3: Obtain SSL Certificate
+
+Replace `your-domain.com` with your actual domain name:
+
+```bash
+# Obtain SSL certificate (Certbot will automatically configure Nginx)
+sudo certbot --nginx -d your-domain.com
+
+# If you have www subdomain, include both:
+sudo certbot --nginx -d your-domain.com -d www.your-domain.com
+```
+
+Certbot will:
+- Automatically verify your domain ownership
+- Obtain and install the SSL certificate
+- Update your Nginx configuration to use HTTPS
+- Set up automatic HTTP to HTTPS redirect
+
+Follow the prompts:
+- Enter your email address (for renewal notifications)
+- Agree to terms of service
+- Choose whether to redirect HTTP to HTTPS (recommended: Yes)
+
+### Step 12.4: Verify Nginx Configuration
+
+After Certbot updates your configuration, verify it:
+
+```bash
+# Test Nginx configuration
+sudo nginx -t
+
+# If test passes, reload Nginx
+sudo systemctl reload nginx
+```
+
+Your `/etc/nginx/conf.d/frl-api.conf` should now look similar to:
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+
+    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### Step 12.5: Test SSL Configuration
+
+```bash
+# Test SSL certificate
+sudo certbot certificates
+
+# Verify HTTPS is working
+curl -I https://your-domain.com
+
+# Test automatic renewal (dry run)
+sudo certbot renew --dry-run
+```
+
+### Step 12.6: Set Up Automatic Certificate Renewal
+
+Let's Encrypt certificates expire after 90 days. Certbot should automatically set up a renewal timer, but verify it:
+
+```bash
+# Check if certbot renewal timer is active
+sudo systemctl status certbot-renew.timer
+
+# Enable and start if not already running
+sudo systemctl enable certbot-renew.timer
+sudo systemctl start certbot-renew.timer
+
+# Verify timer is scheduled
+sudo systemctl list-timers | grep certbot
+```
+
+Certbot typically renews certificates automatically before they expire (usually 30 days before expiration).
+
+### Troubleshooting
+
+**Certificate obtainment fails:**
+- Verify domain DNS A record points to your VPS IP
+- Ensure port 80 is accessible (temporarily needed for domain verification)
+- Check firewall isn't blocking ports 80 and 443
+
+**Nginx configuration errors:**
+- Run `sudo nginx -t` to check for syntax errors
+- Check Nginx error logs: `sudo tail -f /var/log/nginx/error.log`
+
+**Certificate renewal issues:**
+- Manually renew: `sudo certbot renew`
+- Check renewal logs: `sudo journalctl -u certbot-renew.service`
+
+**For detailed Certbot documentation:**
+- Visit: https://eff-certbot.readthedocs.io/
+
+## Step 13: Access Monitoring Dashboard
 
 The application includes a monitoring dashboard accessible at `/monitor/*`. 
 
@@ -183,10 +327,10 @@ The monitoring dashboard requires authentication. Credentials are configured in 
 Once the application is running, access the monitoring dashboard at:
 
 ```
-http://your-domain.com/monitor/login
+https://your-domain.com/monitor/login
 ```
 
-Or if accessing locally:
+Or if accessing locally (no SSL):
 ```
 http://localhost:8000/monitor/login
 ```
