@@ -258,6 +258,15 @@ async def articles_endpoint(
     if webworkscms == 1:
         cms_sql = "SELECT * FROM bwp_cms WHERE domainid = %s"
         cms = db.fetch_row(cms_sql, (domainid,))
+        # #region agent log
+        try:
+            import os
+            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:260","message":"CMS check","data":{"cms_exists":cms is not None,"cmsactive":cms.get('cmsactive') if cms else None,"cmspagetype":cms.get('cmspagetype') if cms else None,"cmspage":cms.get('cmspage') if cms else None},"timestamp":int(__import__("time").time()*1000)})+"\n")
+        except Exception:
+            pass
+        # #endregion
         
         if cms and cms.get('cmsactive') == 1:
             cmspagetype = cms.get('cmspagetype')
@@ -389,10 +398,28 @@ img.align-left { max-width:100%!important;" }
             (isinstance(Action, str) and Action.strip() == '') or
             (action_in_query and (action_from_query is None or action_from_query == ""))
         )
+        # #region agent log
+        try:
+            import os
+            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:392","message":"CMS fallback check","data":{"action_empty":action_empty,"cms_exists":cms is not None,"cmsactive":cms.get('cmsactive') if cms else None},"timestamp":int(__import__("time").time()*1000)})+"\n")
+        except Exception:
+            pass
+        # #endregion
         
         if action_empty:
             # Generate footer HTML for CMS sites when Action is empty
             footer_html = build_footer_wp(domainid, domain_category, domain_settings)
+            # #region agent log
+            try:
+                import os
+                log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:405","message":"Returning footer for CMS site","data":{},"timestamp":int(__import__("time").time()*1000)})+"\n")
+            except Exception:
+                pass
+            # #endregion
             return HTMLResponse(content=footer_html)
     
     # PHP Articles.php: if script_version >= 3 and wp_plugin != 1 and iswin != 1 and usepurl != 0
