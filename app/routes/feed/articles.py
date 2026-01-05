@@ -1,8 +1,31 @@
 """Articles.php endpoint - Homepage/Footer content router."""
 import logging
 import traceback
+import os
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+def _write_debug_log(message: str, data: dict = None):
+    """Write debug log to file in app root directory."""
+    try:
+        # Get app root directory (parent of app/)
+        app_root = Path(__file__).parent.parent.parent
+        debug_log_path = app_root / "debug.log"
+        
+        import json
+        from datetime import datetime
+        log_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "message": message,
+            "data": data or {}
+        }
+        
+        with open(debug_log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry) + "\n")
+    except Exception as e:
+        # Silently fail - don't crash the app if logging fails
+        pass
 
 try:
     from fastapi import APIRouter, Request, Query, HTTPException
@@ -189,7 +212,9 @@ async def articles_endpoint(
     
     if not domain_data:
         # PHP returns empty/404 for invalid domains
-        logger.warning(f"Articles.php: Invalid domain '{domain}' - not found in database")
+        error_msg = f"Articles.php: Invalid domain '{domain}' - not found in database"
+        logger.warning(error_msg)
+        _write_debug_log(error_msg, {"domain": domain, "status_code": 404, "error_type": "invalid_domain"})
         return HTMLResponse(content="<!-- Invalid Domain -->", status_code=404)
     
     domainid = domain_data['id']
@@ -205,7 +230,9 @@ async def articles_endpoint(
     
     if not domain_category:
         # This should rarely happen - domain exists but full query fails
-        logger.warning(f"Articles.php: Domain '{domain}' (id={domainid}) found but domain_category query returned no results")
+        error_msg = f"Articles.php: Domain '{domain}' (id={domainid}) found but domain_category query returned no results"
+        logger.warning(error_msg)
+        _write_debug_log(error_msg, {"domain": domain, "domainid": domainid, "status_code": 404, "error_type": "domain_category_not_found"})
         return HTMLResponse(content="<!-- Domain not found -->", status_code=404)
     
     # Check domain status
