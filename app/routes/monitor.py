@@ -1728,7 +1728,6 @@ async def get_dashboard_page(username: str = Depends(verify_dashboard_credential
                 <li><a href="/monitor/dashboard/page" class="active">Dashboard</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
-                <li><a href="/monitor/logout">Logout</a></li>
             </ul>
         </nav>
         
@@ -2142,7 +2141,6 @@ async def get_worker_detail_page(pid: int, username: str = Depends(verify_dashbo
                 <li><a href="/monitor/dashboard/page">Dashboard</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
-                <li><a href="/monitor/logout">Logout</a></li>
             </ul>
         </nav>
         
@@ -2554,7 +2552,6 @@ async def get_workers_page(username: str = Depends(verify_dashboard_credentials)
                 <li><a href="/monitor/dashboard/page">Dashboard</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
-                <li><a href="/monitor/logout">Logout</a></li>
             </ul>
         </nav>
         
@@ -2885,7 +2882,6 @@ async def get_stats_page(username: str = Depends(verify_dashboard_credentials)):
                 <li><a href="/monitor/dashboard/page">Dashboard</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
-                <li><a href="/monitor/logout">Logout</a></li>
             </ul>
         </nav>
         
@@ -3250,7 +3246,6 @@ async def get_health_page(username: str = Depends(verify_dashboard_credentials))
                 <li><a href="/monitor/dashboard/page">Dashboard</a></li>
                 <li><a href="/monitor/health/page" class="active">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
-                <li><a href="/monitor/logout">Logout</a></li>
             </ul>
         </nav>
         
@@ -4193,7 +4188,6 @@ async def get_log_detail_page(log_hash: str, username: str = Depends(verify_dash
                 <li><a href="/monitor/dashboard/page">Dashboard</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page" class="active">Logs</a></li>
-                <li><a href="/monitor/logout">Logout</a></li>
             </ul>
         </nav>
         
@@ -4657,7 +4651,6 @@ async def get_worker_logs_page(pid: int, username: str = Depends(verify_dashboar
                 <li><a href="/monitor/dashboard/page">Dashboard</a></li>
                 <li><a href="/monitor/health/page">Health</a></li>
                 <li><a href="/monitor/logs/page">Logs</a></li>
-                <li><a href="/monitor/logout">Logout</a></li>
             </ul>
         </nav>
         
