@@ -59,11 +59,14 @@ async def articles_endpoint(
     Handles both GET and POST requests (PHP $_REQUEST gets both).
     """
     # #region agent log
-    import json
-    import os
-    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"articles.py:60","message":"Function entry - initial Action from FastAPI Query","data":{"Action":str(Action) if Action is not None else None,"Action_type":type(Action).__name__,"method":request.method},"timestamp":int(__import__("time").time()*1000)})+"\n")
+    try:
+        import json
+        import os
+        log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"articles.py:60","message":"Function entry - initial Action from FastAPI Query","data":{"Action":str(Action) if Action is not None else None,"Action_type":type(Action).__name__,"method":request.method},"timestamp":int(__import__("time").time()*1000)})+"\n")
+    except Exception:
+        pass
     # #endregion
     
     # For POST requests, also check form data and JSON body
@@ -180,10 +183,13 @@ async def articles_endpoint(
     if Action == "" or (isinstance(Action, str) and Action.strip() == ""):
         Action = None
     # #region agent log
-    import os
-    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"articles.py:171","message":"After normalization","data":{"Action_before":str(action_before_norm) if action_before_norm is not None else None,"Action_after":str(Action) if Action is not None else None},"timestamp":int(__import__("time").time()*1000)})+"\n")
+    try:
+        import os
+        log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"articles.py:171","message":"After normalization","data":{"Action_before":str(action_before_norm) if action_before_norm is not None else None,"Action_after":str(Action) if Action is not None else None},"timestamp":int(__import__("time").time()*1000)})+"\n")
+    except Exception:
+        pass
     # #endregion
     
     # PHP Articles.php requires domain and agent parameters
@@ -241,10 +247,13 @@ async def articles_endpoint(
     # PHP Articles.php line 260-294: Check for webworkscms and redirect to CMS homepage
     webworkscms = domain_category.get('webworkscms') or 0
     # #region agent log
-    import os
-    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"articles.py:227","message":"Domain category loaded","data":{"webworkscms":webworkscms,"script_version":str(domain_category.get('script_version', '0'))},"timestamp":int(__import__("time").time()*1000)})+"\n")
+    try:
+        import os
+        log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"articles.py:227","message":"Domain category loaded","data":{"webworkscms":webworkscms,"script_version":str(domain_category.get('script_version', '0'))},"timestamp":int(__import__("time").time()*1000)})+"\n")
+    except Exception:
+        pass
     # #endregion
     if webworkscms == 1:
         cms_sql = "SELECT * FROM bwp_cms WHERE domainid = %s"
@@ -389,19 +398,25 @@ img.align-left { max-width:100%!important;" }
     
     # PHP line 172: if($domains['script_version'] >= 3 && $domains['wp_plugin'] != 1 && $domains['iswin'] != 1 && $domains['usepurl'] != 0)
     # #region agent log
-    import os
-    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"articles.py:369","message":"Before script_version check","data":{"script_version":script_version,"wp_plugin":wp_plugin,"iswin":iswin,"usepurl":usepurl,"condition_result":script_version >= 3 and wp_plugin != 1 and iswin != 1 and usepurl != 0},"timestamp":int(__import__("time").time()*1000)})+"\n")
+    try:
+        import os
+        log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"articles.py:369","message":"Before script_version check","data":{"script_version":script_version,"wp_plugin":wp_plugin,"iswin":iswin,"usepurl":usepurl,"condition_result":script_version >= 3 and wp_plugin != 1 and iswin != 1 and usepurl != 0},"timestamp":int(__import__("time").time()*1000)})+"\n")
+    except Exception:
+        pass
     # #endregion
     if script_version >= 3 and wp_plugin != 1 and iswin != 1 and usepurl != 0:
         # Generate footer HTML (similar to Articles30.php seo_automation_build_footer30)
         footer_html = build_footer_wp(domainid, domain_category, domain_settings)
         # #region agent log
-        import os
-    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
-    with open(log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"articles.py:373","message":"Returning footer from script_version check","data":{},"timestamp":int(__import__("time").time()*1000)})+"\n")
+        try:
+            import os
+            log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"articles.py:373","message":"Returning footer from script_version check","data":{},"timestamp":int(__import__("time").time()*1000)})+"\n")
+        except Exception:
+            pass
         # #endregion
         # For now, just return the footer HTML
         return HTMLResponse(content=footer_html)
@@ -411,10 +426,13 @@ img.align-left { max-width:100%!important;" }
     action_in_query = "Action" in request.query_params
     action_from_query = request.query_params.get("Action")
     # #region agent log
-    import os
-    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"articles.py:377","message":"Before empty check","data":{"Action":str(Action) if Action is not None else None,"action_in_query":action_in_query,"action_from_query":str(action_from_query) if action_from_query is not None else None,"query_params_keys":list(request.query_params.keys())},"timestamp":int(__import__("time").time()*1000)})+"\n")
+    try:
+        import os
+        log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"articles.py:377","message":"Before empty check","data":{"Action":str(Action) if Action is not None else None,"action_in_query":action_in_query,"action_from_query":str(action_from_query) if action_from_query is not None else None,"query_params_keys":list(request.query_params.keys())},"timestamp":int(__import__("time").time()*1000)})+"\n")
+    except Exception:
+        pass
     # #endregion
     action_empty = (
         not Action or 
@@ -422,10 +440,13 @@ img.align-left { max-width:100%!important;" }
         (action_in_query and (action_from_query is None or action_from_query == ""))
     )
     # #region agent log
-    import os
-    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"articles.py:384","message":"Empty check result","data":{"action_empty":action_empty,"webworkscms":webworkscms,"webworkscms_not_1":webworkscms != 1,"will_generate_footer":action_empty and webworkscms != 1},"timestamp":int(__import__("time").time()*1000)})+"\n")
+    try:
+        import os
+        log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"articles.py:384","message":"Empty check result","data":{"action_empty":action_empty,"webworkscms":webworkscms,"webworkscms_not_1":webworkscms != 1,"will_generate_footer":action_empty and webworkscms != 1},"timestamp":int(__import__("time").time()*1000)})+"\n")
+    except Exception:
+        pass
     # #endregion
     
     if action_empty and webworkscms != 1:
@@ -437,10 +458,13 @@ img.align-left { max-width:100%!important;" }
     # PHP Articles.php has complex logic for generating homepage content with links, etc.
     # This is a simplified version - full implementation would require more PHP code review
     # #region agent log
-    import os
-    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"articles.py:393","message":"Returning error - no conditions met","data":{"Action":str(Action) if Action is not None else None,"action_empty":action_empty,"webworkscms":webworkscms},"timestamp":int(__import__("time").time()*1000)})+"\n")
+    try:
+        import os
+        log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"articles.py:393","message":"Returning error - no conditions met","data":{"Action":str(Action) if Action is not None else None,"action_empty":action_empty,"webworkscms":webworkscms},"timestamp":int(__import__("time").time()*1000)})+"\n")
+    except Exception:
+        pass
     # #endregion
     return HTMLResponse(content="<!-- Articles.php - Action not empty or conditions not met -->")
 
