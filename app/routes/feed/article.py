@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from fastapi import APIRouter, Request, Query, HTTPException, Form
-    from fastapi.responses import JSONResponse, HTMLResponse, Response
+    from fastapi.responses import JSONResponse, HTMLResponse, Response, PlainTextResponse
     from typing import Optional
 except Exception as e:
     logger.error(f"Failed to import FastAPI components: {e}")
@@ -289,6 +289,10 @@ async def article_endpoint(
     # Route based on Action parameter
     if not Action:
         Action = ''
+    
+    # Handle CheckFiles endpoint (case-insensitive) - public health check
+    if Action and isinstance(Action, str) and Action.lower() == "checkfiles":
+        return PlainTextResponse(content="FRL CheckFiles OK")
     
     # Get full domain data for Action handlers
     domain_full_sql = """
