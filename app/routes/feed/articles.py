@@ -379,6 +379,21 @@ img.align-left { max-width:100%!important;" }
                 # Get article from bwp_blog_post (Action=5 - not yet implemented)
                 # For now, return a placeholder
                 return HTMLResponse(content="<!-- CMS Blog Post (Action=5) not yet implemented -->")
+        
+        # For CMS sites with empty Action, if CMS conditions aren't met, generate footer
+        # Check if Action is empty
+        action_in_query = "Action" in request.query_params
+        action_from_query = request.query_params.get("Action")
+        action_empty = (
+            not Action or 
+            (isinstance(Action, str) and Action.strip() == '') or
+            (action_in_query and (action_from_query is None or action_from_query == ""))
+        )
+        
+        if action_empty:
+            # Generate footer HTML for CMS sites when Action is empty
+            footer_html = build_footer_wp(domainid, domain_category, domain_settings)
+            return HTMLResponse(content=footer_html)
     
     # PHP Articles.php: if script_version >= 3 and wp_plugin != 1 and iswin != 1 and usepurl != 0
     # then call seo_automation_build_footer30 (similar to build_footer_wp)
