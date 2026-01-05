@@ -276,6 +276,15 @@ async def articles_endpoint(
                 # Get article from bwp_bubblefeed
                 article_sql = "SELECT * FROM bwp_bubblefeed WHERE id = %s"
                 article = db.fetch_row(article_sql, (cmspage,))
+                # #region agent log
+                try:
+                    import os
+                    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
+                    with open(log_path, "a", encoding="utf-8") as f:
+                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:269","message":"Article lookup for CMS","data":{"cmspage":cmspage,"article_found":article is not None},"timestamp":int(__import__("time").time()*1000)})+"\n")
+                except Exception:
+                    pass
+                # #endregion
                 
                 if article:
                     # Redirect to Article.php with Action=1 and the article's restitle and PageID
@@ -389,7 +398,8 @@ img.align-left { max-width:100%!important;" }
                 # For now, return a placeholder
                 return HTMLResponse(content="<!-- CMS Blog Post (Action=5) not yet implemented -->")
         
-        # For CMS sites with empty Action, if CMS conditions aren't met, generate footer
+        # For CMS sites with empty Action, if CMS conditions aren't met, return empty content
+        # CMS sites handle their own content, so we return empty when Action is empty
         # Check if Action is empty
         action_in_query = "Action" in request.query_params
         action_from_query = request.query_params.get("Action")
@@ -403,24 +413,23 @@ img.align-left { max-width:100%!important;" }
             import os
             log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
             with open(log_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:392","message":"CMS fallback check","data":{"action_empty":action_empty,"cms_exists":cms is not None,"cmsactive":cms.get('cmsactive') if cms else None},"timestamp":int(__import__("time").time()*1000)})+"\n")
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:401","message":"CMS fallback check","data":{"action_empty":action_empty,"cms_exists":cms is not None,"cmsactive":cms.get('cmsactive') if cms else None},"timestamp":int(__import__("time").time()*1000)})+"\n")
         except Exception:
             pass
         # #endregion
         
         if action_empty:
-            # Generate footer HTML for CMS sites when Action is empty
-            footer_html = build_footer_wp(domainid, domain_category, domain_settings)
+            # For CMS sites with empty Action, return empty content (CMS handles its own content)
             # #region agent log
             try:
                 import os
                 log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "debug.log")
                 with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:405","message":"Returning footer for CMS site","data":{},"timestamp":int(__import__("time").time()*1000)})+"\n")
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"articles.py:414","message":"Returning empty for CMS site with empty Action","data":{},"timestamp":int(__import__("time").time()*1000)})+"\n")
             except Exception:
                 pass
             # #endregion
-            return HTMLResponse(content=footer_html)
+            return HTMLResponse(content="")
     
     # PHP Articles.php: if script_version >= 3 and wp_plugin != 1 and iswin != 1 and usepurl != 0
     # then call seo_automation_build_footer30 (similar to build_footer_wp)
