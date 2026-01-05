@@ -10,7 +10,12 @@ def _write_debug_log(message: str, data: dict = None):
     """Write debug log to file in app root directory."""
     try:
         # Get app root directory (parent of app/)
-        app_root = Path(__file__).parent.parent.parent
+        # __file__ is app/routes/feed/articles.py
+        # .parent = app/routes/feed/
+        # .parent.parent = app/routes/
+        # .parent.parent.parent = app/
+        # .parent.parent.parent.parent = root/
+        app_root = Path(__file__).parent.parent.parent.parent
         debug_log_path = app_root / "debug.log"
         
         import json
@@ -21,11 +26,18 @@ def _write_debug_log(message: str, data: dict = None):
             "data": data or {}
         }
         
+        # Write to file (creates file if it doesn't exist)
         with open(debug_log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(log_entry) + "\n")
+            f.flush()  # Ensure data is written immediately
+    except PermissionError as e:
+        # Log permission errors to standard logger
+        logger.error(f"Permission denied writing debug log to {debug_log_path}: {e}")
     except Exception as e:
-        # Silently fail - don't crash the app if logging fails
-        pass
+        # Log other errors to standard logger as fallback
+        logger.error(f"Failed to write debug log to {debug_log_path}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
 
 try:
     from fastapi import APIRouter, Request, Query, HTTPException
