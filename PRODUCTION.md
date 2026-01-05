@@ -27,11 +27,6 @@ git clone https://github.com/BlackwoodAdmin/frl_public_api_production.git
 
 # Navigate to project directory
 cd frl_public_api_production
-
-# Create production directory structure (recommended for production)
-sudo mkdir -p /var/www/frl_public_api_production
-sudo cp -r . /var/www/frl_public_api_production/
-cd /var/www/frl_public_api_production
 ```
 
 ## Step 3: Create Virtual Environment
@@ -142,14 +137,16 @@ If successful, you should see "Database connected". If you encounter errors, ver
 
 ## Step 7: Create Systemd Service
 
-Create a systemd service file to run the application as a service with automatic restart:
+Create a systemd service file to run the application as a service with automatic restart.
+
+**Note:** Replace `/path/to/frl_public_api_production` in the service file with the actual path where you cloned the repository (e.g., `/home/your_username/frl_public_api_production` or `/var/www/frl_public_api_production`).
 
 ```bash
 # Create systemd service file
 sudo nano /etc/systemd/system/frl-python-api.service
 ```
 
-Add this configuration:
+Add this configuration (replace `/path/to/frl_public_api_production` with your actual project path):
 
 ```ini
 [Unit]
@@ -160,10 +157,10 @@ After=network.target
 Type=notify
 User=root
 Group=root
-WorkingDirectory=/var/www/frl_public_api_production
-Environment="PATH=/var/www/frl_public_api_production/venv/bin"
-EnvironmentFile=/var/www/frl_public_api_production/.env
-ExecStart=/var/www/frl_public_api_production/venv/bin/gunicorn app.main:app -c gunicorn_config.py
+WorkingDirectory=/path/to/frl_public_api_production
+Environment="PATH=/path/to/frl_public_api_production/venv/bin"
+EnvironmentFile=/path/to/frl_public_api_production/.env
+ExecStart=/path/to/frl_public_api_production/venv/bin/gunicorn app.main:app -c gunicorn_config.py
 Restart=always
 RestartSec=10
 
@@ -548,7 +545,7 @@ sudo systemctl status frl-python-api
 sudo journalctl -u frl-python-api -n 100 --no-pager
 
 # Verify .env file exists and has correct paths
-ls -la /var/www/frl_public_api_production/.env
+ls -la /path/to/frl_public_api_production/.env
 ```
 
 ### Database Connection Issues
