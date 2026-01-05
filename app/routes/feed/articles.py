@@ -367,6 +367,15 @@ img.align-left { max-width:100%!important;" }
         # For now, just return the footer HTML
         return HTMLResponse(content=footer_html)
     
+    # When Action is empty, generate footer HTML for non-CMS sites
+    # Check if Action is empty (None or empty string)
+    action_empty = not Action or (isinstance(Action, str) and Action.strip() == '')
+    
+    if action_empty and webworkscms != 1:
+        # Generate footer HTML for non-CMS sites when Action is empty
+        footer_html = build_footer_wp(domainid, domain_category, domain_settings)
+        return HTMLResponse(content=footer_html)
+    
     # For other cases, return a basic response
     # PHP Articles.php has complex logic for generating homepage content with links, etc.
     # This is a simplified version - full implementation would require more PHP code review
