@@ -1,6 +1,8 @@
 """FastAPI application entry point."""
 import logging
 import traceback
+import os
+from pathlib import Path
 
 
 class SocketErrorFilter(logging.Filter):
@@ -27,6 +29,7 @@ logger = logging.getLogger(__name__)
 try:
     from fastapi import FastAPI
     from fastapi.responses import HTMLResponse
+    from fastapi.staticfiles import StaticFiles
 except Exception as e:
     logger.error(f"Failed to import FastAPI: {e}")
     logger.error(traceback.format_exc())
@@ -92,6 +95,23 @@ except Exception as e:
     logger.error(f"Failed to register StatsTrackingMiddleware: {e}")
     logger.error(traceback.format_exc())
     raise
+
+# Mount static files for external_files directory
+try:
+    # Get the app root directory (parent of app/)
+    app_root = Path(__file__).parent.parent
+    external_files_dir = app_root / "external_files"
+    
+    # Create external_files directory if it doesn't exist
+    external_files_dir.mkdir(exist_ok=True)
+    logger.info(f"External files directory ready at: {external_files_dir}")
+    
+    # Mount static files at /external_files/
+    app.mount("/external_files", StaticFiles(directory=str(external_files_dir)), name="external_files")
+except Exception as e:
+    logger.error(f"Failed to mount external_files static directory: {e}")
+    logger.error(traceback.format_exc())
+    # Don't raise - allow app to continue even if static files fail
 
 # Include routers
 try:
