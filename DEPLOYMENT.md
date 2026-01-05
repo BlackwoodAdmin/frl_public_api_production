@@ -45,6 +45,28 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
+### Troubleshooting: psutil Installation Error
+
+If you encounter an error like `error: command 'gcc' failed: No such file or directory` when installing `psutil`, you need to install the C compiler and Python development headers:
+
+```bash
+# Install GCC compiler and Python development headers
+sudo dnf install gcc python3.11-devel -y
+
+# Then retry installing requirements
+pip install -r requirements.txt
+```
+
+**Note:** The "Development Tools" group installed in Step 1 should include `gcc`, but if you skipped that step or it didn't install properly, run the command above. For a complete development environment:
+
+```bash
+# Install the full Development Tools group (includes gcc, make, etc.)
+sudo dnf groupinstall "Development Tools" -y
+
+# Ensure Python 3.11 development headers are installed
+sudo dnf install python3.11-devel -y
+```
+
 ## Step 5: Configure Environment
 
 ```bash
