@@ -21,7 +21,7 @@ git commit -m "Initial commit: FRL Python API project structure"
 
 ```bash
 # Add your GitHub repository as remote
-git remote add origin https://github.com/BlackwoodAdmin/frl_public_api_production.git
+git remote add origin https://github.com/Blackwoodproductions/frl_public_api_production.git
 
 # Push to GitHub
 git branch -M main
@@ -35,7 +35,7 @@ git push -u origin main
 ssh user@your-vps-ip
 
 # Clone the repository
-git clone https://github.com/BlackwoodAdmin/frl_public_api_production.git
+git clone https://github.com/Blackwoodproductions/frl_public_api_production.git
 cd frl_public_api_production
 ```
 
