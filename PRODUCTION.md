@@ -135,6 +135,24 @@ python3 -c "from app.database import db; print('Database connected')"
 
 If successful, you should see "Database connected". If you encounter errors, verify your database credentials in the `.env` file.
 
+## Step 6.5: Create Required Directories
+
+Create the directories needed for logging and stats:
+
+```bash
+# Create log directory (for file-based logging fallback)
+sudo mkdir -p /var/log/frl-python-api
+sudo chown root:root /var/log/frl-python-api
+sudo chmod 755 /var/log/frl-python-api
+
+# Create stats directory (for request statistics)
+sudo mkdir -p /var/run/frl-python-api
+sudo chown root:root /var/run/frl-python-api
+sudo chmod 755 /var/run/frl-python-api
+```
+
+**Note:** The stats directory will be automatically created by the application if it doesn't exist, but it's good practice to create it manually with proper permissions. The log directory is needed if `USE_JOURNALCTL=false` or as a fallback.
+
 ## Step 7: Create Systemd Service
 
 Create a systemd service file to run the application as a service with automatic restart.
@@ -301,14 +319,23 @@ This step configures HTTPS using Let's Encrypt SSL certificates with Certbot. Th
 - Nginx installed and running (from Step 9)
 - Ports 80 and 443 open in firewall (from Step 8)
 
-### Step 10.1: Install Certbot
+### Step 10.1: Install EPEL Repository
+
+Certbot is available in the EPEL (Extra Packages for Enterprise Linux) repository. First, install EPEL:
+
+```bash
+# Install EPEL repository (required for certbot)
+sudo dnf install epel-release -y
+```
+
+### Step 10.2: Install Certbot
 
 ```bash
 # Install Certbot and Nginx plugin
 sudo dnf install certbot python3-certbot-nginx -y
 ```
 
-### Step 10.2: Obtain SSL Certificate
+### Step 10.3: Obtain SSL Certificate
 
 Replace `your-domain.com` with your actual domain name:
 
@@ -331,7 +358,7 @@ Follow the prompts:
 - Agree to terms of service
 - Choose whether to redirect HTTP to HTTPS (recommended: **Yes**)
 
-### Step 10.3: Verify Nginx Configuration
+### Step 10.4: Verify Nginx Configuration
 
 After Certbot updates your configuration, verify it:
 
@@ -371,7 +398,7 @@ server {
 }
 ```
 
-### Step 10.4: Test SSL Configuration
+### Step 10.5: Test SSL Configuration
 
 ```bash
 # Test SSL certificate
@@ -384,7 +411,7 @@ curl -I https://your-domain.com
 sudo certbot renew --dry-run
 ```
 
-### Step 10.5: Set Up Automatic Certificate Renewal
+### Step 10.6: Set Up Automatic Certificate Renewal
 
 Let's Encrypt certificates expire after 90 days. Certbot should automatically set up a renewal timer, but verify it:
 
