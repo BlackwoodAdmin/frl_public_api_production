@@ -373,8 +373,13 @@ img.align-left { max-width:100%!important;" }
         return HTMLResponse(content=footer_html)
     
     # When Action is empty, generate footer HTML for non-CMS sites
-    # Check if Action is empty (None or empty string)
-    action_empty = not Action or (isinstance(Action, str) and Action.strip() == '')
+    # Check if Action is empty (None or empty string) - also check query params directly
+    action_from_query = request.query_params.get("Action")
+    action_empty = (
+        not Action or 
+        (isinstance(Action, str) and Action.strip() == '') or
+        (action_from_query is not None and action_from_query == "")
+    )
     
     if action_empty and webworkscms != 1:
         # Generate footer HTML for non-CMS sites when Action is empty
