@@ -135,9 +135,9 @@ python3 -c "from app.database import db; print('Database connected')"
 
 If successful, you should see "Database connected". If you encounter errors, verify your database credentials in the `.env` file.
 
-## Step 6.5: Create Required Directories
+## Step 6.5: Create Required Directories and Files
 
-Create the directories needed for logging and stats:
+Create the directories and files needed for logging and stats:
 
 ```bash
 # Create log directory (for file-based logging fallback)
@@ -145,13 +145,18 @@ sudo mkdir -p /var/log/frl-python-api
 sudo chown root:root /var/log/frl-python-api
 sudo chmod 755 /var/log/frl-python-api
 
+# Create log file (needed if USE_JOURNALCTL=false or as fallback)
+sudo touch /var/log/frl-python-api/app.log
+sudo chown root:root /var/log/frl-python-api/app.log
+sudo chmod 644 /var/log/frl-python-api/app.log
+
 # Create stats directory (for request statistics)
 sudo mkdir -p /var/run/frl-python-api
 sudo chown root:root /var/run/frl-python-api
 sudo chmod 755 /var/run/frl-python-api
 ```
 
-**Note:** The stats directory will be automatically created by the application if it doesn't exist, but it's good practice to create it manually with proper permissions. The log directory is needed if `USE_JOURNALCTL=false` or as a fallback.
+**Note:** The stats directory will be automatically created by the application if it doesn't exist, but it's good practice to create it manually with proper permissions. The log file is needed if `USE_JOURNALCTL=false` in your `.env` file or as a fallback if journalctl isn't available.
 
 ## Step 7: Create Systemd Service
 
