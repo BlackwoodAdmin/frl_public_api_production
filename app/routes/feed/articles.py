@@ -165,6 +165,11 @@ async def articles_endpoint(
         except Exception as e:
             logger.warning(f"Could not parse POST body: {e}")
     
+    # Normalize Action - treat empty string as None/empty
+    # Check if Action is empty string from any source (GET query, POST form, POST JSON)
+    if Action == "" or (isinstance(Action, str) and Action.strip() == ""):
+        Action = None
+    
     # PHP Articles.php requires domain and agent parameters
     if not domain:
         raise HTTPException(status_code=400, detail="Domain parameter required")
