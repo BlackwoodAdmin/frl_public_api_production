@@ -1274,7 +1274,7 @@ def _extract_traceback(message: str) -> Optional[str]:
 def _extract_metadata_from_message(message: str) -> Dict[str, Any]:
     """Extract metadata from log message if available.
     
-    Attempts to extract PID, file paths, line numbers, and other
+    Attempts to extract PID, file paths, line numbers, query strings, and other
     metadata from log messages.
     
     Args:
@@ -1305,6 +1305,39 @@ def _extract_metadata_from_message(message: str) -> Dict[str, Any]:
             metadata['line_number'] = int(file_match.group(2))
         except ValueError:
             pass
+    
+    # Try to extract query string from log message
+    # Look for patterns like "query_string: ?param=value" or "?param=value&param2=value2"
+    # or "query_params: {...}" or URL patterns with query strings
+    query_string_patterns = [
+        r'query[_\s]*string[:\s]+(\?[^\s]+)',  # "query_string: ?param=value"
+        r'query[_\s]*params[:\s]+(\?[^\s]+)',  # "query_params: ?param=value"
+        r'(\?[a-zA-Z0-9_\-\.=&%]+)',  # Standalone query string pattern
+        r'URL[:\s]+[^\s]*(\?[^\s]+)',  # "URL: ...?param=value"
+    ]
+    
+    for pattern in query_string_patterns:
+        query_match = re.search(pattern, message, re.IGNORECASE)
+        if query_match:
+            query_string = query_match.group(1)
+            # Clean up the query string (remove trailing punctuation if any)
+            query_string = query_string.rstrip('.,;:')
+            metadata['query_string'] = query_string
+            break
+    
+    # Also try to extract query string from JSON-like structures in the message
+    # Look for patterns like '"query_string": "?param=value"' or '"query": "?param=value"'
+    json_query_patterns = [
+        r'["\']query[_\s]*string["\']\s*:\s*["\'](\?[^"\']+)["\']',
+        r'["\']query["\']\s*:\s*["\'](\?[^"\']+)["\']',
+    ]
+    
+    for pattern in json_query_patterns:
+        json_query_match = re.search(pattern, message, re.IGNORECASE)
+        if json_query_match:
+            query_string = json_query_match.group(1)
+            metadata['query_string'] = query_string
+            break
     
     return metadata
 
@@ -4310,6 +4343,13 @@ async def get_log_detail_page(log_hash: str, username: str = Depends(verify_dash
                 html += '<div class="metadata-label">Log Hash</div>';
                 html += '<div class="metadata-value" style="font-family: monospace; font-size: 12px;">' + escapeHtml(data.log_hash || 'N/A') + '</div>';
                 html += '</div>';
+                // Add query string if it exists in metadata
+                if (data.metadata && data.metadata.query_string) {{
+                    html += '<div class="metadata-item">';
+                    html += '<div class="metadata-label">Query String</div>';
+                    html += '<div class="metadata-value" style="font-family: monospace; font-size: 12px; word-break: break-all;">' + escapeHtml(data.metadata.query_string) + '</div>';
+                    html += '</div>';
+                }}
                 html += '</div>';
                 html += '</div>';
                 
