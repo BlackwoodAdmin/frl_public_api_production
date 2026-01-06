@@ -1450,57 +1450,57 @@ async def handle_apifeedwp59(
     """
     Handle apifeedwp5.9.php requests (WordPress 5.9 plugin feed).
     """
-    
-    logger.info(f"handle_apifeedwp59 called: domain={domain}, feededit={feedit}, kkyy={kkyy}")
-    
-    # Validate domain parameter
-    if not domain:
-        return PlainTextResponse(content="Invalid Request F105", status_code=400)
-    
-    # Get domain data (include contentshare, ishttps, usewww fields)
-    sql = """
-        SELECT d.id as domainid, d.domain_name, d.servicetype, d.writerlock, d.domainip, 
-               d.showsnapshot, d.wr_address, d.userid, d.status, d.wr_video, d.wr_facebook, 
-               d.wr_googleplus, d.wr_twitter, d.wr_yelp, d.wr_bing, d.wr_name, d.linkexchange, 
-               d.resourcesactive, d.contentshare, d.ishttps, d.usewww, r.email as owneremail, s.price
-        FROM bwp_domains d
-        LEFT JOIN bwp_register r ON d.userid = r.id
-        LEFT JOIN bwp_services s ON d.servicetype = s.id
-        WHERE d.domain_name = %s AND d.deleted != 1
-    """
-    
-    domains = db.fetch_all(sql, (domain,))
-    
-    if not domains:
-        return PlainTextResponse(content="Domain Does Not Exist", status_code=404)
-    
-    domain_data = domains[0]
-    domainid = domain_data['domainid']
-    
-    # Handle feededit parameter
-    if feededit == 'add':
-        try:
-            # Update domain with wp_plugin=1, spydermap=0, script_version='5.9'
-            db.execute(
-                "UPDATE bwp_domains SET wp_plugin=1, spydermap=0, script_version='5.9' WHERE id = %s",
-                (domainid,)
-            )
-            
-            # Return limited domain data
-            rdomains = [{
-                'domainid': domain_data['domainid'],
-                'status': domain_data['status'],
-                'wr_name': domain_data.get('wr_name', ''),
-                'owneremail': domain_data.get('owneremail', '')
-            }]
-            
-            return JSONResponse(content=rdomains)
-        except Exception as e:
-            logger.error(f"Error in handle_apifeedwp59 feededit=add: {e}")
-            logger.error(traceback.format_exc())
-            return PlainTextResponse(content="Internal Server Error", status_code=500)
-    
-    elif feededit == '1' or feededit == 1:
+    try:
+        logger.info(f"handle_apifeedwp59 called: domain={domain}, feededit={feedit}, kkyy={kkyy}")
+        
+        # Validate domain parameter
+        if not domain:
+            return PlainTextResponse(content="Invalid Request F105", status_code=400)
+        
+        # Get domain data (include contentshare, ishttps, usewww fields)
+        sql = """
+            SELECT d.id as domainid, d.domain_name, d.servicetype, d.writerlock, d.domainip, 
+                   d.showsnapshot, d.wr_address, d.userid, d.status, d.wr_video, d.wr_facebook, 
+                   d.wr_googleplus, d.wr_twitter, d.wr_yelp, d.wr_bing, d.wr_name, d.linkexchange, 
+                   d.resourcesactive, d.contentshare, d.ishttps, d.usewww, r.email as owneremail, s.price
+            FROM bwp_domains d
+            LEFT JOIN bwp_register r ON d.userid = r.id
+            LEFT JOIN bwp_services s ON d.servicetype = s.id
+            WHERE d.domain_name = %s AND d.deleted != 1
+        """
+        
+        domains = db.fetch_all(sql, (domain,))
+        
+        if not domains:
+            return PlainTextResponse(content="Domain Does Not Exist", status_code=404)
+        
+        domain_data = domains[0]
+        domainid = domain_data['domainid']
+        
+        # Handle feededit parameter
+        if feededit == 'add':
+            try:
+                # Update domain with wp_plugin=1, spydermap=0, script_version='5.9'
+                db.execute(
+                    "UPDATE bwp_domains SET wp_plugin=1, spydermap=0, script_version='5.9' WHERE id = %s",
+                    (domainid,)
+                )
+                
+                # Return limited domain data
+                rdomains = [{
+                    'domainid': domain_data['domainid'],
+                    'status': domain_data['status'],
+                    'wr_name': domain_data.get('wr_name', ''),
+                    'owneremail': domain_data.get('owneremail', '')
+                }]
+                
+                return JSONResponse(content=rdomains)
+            except Exception as e:
+                logger.error(f"Error in handle_apifeedwp59 feededit=add: {e}")
+                logger.error(traceback.format_exc())
+                return PlainTextResponse(content="Internal Server Error", status_code=500)
+        
+        elif feededit == '1' or feededit == 1:
         try:
             logger.info(f"handle_apifeedwp59: Processing feededit=1 for domain={domain}, domainid={domainid}")
             # Get agent parameter
@@ -1512,18 +1512,18 @@ async def handle_apifeedwp59(
             
             pagesarray = []
             import html
-        
-        # a. Bubblefeed pages (if resourcesactive is true)
-        if domain_data.get('resourcesactive'):
-            sql = """
-                SELECT b.*, c.category AS bubblecat, c.bubblefeedid AS bubblecatid, c.id AS bubblecatsid
-                FROM bwp_bubblefeed b
-                LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
-                WHERE b.active = 1 AND b.domainid = %s AND b.deleted != 1
-            """
-            page_ex = db.fetch_all(sql, (domainid,))
             
-            for page in page_ex:
+            # a. Bubblefeed pages (if resourcesactive is true)
+            if domain_data.get('resourcesactive'):
+                sql = """
+                    SELECT b.*, c.category AS bubblecat, c.bubblefeedid AS bubblecatid, c.id AS bubblecatsid
+                    FROM bwp_bubblefeed b
+                    LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
+                    WHERE b.active = 1 AND b.domainid = %s AND b.deleted != 1
+                """
+                page_ex = db.fetch_all(sql, (domainid,))
+                
+                for page in page_ex:
                 pageid = page['id']
                 keyword = clean_title(seo_filter_text_custom(page['restitle']))
                 
@@ -1595,69 +1595,69 @@ async def handle_apifeedwp59(
                     'post_metakeywords': metaKeywords
                 }
                 pagesarray.append(pagearray)
-        
-        # b. Link placement pages (if linkexchange == 1)
-        if domain_data.get('linkexchange') == 1:
-            sql = """
-                SELECT DISTINCT showonpgid
-                FROM bwp_link_placement
-                WHERE deleted != 1 AND showondomainid = %s
-                GROUP BY bubblefeedid
-                ORDER BY relevant DESC
-            """
-            bcpage_ex = db.fetch_all(sql, (domainid,))
             
-            for bcpage in bcpage_ex:
-                pageid = bcpage['showonpgid']
-                bpage = db.fetch_row(
-                    'SELECT restitle, resshorttext, createdDate FROM bwp_bubblefeed WHERE id = %s',
-                    (pageid,)
-                )
+            # b. Link placement pages (if linkexchange == 1)
+            if domain_data.get('linkexchange') == 1:
+                sql = """
+                    SELECT DISTINCT showonpgid
+                    FROM bwp_link_placement
+                    WHERE deleted != 1 AND showondomainid = %s
+                    GROUP BY bubblefeedid
+                    ORDER BY relevant DESC
+                """
+                bcpage_ex = db.fetch_all(sql, (domainid,))
                 
-                if bpage:
-                    if len(bpage.get('resshorttext', '')) > 50:
-                        sorttext = bpage['resshorttext']
-                    else:
-                        sorttext = ''
+                for bcpage in bcpage_ex:
+                    pageid = bcpage['showonpgid']
+                    bpage = db.fetch_row(
+                        'SELECT restitle, resshorttext, createdDate FROM bwp_bubblefeed WHERE id = %s',
+                        (pageid,)
+                    )
                     
-                    keyword = clean_title(seo_filter_text_custom(bpage['restitle']))
-                    
-                    # Create slug using PHP 5.9 order: toAscii(keyword) → seo_filter_text_custom(...) → html_entity_decode(...) → strtolower(...) → str_replace(' ', '-', ...) → append -pageid-bc
-                    slug_text = to_ascii(keyword)  # toAscii first
-                    slug_text = seo_filter_text_custom(slug_text)  # seo_filter_text_custom2 (same as seo_filter_text_custom)
-                    slug_text = html.unescape(slug_text)  # html_entity_decode
-                    slug_text = slug_text.lower().replace(' ', '-')  # strtolower and str_replace
-                    slug = slug_text + '-' + str(pageid) + 'bc'
-                    
-                    # Convert datetime to string if needed
-                    post_date = bpage.get('createdDate', '')
-                    if post_date and hasattr(post_date, 'strftime'):
-                        post_date = post_date.strftime('%Y-%m-%d %H:%M:%S')
-                    elif post_date is None:
-                        post_date = ''
-                    
-                    bcpagearray = {
-                        'pageid': str(pageid) + 'bc',
-                        'post_title': keyword.lower() + ' - ' + domain_data['domain_name'],
-                        'post_type': 'page',
-                        'comment_status': 'closed',
-                        'ping_status': 'closed',
-                        'post_date': str(post_date),
-                        'post_excerpt': sorttext,
-                        'post_name': slug,
-                        'post_status': 'publish',
-                        'post_metatitle': keyword.lower() + ' - ' + domain_data['domain_name'],
-                        'post_metakeywords': keyword.lower() + ', ' + domain_data['domain_name']
-                    }
-                    pagesarray.append(bcpagearray)
+                    if bpage:
+                        if len(bpage.get('resshorttext', '')) > 50:
+                            sorttext = bpage['resshorttext']
+                        else:
+                            sorttext = ''
+                        
+                        keyword = clean_title(seo_filter_text_custom(bpage['restitle']))
+                        
+                        # Create slug using PHP 5.9 order: toAscii(keyword) → seo_filter_text_custom(...) → html_entity_decode(...) → strtolower(...) → str_replace(' ', '-', ...) → append -pageid-bc
+                        slug_text = to_ascii(keyword)  # toAscii first
+                        slug_text = seo_filter_text_custom(slug_text)  # seo_filter_text_custom2 (same as seo_filter_text_custom)
+                        slug_text = html.unescape(slug_text)  # html_entity_decode
+                        slug_text = slug_text.lower().replace(' ', '-')  # strtolower and str_replace
+                        slug = slug_text + '-' + str(pageid) + 'bc'
+                        
+                        # Convert datetime to string if needed
+                        post_date = bpage.get('createdDate', '')
+                        if post_date and hasattr(post_date, 'strftime'):
+                            post_date = post_date.strftime('%Y-%m-%d %H:%M:%S')
+                        elif post_date is None:
+                            post_date = ''
+                        
+                        bcpagearray = {
+                            'pageid': str(pageid) + 'bc',
+                            'post_title': keyword.lower() + ' - ' + domain_data['domain_name'],
+                            'post_type': 'page',
+                            'comment_status': 'closed',
+                            'ping_status': 'closed',
+                            'post_date': str(post_date),
+                            'post_excerpt': sorttext,
+                            'post_name': slug,
+                            'post_status': 'publish',
+                            'post_metatitle': keyword.lower() + ' - ' + domain_data['domain_name'],
+                            'post_metakeywords': keyword.lower() + ', ' + domain_data['domain_name']
+                        }
+                        pagesarray.append(bcpagearray)
             
             return JSONResponse(content=pagesarray)
         except Exception as e:
             logger.error(f"Error in handle_apifeedwp59 feededit=1: {e}")
             logger.error(traceback.format_exc())
             return PlainTextResponse(content="Internal Server Error", status_code=500)
-    
-    elif feededit == '2' or feededit == 2:
+        
+        elif feededit == '2' or feededit == 2:
         try:
             # Get domain settings
             domain_settings = db.fetch_row(
@@ -1691,6 +1691,11 @@ async def handle_apifeedwp59(
             logger.error(f"Error in handle_apifeedwp59 feededit=2: {e}")
             logger.error(traceback.format_exc())
             return PlainTextResponse(content="Internal Server Error", status_code=500)
-    
-    else:
-        return PlainTextResponse(content="Invalid Request F105", status_code=400)
+        
+        else:
+            return PlainTextResponse(content="Invalid Request F105", status_code=400)
+    except Exception as e:
+        # Top-level error handler to catch any unhandled exceptions
+        logger.error(f"Unhandled error in handle_apifeedwp59: {e}")
+        logger.error(traceback.format_exc())
+        return PlainTextResponse(content="Internal Server Error", status_code=500)
