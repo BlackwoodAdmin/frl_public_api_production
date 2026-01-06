@@ -1490,9 +1490,15 @@ async def handle_apifeedwp59(
         try:
             with open(r"c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log", "a", encoding="utf-8") as f:
                 import json, time
-                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"article.py:1472","message":"After domain query","data":{"domain_count":len(domains) if domains else 0},"timestamp":int(time.time()*1000)})+"\n")
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"article.py:1485","message":"After domain query","data":{"domain_count":len(domains) if domains else 0,"domain":str(domain)},"timestamp":int(time.time()*1000)})+"\n")
                 f.flush()
-        except: pass
+        except Exception as e:
+            try:
+                with open(r"c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log", "a", encoding="utf-8") as f:
+                    import json, time
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"article.py:1485","message":"Debug log write failed","data":{"error":str(e)},"timestamp":int(time.time()*1000)})+"\n")
+                    f.flush()
+            except: pass
         # #endregion
         
         if not domains:
@@ -1511,6 +1517,14 @@ async def handle_apifeedwp59(
         
         # Handle feededit parameter
         if feededit == 'add':
+            # #region agent log
+            try:
+                with open(r"c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log", "a", encoding="utf-8") as f:
+                    import json, time
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1489","message":"feededit=add handler entry","data":{"feededit":str(feededit),"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
+                    f.flush()
+            except: pass
+            # #endregion
             try:
                 # Update domain with wp_plugin=1, spydermap=0, script_version='5.9'
                 db.execute(
@@ -1533,6 +1547,14 @@ async def handle_apifeedwp59(
                 return PlainTextResponse(content="Internal Server Error", status_code=500)
         
         elif feededit == '1' or feededit == 1:
+            # #region agent log
+            try:
+                with open(r"c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log", "a", encoding="utf-8") as f:
+                    import json, time
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1505","message":"feededit=1 handler entry","data":{"feededit":str(feededit),"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
+                    f.flush()
+            except: pass
+            # #endregion
             try:
                 logger.info(f"handle_apifeedwp59: Processing feededit=1 for domain={domain}, domainid={domainid}")
                 # Get agent parameter
@@ -1690,6 +1712,14 @@ async def handle_apifeedwp59(
                 return PlainTextResponse(content="Internal Server Error", status_code=500)
         
         elif feededit == '2' or feededit == 2:
+            # #region agent log
+            try:
+                with open(r"c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log", "a", encoding="utf-8") as f:
+                    import json, time
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1693","message":"feededit=2 handler entry","data":{"feededit":str(feededit),"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
+                    f.flush()
+            except: pass
+            # #endregion
             try:
                 # Get domain settings
                 domain_settings = db.fetch_row(
@@ -1728,14 +1758,17 @@ async def handle_apifeedwp59(
             return PlainTextResponse(content="Invalid Request F105", status_code=400)
     except Exception as e:
         # Top-level error handler to catch any unhandled exceptions
+        error_trace = traceback.format_exc()
         logger.error(f"Unhandled error in handle_apifeedwp59: {e}")
-        logger.error(traceback.format_exc())
+        logger.error(error_trace)
         # #region agent log
         try:
             with open(r"c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log", "a", encoding="utf-8") as f:
                 import json, time
-                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"article.py:1697","message":"Top-level exception caught","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"article.py:1730","message":"Top-level exception caught","data":{"error":str(e),"error_type":type(e).__name__,"traceback":error_trace[:500]},"timestamp":int(time.time()*1000)})+"\n")
                 f.flush()
-        except: pass
+        except Exception as log_err:
+            # Even if debug log fails, try to log the original error
+            logger.error(f"Failed to write debug log: {log_err}")
         # #endregion
         return PlainTextResponse(content="Internal Server Error", status_code=500)
