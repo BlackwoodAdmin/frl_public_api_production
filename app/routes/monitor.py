@@ -1407,7 +1407,7 @@ def _extract_metadata_from_message(message: str) -> Dict[str, Any]:
         if 'post_variables' not in metadata:
             standalone_form_pattern = r'\b([a-zA-Z0-9_\-\.]+=[a-zA-Z0-9_\-\.%]+(?:&[a-zA-Z0-9_\-\.]+=[a-zA-Z0-9_\-\.%]+)+)\b'
             standalone_match = re.search(standalone_form_pattern, message)
-            if standalone_match and '=' in standalone_match.group(1) and '&' in standalone_match.group(1):
+            if standalone_match and standalone_match.group(1) and '=' in standalone_match.group(1) and '&' in standalone_match.group(1):
                 form_data_str = standalone_match.group(1)
                 try:
                     parsed = parse_qs(form_data_str, keep_blank_values=True)
