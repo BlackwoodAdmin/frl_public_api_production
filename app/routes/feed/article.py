@@ -1,8 +1,19 @@
 """Article.php endpoint - Main content router."""
 import logging
 import traceback
+import os
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# Cross-platform debug log path
+DEBUG_LOG_PATH = os.getenv("DEBUG_LOG_PATH", str(Path(__file__).parent.parent.parent / ".cursor" / "debug.log"))
+# Ensure log directory exists
+try:
+    log_dir = Path(DEBUG_LOG_PATH).parent
+    log_dir.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass  # If we can't create the directory, logging will just fail silently
 
 try:
     from fastapi import APIRouter, Request, Query, HTTPException, Form
@@ -72,6 +83,14 @@ async def article_endpoint(
     Replicates the PHP Article.php functionality.
     Handles both GET and POST requests (PHP $_REQUEST gets both).
     """
+    # #region agent log
+    try:
+        with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
+            import json as json_lib
+            import time
+            f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"I","location":"article.py:52","message":"article_endpoint entry","data":{"method":request.method,"domain":domain,"kkyy":kkyy,"feededit":feedit},"timestamp":int(time.time()*1000)})+"\n")
+    except: pass
+    # #endregion
     
     # For POST requests, also check form data and JSON body (PHP $_REQUEST includes both GET and POST)
     # Note: POST requests can have parameters in query string OR body
@@ -128,32 +147,33 @@ async def article_endpoint(
                 # Only try JSON if explicitly JSON content type
                 try:
                     json_data = await request.json()
-                    if json_data.get("domain"):
-                        domain = json_data.get("domain")
-                    if json_data.get("Action"):
-                        Action = json_data.get("Action")
-                    if json_data.get("apiid"):
-                        apiid = json_data.get("apiid")
-                    if json_data.get("apikey"):
-                        apikey = json_data.get("apikey")
-                    if json_data.get("kkyy"):
-                        kkyy = json_data.get("kkyy")
-                    if json_data.get("feedit"):
-                        feededit = json_data.get("feedit")
-                    if json_data.get("k"):
-                        k = json_data.get("k")
-                    if json_data.get("key"):
-                        key = json_data.get("key")
-                    if json_data.get("pageid"):
-                        pageid = json_data.get("pageid")
-                    if json_data.get("version"):
-                        version = json_data.get("version")
-                    if json_data.get("agent"):
-                        agent = json_data.get("agent")
-                    if json_data.get("category"):
-                        category = json_data.get("category")
-                    if json_data.get("c"):
-                        c = json_data.get("c")
+                    if json_data and isinstance(json_data, dict):
+                        if json_data.get("domain"):
+                            domain = json_data.get("domain")
+                        if json_data.get("Action"):
+                            Action = json_data.get("Action")
+                        if json_data.get("apiid"):
+                            apiid = json_data.get("apiid")
+                        if json_data.get("apikey"):
+                            apikey = json_data.get("apikey")
+                        if json_data.get("kkyy"):
+                            kkyy = json_data.get("kkyy")
+                        if json_data.get("feedit"):
+                            feededit = json_data.get("feedit")
+                        if json_data.get("k"):
+                            k = json_data.get("k")
+                        if json_data.get("key"):
+                            key = json_data.get("key")
+                        if json_data.get("pageid"):
+                            pageid = json_data.get("pageid")
+                        if json_data.get("version"):
+                            version = json_data.get("version")
+                        if json_data.get("agent"):
+                            agent = json_data.get("agent")
+                        if json_data.get("category"):
+                            category = json_data.get("category")
+                        if json_data.get("c"):
+                            c = json_data.get("c")
                 except Exception as e2:
                     logger.warning(f"JSON parsing failed: {e2}")
             else:
@@ -247,12 +267,12 @@ async def article_endpoint(
             if not feededit_param:
                 if form_data:
                     feededit_param = form_data.get('feedit')
-                elif json_data:
+                elif json_data and isinstance(json_data, dict):
                     feededit_param = json_data.get('feedit')
             serveup_param = request.query_params.get('serveup', '0')
             if form_data:
                 serveup_param = form_data.get('serveup', serveup_param)
-            elif json_data:
+            elif json_data and isinstance(json_data, dict):
                 serveup_param = json_data.get('serveup', serveup_param)
             return await handle_apifeedwp30(
                 domain=domain,
@@ -272,7 +292,7 @@ async def article_endpoint(
             if not feededit_param:
                 if form_data:
                     feededit_param = form_data.get('feedit')
-                elif json_data:
+                elif json_data and isinstance(json_data, dict):
                     feededit_param = json_data.get('feedit')
             return await handle_apifeedwp61(
                 domain=domain,
@@ -284,22 +304,63 @@ async def article_endpoint(
             )
         elif kkyy_normalized == 'AFfa0fd7KMD98enfawrut7cySa15yV7BXpS85':
             # Route to apifeedwp5.9
+            # #region agent log
+            try:
+                with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
+                    import json as json_lib
+                    import time
+                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:285","message":"Routing to apifeedwp5.9","data":{"kkyy":kkyy_normalized,"feededit":feedit,"domain":domain},"timestamp":int(time.time()*1000)})+"\n")
+            except: pass
+            # #endregion
+            
             logger.info(f"Matched kkyy for apifeedwp5.9: {kkyy_normalized}, feededit={feedit}")
             feededit_param = feededit or request.query_params.get('feedit')
             if not feededit_param:
                 if form_data:
                     feededit_param = form_data.get('feedit')
-                elif json_data:
+                elif json_data and isinstance(json_data, dict):
                     feededit_param = json_data.get('feedit')
+            
+            # #region agent log
+            try:
+                with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
+                    import json as json_lib
+                    import time
+                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:295","message":"Before calling handle_apifeedwp59","data":{"feededit_param":feededit_param,"domain":domain},"timestamp":int(time.time()*1000)})+"\n")
+            except: pass
+            # #endregion
+            
             logger.info(f"Calling handle_apifeedwp59 with feededit={feededit_param}, domain={domain}")
-            return await handle_apifeedwp59(
-                domain=domain,
-                request=request,
-                form_data=form_data,
-                json_data=json_data,
-                feededit=feededit_param,
-                kkyy=kkyy_normalized
-            )
+            try:
+                result = await handle_apifeedwp59(
+                    domain=domain,
+                    request=request,
+                    form_data=form_data,
+                    json_data=json_data,
+                    feededit=feededit_param,
+                    kkyy=kkyy_normalized
+                )
+                # #region agent log
+                try:
+                    with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
+                        import json as json_lib
+                        import time
+                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:295","message":"handle_apifeedwp59 returned successfully","data":{},"timestamp":int(time.time()*1000)})+"\n")
+                except: pass
+                # #endregion
+                return result
+            except Exception as e:
+                # #region agent log
+                try:
+                    with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
+                        import json as json_lib
+                        import time
+                        import traceback
+                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:295","message":"Exception calling handle_apifeedwp59","data":{"error":str(e),"error_type":type(e).__name__,"traceback":traceback.format_exc()},"timestamp":int(time.time()*1000)})+"\n")
+                except: pass
+                # #endregion
+                logger.error(f"Exception in handle_apifeedwp59: {e}", exc_info=True)
+                raise
         elif kkyy_normalized == 'KVFotrmIERNortemkl39jwetsdakfhklo8wer7':
             # Route to apifeedwp6
             logger.info(f"Matched kkyy for apifeedwp6: {kkyy_normalized}")
@@ -1402,7 +1463,7 @@ async def handle_apifeedwp59(
     try:
         # #region agent log
         try:
-            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                 import json as json_lib
                 import time
                 f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1391","message":"handle_apifeedwp59 entry","data":{"domain":domain,"feededit":feededit,"kkyy":kkyy},"timestamp":int(time.time()*1000)})+"\n")
@@ -1429,7 +1490,7 @@ async def handle_apifeedwp59(
         
         # #region agent log
         try:
-            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                 import json as json_lib
                 import time
                 f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1421","message":"Before db.fetch_all","data":{"sql":sql,"domain":domain},"timestamp":int(time.time()*1000)})+"\n")
@@ -1441,7 +1502,7 @@ async def handle_apifeedwp59(
         except Exception as e:
             # #region agent log
             try:
-                with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                     import json as json_lib
                     import time
                     f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1421","message":"db.fetch_all exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
@@ -1452,7 +1513,7 @@ async def handle_apifeedwp59(
         
         # #region agent log
         try:
-            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                 import json as json_lib
                 import time
                 f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1421","message":"After db.fetch_all","data":{"domains_count":len(domains) if domains else 0},"timestamp":int(time.time()*1000)})+"\n")
@@ -1467,7 +1528,7 @@ async def handle_apifeedwp59(
         
         # #region agent log
         try:
-            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                 import json as json_lib
                 import time
                 f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1427","message":"Domain data retrieved","data":{"domainid":domainid,"resourcesactive":domain_data.get('resourcesactive'),"linkexchange":domain_data.get('linkexchange')},"timestamp":int(time.time()*1000)})+"\n")
@@ -1495,7 +1556,7 @@ async def handle_apifeedwp59(
         elif feededit == '1' or feededit == 1:
             # #region agent log
             try:
-                with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                     import json as json_lib
                     import time
                     f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"article.py:1447","message":"feededit=1 branch entered","data":{"domain":domain,"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
@@ -1517,7 +1578,7 @@ async def handle_apifeedwp59(
             if domain_data.get('resourcesactive'):
                 # #region agent log
                 try:
-                    with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                         import json as json_lib
                         import time
                         f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1460","message":"resourcesactive is true, querying bubblefeed","data":{"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
@@ -1535,7 +1596,7 @@ async def handle_apifeedwp59(
                 except Exception as e:
                     # #region agent log
                     try:
-                        with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                        with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                             import json as json_lib
                             import time
                             f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1467","message":"bubblefeed query exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
@@ -1546,7 +1607,7 @@ async def handle_apifeedwp59(
                 
                 # #region agent log
                 try:
-                    with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                         import json as json_lib
                         import time
                         f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1467","message":"bubblefeed query result","data":{"page_count":len(page_ex) if page_ex else 0},"timestamp":int(time.time()*1000)})+"\n")
@@ -1556,7 +1617,7 @@ async def handle_apifeedwp59(
                 for page in page_ex:
                     # #region agent log
                     try:
-                        with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                        with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                             import json as json_lib
                             import time
                             f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"article.py:1469","message":"Processing bubblefeed page","data":{"pageid":page.get('id')},"timestamp":int(time.time()*1000)})+"\n")
@@ -1638,7 +1699,7 @@ async def handle_apifeedwp59(
                     except Exception as e:
                         # #region agent log
                         try:
-                            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                            with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                                 import json as json_lib
                                 import time
                                 f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"article.py:1469","message":"Exception processing bubblefeed page","data":{"error":str(e),"error_type":type(e).__name__,"pageid":page.get('id') if page else None},"timestamp":int(time.time()*1000)})+"\n")
@@ -1651,7 +1712,7 @@ async def handle_apifeedwp59(
             if domain_data.get('linkexchange') == 1:
                 # #region agent log
                 try:
-                    with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                         import json as json_lib
                         import time
                         f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1542","message":"linkexchange is 1, querying link placement","data":{"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
@@ -1670,7 +1731,7 @@ async def handle_apifeedwp59(
                 except Exception as e:
                     # #region agent log
                     try:
-                        with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                        with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                             import json as json_lib
                             import time
                             f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1551","message":"link placement query exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
@@ -1726,7 +1787,7 @@ async def handle_apifeedwp59(
                     except Exception as e:
                         # #region agent log
                         try:
-                            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                            with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                                 import json as json_lib
                                 import time
                                 f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1553","message":"Exception processing link placement page","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
@@ -1737,7 +1798,7 @@ async def handle_apifeedwp59(
         
             # #region agent log
             try:
-                with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                     import json as json_lib
                     import time
                     f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"article.py:1597","message":"Before JSONResponse","data":{"pagesarray_count":len(pagesarray)},"timestamp":int(time.time()*1000)})+"\n")
@@ -1749,7 +1810,7 @@ async def handle_apifeedwp59(
             except Exception as e:
                 # #region agent log
                 try:
-                    with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                         import json as json_lib
                         import time
                         f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"article.py:1597","message":"JSONResponse exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
@@ -1793,7 +1854,7 @@ async def handle_apifeedwp59(
     except Exception as e:
         # #region agent log
         try:
-            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                 import json as json_lib
                 import time
                 import traceback
