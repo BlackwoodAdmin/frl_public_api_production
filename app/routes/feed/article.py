@@ -1640,54 +1640,54 @@ async def handle_apifeedwp59(
                     bcpage_ex = db.fetch_all(sql, (domainid,))
                     
                     for bcpage in bcpage_ex:
-                    pageid = bcpage['showonpgid']
-                    bpage = db.fetch_row(
-                        'SELECT restitle, resshorttext, createdDate FROM bwp_bubblefeed WHERE id = %s',
-                        (pageid,)
-                    )
-                    
-                    if bpage:
-                        if len(bpage.get('resshorttext', '')) > 50:
-                            sorttext = bpage['resshorttext']
-                        else:
-                            sorttext = ''
+                        pageid = bcpage['showonpgid']
+                        bpage = db.fetch_row(
+                            'SELECT restitle, resshorttext, createdDate FROM bwp_bubblefeed WHERE id = %s',
+                            (pageid,)
+                        )
                         
-                        keyword = clean_title(seo_filter_text_custom(bpage['restitle']))
-                        
-                        # Create slug using PHP 5.9 order: toAscii(keyword) → seo_filter_text_custom(...) → html_entity_decode(...) → strtolower(...) → str_replace(' ', '-', ...) → append -pageid-bc
-                        slug_text = to_ascii(keyword)  # toAscii first
-                        slug_text = seo_filter_text_custom(slug_text)  # seo_filter_text_custom2 (same as seo_filter_text_custom)
-                        slug_text = html.unescape(slug_text)  # html_entity_decode
-                        slug_text = slug_text.lower().replace(' ', '-')  # strtolower and str_replace
-                        slug = slug_text + '-' + str(pageid) + 'bc'
-                        
-                        # Convert datetime to string if needed
-                        post_date = bpage.get('createdDate', '')
-                        if post_date and hasattr(post_date, 'strftime'):
-                            post_date = post_date.strftime('%Y-%m-%d %H:%M:%S')
-                        elif post_date is None:
-                            post_date = ''
-                        
-                        bcpagearray = {
-                            'pageid': str(pageid) + 'bc',
-                            'post_title': keyword.lower() + ' - ' + domain_data['domain_name'],
-                            'post_type': 'page',
-                            'comment_status': 'closed',
-                            'ping_status': 'closed',
-                            'post_date': str(post_date),
-                            'post_excerpt': sorttext,
-                            'post_name': slug,
-                            'post_status': 'publish',
-                            'post_metatitle': keyword.lower() + ' - ' + domain_data['domain_name'],
-                            'post_metakeywords': keyword.lower() + ', ' + domain_data['domain_name']
-                        }
-                        pagesarray.append(bcpagearray)
+                        if bpage:
+                            if len(bpage.get('resshorttext', '')) > 50:
+                                sorttext = bpage['resshorttext']
+                            else:
+                                sorttext = ''
+                            
+                            keyword = clean_title(seo_filter_text_custom(bpage['restitle']))
+                            
+                            # Create slug using PHP 5.9 order: toAscii(keyword) → seo_filter_text_custom(...) → html_entity_decode(...) → strtolower(...) → str_replace(' ', '-', ...) → append -pageid-bc
+                            slug_text = to_ascii(keyword)  # toAscii first
+                            slug_text = seo_filter_text_custom(slug_text)  # seo_filter_text_custom2 (same as seo_filter_text_custom)
+                            slug_text = html.unescape(slug_text)  # html_entity_decode
+                            slug_text = slug_text.lower().replace(' ', '-')  # strtolower and str_replace
+                            slug = slug_text + '-' + str(pageid) + 'bc'
+                            
+                            # Convert datetime to string if needed
+                            post_date = bpage.get('createdDate', '')
+                            if post_date and hasattr(post_date, 'strftime'):
+                                post_date = post_date.strftime('%Y-%m-%d %H:%M:%S')
+                            elif post_date is None:
+                                post_date = ''
+                            
+                            bcpagearray = {
+                                'pageid': str(pageid) + 'bc',
+                                'post_title': keyword.lower() + ' - ' + domain_data['domain_name'],
+                                'post_type': 'page',
+                                'comment_status': 'closed',
+                                'ping_status': 'closed',
+                                'post_date': str(post_date),
+                                'post_excerpt': sorttext,
+                                'post_name': slug,
+                                'post_status': 'publish',
+                                'post_metatitle': keyword.lower() + ' - ' + domain_data['domain_name'],
+                                'post_metakeywords': keyword.lower() + ', ' + domain_data['domain_name']
+                            }
+                            pagesarray.append(bcpagearray)
                 
                 return JSONResponse(content=pagesarray)
             except Exception as e:
-            logger.error(f"Error in handle_apifeedwp59 feededit=1: {e}")
-            logger.error(traceback.format_exc())
-            return PlainTextResponse(content="Internal Server Error", status_code=500)
+                logger.error(f"Error in handle_apifeedwp59 feededit=1: {e}")
+                logger.error(traceback.format_exc())
+                return PlainTextResponse(content="Internal Server Error", status_code=500)
         
         elif feededit == '2' or feededit == 2:
             try:
@@ -1720,9 +1720,9 @@ async def handle_apifeedwp59(
                     media_type="application/json"
                 )
             except Exception as e:
-            logger.error(f"Error in handle_apifeedwp59 feededit=2: {e}")
-            logger.error(traceback.format_exc())
-            return PlainTextResponse(content="Internal Server Error", status_code=500)
+                logger.error(f"Error in handle_apifeedwp59 feededit=2: {e}")
+                logger.error(traceback.format_exc())
+                return PlainTextResponse(content="Internal Server Error", status_code=500)
         
         else:
             return PlainTextResponse(content="Invalid Request F105", status_code=400)
