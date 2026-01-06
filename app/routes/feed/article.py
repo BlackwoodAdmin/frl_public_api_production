@@ -279,6 +279,22 @@ async def article_endpoint(
                 feededit=feededit_param,
                 kkyy=kkyy_normalized
             )
+        elif kkyy_normalized == 'AFfa0fd7KMD98enfawrut7cySa15yV7BXpS85':
+            # Route to apifeedwp5.9
+            feededit_param = feededit or request.query_params.get('feedit')
+            if not feededit_param:
+                if form_data:
+                    feededit_param = form_data.get('feedit')
+                elif json_data:
+                    feededit_param = json_data.get('feedit')
+            return await handle_apifeedwp59(
+                domain=domain,
+                request=request,
+                form_data=form_data,
+                json_data=json_data,
+                feededit=feededit_param,
+                kkyy=kkyy_normalized
+            )
         elif kkyy == 'KVFotrmIERNortemkl39jwetsdakfhklo8wer7':
             # Route to apifeedwp6
             pass
@@ -1339,6 +1355,245 @@ async def handle_apifeedwp61(
                     'template_file': template_file
                 }
                 pagesarray.append(bcpagearray)
+        
+        return JSONResponse(content=pagesarray)
+    
+    elif feededit == '2' or feededit == 2:
+        # Get domain settings
+        domain_settings = db.fetch_row(
+            "SELECT * FROM bwp_domain_settings WHERE domainid = %s",
+            (domainid,)
+        )
+        
+        if not domain_settings:
+            # Create default settings
+            db.execute(
+                "INSERT INTO bwp_domain_settings SET domainid = %s",
+                (domainid,)
+            )
+            domain_settings = db.fetch_row(
+                "SELECT * FROM bwp_domain_settings WHERE domainid = %s",
+                (domainid,)
+            )
+        
+        # Build footer HTML
+        footer_html = build_footer_wp(domainid, domain_data, domain_settings)
+        
+        # Return footer content as JSON-encoded HTML entities
+        import json
+        import html
+        escaped_html = html.escape(footer_html)
+        return Response(
+            content=json.dumps(escaped_html),
+            media_type="application/json"
+        )
+    
+    else:
+        return PlainTextResponse(content="Invalid Request F105", status_code=400)
+
+
+async def handle_apifeedwp59(
+    request: Request,
+    domain: Optional[str],
+    feededit: Optional[str],
+    kkyy: str,
+    form_data: Optional[dict] = None,
+    json_data: Optional[dict] = None
+):
+    """
+    Handle apifeedwp5.9.php requests (WordPress 5.9 plugin feed).
+    """
+    
+    # Validate domain parameter
+    if not domain:
+        return PlainTextResponse(content="Invalid Request F105", status_code=400)
+    
+    # Get domain data (include contentshare field)
+    sql = """
+        SELECT d.id as domainid, d.domain_name, d.servicetype, d.writerlock, d.domainip, 
+               d.showsnapshot, d.wr_address, d.userid, d.status, d.wr_video, d.wr_facebook, 
+               d.wr_googleplus, d.wr_twitter, d.wr_yelp, d.wr_bing, d.wr_name, d.linkexchange, 
+               d.resourcesactive, d.contentshare, r.email as owneremail, s.price
+        FROM bwp_domains d
+        LEFT JOIN bwp_register r ON d.userid = r.id
+        LEFT JOIN bwp_services s ON d.servicetype = s.id
+        WHERE d.domain_name = %s AND d.deleted != 1
+    """
+    
+    domains = db.fetch_all(sql, (domain,))
+    
+    if not domains:
+        return PlainTextResponse(content="Domain Does Not Exist", status_code=404)
+    
+    domain_data = domains[0]
+    domainid = domain_data['domainid']
+    
+    # Handle feededit parameter
+    if feededit == 'add':
+        # Update domain with wp_plugin=1, spydermap=0, script_version='5.9'
+        db.execute(
+            "UPDATE bwp_domains SET wp_plugin=1, spydermap=0, script_version='5.9' WHERE id = %s",
+            (domainid,)
+        )
+        
+        # Return limited domain data
+        rdomains = [{
+            'domainid': domain_data['domainid'],
+            'status': domain_data['status'],
+            'wr_name': domain_data.get('wr_name', ''),
+            'owneremail': domain_data.get('owneremail', '')
+        }]
+        
+        return JSONResponse(content=rdomains)
+    
+    elif feededit == '1' or feededit == 1:
+        # Get agent parameter
+        agent = request.query_params.get('agent', '')
+        if form_data:
+            agent = form_data.get('agent', agent)
+        elif json_data:
+            agent = json_data.get('agent', agent)
+        
+        pagesarray = []
+        import html
+        
+        # a. Bubblefeed pages (if resourcesactive is true)
+        if domain_data.get('resourcesactive'):
+            sql = """
+                SELECT b.*, c.category AS bubblecat, c.bubblefeedid AS bubblecatid, c.id AS bubblecatsid
+                FROM bwp_bubblefeed b
+                LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
+                WHERE b.active = 1 AND b.domainid = %s AND b.deleted != 1
+            """
+            page_ex = db.fetch_all(sql, (domainid,))
+            
+            for page in page_ex:
+                pageid = page['id']
+                keyword = clean_title(seo_filter_text_custom(page['restitle']))
+                
+                # Generate meta title and keywords (with supporting keywords from same category)
+                if page.get('metatitle') and page['metatitle'].strip():
+                    metaTitle = clean_title(seo_filter_text_custom(page['metatitle']))
+                    metaKeywords = seo_filter_text_custom(page['restitle']).lower()
+                    if page.get('bubblecat'):
+                        bubbles_sql = "SELECT restitle FROM bwp_bubblefeed WHERE domainid = %s AND categoryid = %s"
+                        bubbles = db.fetch_all(bubbles_sql, (domainid, page.get('categoryid')))
+                        for bub in bubbles:
+                            if bub['restitle'] != page['restitle']:
+                                metaKeywords += ', ' + seo_filter_text_custom(bub['restitle']).lower()
+                else:
+                    metaTitle = clean_title(seo_filter_text_custom(page['restitle']))
+                    metaKeywords = seo_filter_text_custom(page['restitle']).lower()
+                    if page.get('bubblecat'):
+                        bubbles_sql = "SELECT restitle FROM bwp_bubblefeed WHERE domainid = %s AND categoryid = %s"
+                        bubbles = db.fetch_all(bubbles_sql, (domainid, page.get('categoryid')))
+                        for bub in bubbles:
+                            if bub['restitle'] != page['restitle']:
+                                metaTitle += ' - ' + clean_title(seo_filter_text_custom(bub['restitle']))
+                                metaKeywords += ', ' + seo_filter_text_custom(bub['restitle']).lower()
+                
+                # Build excerpt from metadescription or resfulltext
+                if page.get('metadescription') and page['metadescription'].strip():
+                    sorttext = seo_filter_text_custom(page['metadescription'])
+                else:
+                    if len(page.get('resfulltext', '')) > 50:
+                        # Process resfulltext to match PHP exactly
+                        import re
+                        content = page.get('resfulltext', '')
+                        # PHP order: strip_tags, html_entity_decode, seo_filter_text_custom
+                        content = re.sub(r'<[^>]+>', '', content)  # Remove HTML tags (strip_tags)
+                        content = html.unescape(content)  # html_entity_decode
+                        content = seo_filter_text_custom(content)  # seo_filter_text_custom
+                        # Split into words and take first 20
+                        words = content.split()[:20]
+                        sorttext = ' '.join(words) + '... ' + metaTitle
+                    else:
+                        sorttext = ''
+                
+                # Create slug using PHP 5.9 order: toAscii(keyword) → seo_filter_text_custom(...) → html_entity_decode(...) → strtolower(...) → str_replace(' ', '-', ...) → append -pageid
+                slug_text = to_ascii(keyword)  # toAscii first
+                slug_text = seo_filter_text_custom(slug_text)  # seo_filter_text_custom2 (same as seo_filter_text_custom)
+                slug_text = html.unescape(slug_text)  # html_entity_decode
+                slug_text = slug_text.lower().replace(' ', '-')  # strtolower and str_replace
+                slug = slug_text + '-' + str(pageid)
+                
+                # Convert datetime to string if needed
+                post_date = page.get('createdDate', '')
+                if post_date and hasattr(post_date, 'strftime'):
+                    post_date = post_date.strftime('%Y-%m-%d %H:%M:%S')
+                elif post_date is None:
+                    post_date = ''
+                
+                pagearray = {
+                    'pageid': str(pageid),
+                    'post_title': keyword,
+                    'canonical': '',
+                    'post_type': 'page',
+                    'comment_status': 'closed',
+                    'ping_status': 'closed',
+                    'post_date': str(post_date),
+                    'post_excerpt': sorttext,
+                    'post_name': slug,
+                    'post_status': 'publish',
+                    'post_metatitle': metaTitle,
+                    'post_metakeywords': metaKeywords
+                }
+                pagesarray.append(pagearray)
+        
+        # b. Link placement pages (if linkexchange == 1)
+        if domain_data.get('linkexchange') == 1:
+            sql = """
+                SELECT DISTINCT showonpgid
+                FROM bwp_link_placement
+                WHERE deleted != 1 AND showondomainid = %s
+                GROUP BY bubblefeedid
+                ORDER BY relevant DESC
+            """
+            bcpage_ex = db.fetch_all(sql, (domainid,))
+            
+            for bcpage in bcpage_ex:
+                pageid = bcpage['showonpgid']
+                bpage = db.fetch_row(
+                    'SELECT restitle, resshorttext, createdDate FROM bwp_bubblefeed WHERE id = %s',
+                    (pageid,)
+                )
+                
+                if bpage:
+                    if len(bpage.get('resshorttext', '')) > 50:
+                        sorttext = bpage['resshorttext']
+                    else:
+                        sorttext = ''
+                    
+                    keyword = clean_title(seo_filter_text_custom(bpage['restitle']))
+                    
+                    # Create slug using PHP 5.9 order: toAscii(keyword) → seo_filter_text_custom(...) → html_entity_decode(...) → strtolower(...) → str_replace(' ', '-', ...) → append -pageid-bc
+                    slug_text = to_ascii(keyword)  # toAscii first
+                    slug_text = seo_filter_text_custom(slug_text)  # seo_filter_text_custom2 (same as seo_filter_text_custom)
+                    slug_text = html.unescape(slug_text)  # html_entity_decode
+                    slug_text = slug_text.lower().replace(' ', '-')  # strtolower and str_replace
+                    slug = slug_text + '-' + str(pageid) + 'bc'
+                    
+                    # Convert datetime to string if needed
+                    post_date = bpage.get('createdDate', '')
+                    if post_date and hasattr(post_date, 'strftime'):
+                        post_date = post_date.strftime('%Y-%m-%d %H:%M:%S')
+                    elif post_date is None:
+                        post_date = ''
+                    
+                    bcpagearray = {
+                        'pageid': str(pageid) + 'bc',
+                        'post_title': keyword.lower() + ' - ' + domain_data['domain_name'],
+                        'post_type': 'page',
+                        'comment_status': 'closed',
+                        'ping_status': 'closed',
+                        'post_date': str(post_date),
+                        'post_excerpt': sorttext,
+                        'post_name': slug,
+                        'post_status': 'publish',
+                        'post_metatitle': keyword.lower() + ' - ' + domain_data['domain_name'],
+                        'post_metakeywords': keyword.lower() + ', ' + domain_data['domain_name']
+                    }
+                    pagesarray.append(bcpagearray)
         
         return JSONResponse(content=pagesarray)
     
