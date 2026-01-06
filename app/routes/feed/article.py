@@ -83,13 +83,17 @@ async def article_endpoint(
     Replicates the PHP Article.php functionality.
     Handles both GET and POST requests (PHP $_REQUEST gets both).
     """
+    # Log to standard logger first (always works)
+    logger.info(f"article_endpoint called: method={request.method}, domain={domain}, kkyy={kkyy}, feededit={feedit}")
+    
     # #region agent log
     try:
         with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
             import json as json_lib
             import time
             f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"I","location":"article.py:52","message":"article_endpoint entry","data":{"method":request.method,"domain":domain,"kkyy":kkyy,"feededit":feedit},"timestamp":int(time.time()*1000)})+"\n")
-    except: pass
+    except Exception as log_err:
+        logger.warning(f"Failed to write debug log: {log_err}")
     # #endregion
     
     # For POST requests, also check form data and JSON body (PHP $_REQUEST includes both GET and POST)
@@ -304,16 +308,17 @@ async def article_endpoint(
             )
         elif kkyy_normalized == 'AFfa0fd7KMD98enfawrut7cySa15yV7BXpS85':
             # Route to apifeedwp5.9
+            logger.info(f"Matched kkyy for apifeedwp5.9: {kkyy_normalized}, feededit={feedit}, domain={domain}")
+            
             # #region agent log
             try:
                 with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                     import json as json_lib
                     import time
-                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:285","message":"Routing to apifeedwp5.9","data":{"kkyy":kkyy_normalized,"feededit":feedit,"domain":domain},"timestamp":int(time.time()*1000)})+"\n")
-            except: pass
+                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:310","message":"Routing to apifeedwp5.9","data":{"kkyy":kkyy_normalized,"feededit":feedit,"domain":domain},"timestamp":int(time.time()*1000)})+"\n")
+            except Exception as log_err:
+                logger.warning(f"Failed to write debug log: {log_err}")
             # #endregion
-            
-            logger.info(f"Matched kkyy for apifeedwp5.9: {kkyy_normalized}, feededit={feedit}")
             feededit_param = feededit or request.query_params.get('feedit')
             if not feededit_param:
                 if form_data:
@@ -331,7 +336,19 @@ async def article_endpoint(
             # #endregion
             
             logger.info(f"Calling handle_apifeedwp59 with feededit={feededit_param}, domain={domain}")
+            
+            # #region agent log
             try:
+                with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
+                    import json as json_lib
+                    import time
+                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:339","message":"About to await handle_apifeedwp59","data":{"feededit_param":feededit_param,"domain":domain},"timestamp":int(time.time()*1000)})+"\n")
+            except Exception as log_err:
+                logger.warning(f"Failed to write debug log: {log_err}")
+            # #endregion
+            
+            try:
+                logger.info(f"Starting await handle_apifeedwp59...")
                 result = await handle_apifeedwp59(
                     domain=domain,
                     request=request,
@@ -350,16 +367,19 @@ async def article_endpoint(
                 # #endregion
                 return result
             except Exception as e:
+                logger.error(f"Exception in handle_apifeedwp59: {e}", exc_info=True)
+                
                 # #region agent log
                 try:
                     with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                         import json as json_lib
                         import time
                         import traceback
-                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:295","message":"Exception calling handle_apifeedwp59","data":{"error":str(e),"error_type":type(e).__name__,"traceback":traceback.format_exc()},"timestamp":int(time.time()*1000)})+"\n")
-                except: pass
+                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:357","message":"Exception calling handle_apifeedwp59","data":{"error":str(e),"error_type":type(e).__name__,"traceback":traceback.format_exc()},"timestamp":int(time.time()*1000)})+"\n")
+                except Exception as log_err:
+                    logger.warning(f"Failed to write debug log: {log_err}")
                 # #endregion
-                logger.error(f"Exception in handle_apifeedwp59: {e}", exc_info=True)
+                
                 raise
         elif kkyy_normalized == 'KVFotrmIERNortemkl39jwetsdakfhklo8wer7':
             # Route to apifeedwp6
