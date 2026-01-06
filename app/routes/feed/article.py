@@ -1457,12 +1457,12 @@ async def handle_apifeedwp59(
     if not domain:
         return PlainTextResponse(content="Invalid Request F105", status_code=400)
     
-    # Get domain data (include contentshare field)
+    # Get domain data (include contentshare, ishttps, usewww fields)
     sql = """
         SELECT d.id as domainid, d.domain_name, d.servicetype, d.writerlock, d.domainip, 
                d.showsnapshot, d.wr_address, d.userid, d.status, d.wr_video, d.wr_facebook, 
                d.wr_googleplus, d.wr_twitter, d.wr_yelp, d.wr_bing, d.wr_name, d.linkexchange, 
-               d.resourcesactive, d.contentshare, r.email as owneremail, s.price
+               d.resourcesactive, d.contentshare, d.ishttps, d.usewww, r.email as owneremail, s.price
         FROM bwp_domains d
         LEFT JOIN bwp_register r ON d.userid = r.id
         LEFT JOIN bwp_services s ON d.servicetype = s.id
@@ -1479,33 +1479,39 @@ async def handle_apifeedwp59(
     
     # Handle feededit parameter
     if feededit == 'add':
-        # Update domain with wp_plugin=1, spydermap=0, script_version='5.9'
-        db.execute(
-            "UPDATE bwp_domains SET wp_plugin=1, spydermap=0, script_version='5.9' WHERE id = %s",
-            (domainid,)
-        )
-        
-        # Return limited domain data
-        rdomains = [{
-            'domainid': domain_data['domainid'],
-            'status': domain_data['status'],
-            'wr_name': domain_data.get('wr_name', ''),
-            'owneremail': domain_data.get('owneremail', '')
-        }]
-        
-        return JSONResponse(content=rdomains)
+        try:
+            # Update domain with wp_plugin=1, spydermap=0, script_version='5.9'
+            db.execute(
+                "UPDATE bwp_domains SET wp_plugin=1, spydermap=0, script_version='5.9' WHERE id = %s",
+                (domainid,)
+            )
+            
+            # Return limited domain data
+            rdomains = [{
+                'domainid': domain_data['domainid'],
+                'status': domain_data['status'],
+                'wr_name': domain_data.get('wr_name', ''),
+                'owneremail': domain_data.get('owneremail', '')
+            }]
+            
+            return JSONResponse(content=rdomains)
+        except Exception as e:
+            logger.error(f"Error in handle_apifeedwp59 feededit=add: {e}")
+            logger.error(traceback.format_exc())
+            return PlainTextResponse(content="Internal Server Error", status_code=500)
     
     elif feededit == '1' or feededit == 1:
-        logger.info(f"handle_apifeedwp59: Processing feededit=1 for domain={domain}, domainid={domainid}")
-        # Get agent parameter
-        agent = request.query_params.get('agent', '')
-        if form_data:
-            agent = form_data.get('agent', agent)
-        elif json_data:
-            agent = json_data.get('agent', agent)
-        
-        pagesarray = []
-        import html
+        try:
+            logger.info(f"handle_apifeedwp59: Processing feededit=1 for domain={domain}, domainid={domainid}")
+            # Get agent parameter
+            agent = request.query_params.get('agent', '')
+            if form_data:
+                agent = form_data.get('agent', agent)
+            elif json_data:
+                agent = json_data.get('agent', agent)
+            
+            pagesarray = []
+            import html
         
         # a. Bubblefeed pages (if resourcesactive is true)
         if domain_data.get('resourcesactive'):
@@ -1644,38 +1650,47 @@ async def handle_apifeedwp59(
                         'post_metakeywords': keyword.lower() + ', ' + domain_data['domain_name']
                     }
                     pagesarray.append(bcpagearray)
-        
-        return JSONResponse(content=pagesarray)
+            
+            return JSONResponse(content=pagesarray)
+        except Exception as e:
+            logger.error(f"Error in handle_apifeedwp59 feededit=1: {e}")
+            logger.error(traceback.format_exc())
+            return PlainTextResponse(content="Internal Server Error", status_code=500)
     
     elif feededit == '2' or feededit == 2:
-        # Get domain settings
-        domain_settings = db.fetch_row(
-            "SELECT * FROM bwp_domain_settings WHERE domainid = %s",
-            (domainid,)
-        )
-        
-        if not domain_settings:
-            # Create default settings
-            db.execute(
-                "INSERT INTO bwp_domain_settings SET domainid = %s",
-                (domainid,)
-            )
+        try:
+            # Get domain settings
             domain_settings = db.fetch_row(
                 "SELECT * FROM bwp_domain_settings WHERE domainid = %s",
                 (domainid,)
             )
-        
-        # Build footer HTML
-        footer_html = build_footer_wp(domainid, domain_data, domain_settings)
-        
-        # Return footer content as JSON-encoded HTML entities
-        import json
-        import html
-        escaped_html = html.escape(footer_html)
-        return Response(
-            content=json.dumps(escaped_html),
-            media_type="application/json"
-        )
+            
+            if not domain_settings:
+                # Create default settings
+                db.execute(
+                    "INSERT INTO bwp_domain_settings SET domainid = %s",
+                    (domainid,)
+                )
+                domain_settings = db.fetch_row(
+                    "SELECT * FROM bwp_domain_settings WHERE domainid = %s",
+                    (domainid,)
+                )
+            
+            # Build footer HTML
+            footer_html = build_footer_wp(domainid, domain_data, domain_settings)
+            
+            # Return footer content as JSON-encoded HTML entities
+            import json
+            import html
+            escaped_html = html.escape(footer_html)
+            return Response(
+                content=json.dumps(escaped_html),
+                media_type="application/json"
+            )
+        except Exception as e:
+            logger.error(f"Error in handle_apifeedwp59 feededit=2: {e}")
+            logger.error(traceback.format_exc())
+            return PlainTextResponse(content="Internal Server Error", status_code=500)
     
     else:
         return PlainTextResponse(content="Invalid Request F105", status_code=400)
