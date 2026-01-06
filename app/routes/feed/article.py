@@ -1410,13 +1410,13 @@ async def handle_apifeedwp59(
         # #endregion
         
         logger.info(f"handle_apifeedwp59 called: domain={domain}, feededit={feedit}, kkyy={kkyy}")
-    
-    # Validate domain parameter
-    if not domain:
-        return PlainTextResponse(content="Invalid Request F105", status_code=400)
-    
-    # Get domain data (include contentshare field)
-    sql = """
+        
+        # Validate domain parameter
+        if not domain:
+            return PlainTextResponse(content="Invalid Request F105", status_code=400)
+        
+        # Get domain data (include contentshare field)
+        sql = """
         SELECT d.id as domainid, d.domain_name, d.servicetype, d.writerlock, d.domainip, 
                d.showsnapshot, d.wr_address, d.userid, d.status, d.wr_video, d.wr_facebook, 
                d.wr_googleplus, d.wr_twitter, d.wr_yelp, d.wr_bing, d.wr_name, d.linkexchange, 
@@ -1425,293 +1425,205 @@ async def handle_apifeedwp59(
         LEFT JOIN bwp_register r ON d.userid = r.id
         LEFT JOIN bwp_services s ON d.servicetype = s.id
         WHERE d.domain_name = %s AND d.deleted != 1
-    """
-    
-    # #region agent log
-    try:
-        with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
-            import json as json_lib
-            import time
-            f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1421","message":"Before db.fetch_all","data":{"sql":sql,"domain":domain},"timestamp":int(time.time()*1000)})+"\n")
-    except: pass
-    # #endregion
-    
-    try:
-        domains = db.fetch_all(sql, (domain,))
-    except Exception as e:
+        """
+        
         # #region agent log
         try:
             with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
                 import json as json_lib
                 import time
-                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1421","message":"db.fetch_all exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
+                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1421","message":"Before db.fetch_all","data":{"sql":sql,"domain":domain},"timestamp":int(time.time()*1000)})+"\n")
         except: pass
         # #endregion
-        logger.error(f"Database query failed in handle_apifeedwp59: {e}", exc_info=True)
-        raise
-    
-    # #region agent log
-    try:
-        with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
-            import json as json_lib
-            import time
-            f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1421","message":"After db.fetch_all","data":{"domains_count":len(domains) if domains else 0},"timestamp":int(time.time()*1000)})+"\n")
-    except: pass
-    # #endregion
-    
-    if not domains:
-        return PlainTextResponse(content="Domain Does Not Exist", status_code=404)
-    
-    domain_data = domains[0]
-    domainid = domain_data['domainid']
-    
-    # #region agent log
-    try:
-        with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
-            import json as json_lib
-            import time
-            f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1427","message":"Domain data retrieved","data":{"domainid":domainid,"resourcesactive":domain_data.get('resourcesactive'),"linkexchange":domain_data.get('linkexchange')},"timestamp":int(time.time()*1000)})+"\n")
-    except: pass
-    # #endregion
-    
-    # Handle feededit parameter
-    if feededit == 'add':
-        # Update domain with wp_plugin=1, spydermap=0, script_version='5.9'
-        db.execute(
-            "UPDATE bwp_domains SET wp_plugin=1, spydermap=0, script_version='5.9' WHERE id = %s",
-            (domainid,)
-        )
         
-        # Return limited domain data
-        rdomains = [{
-            'domainid': domain_data['domainid'],
-            'status': domain_data['status'],
-            'wr_name': domain_data.get('wr_name', ''),
-            'owneremail': domain_data.get('owneremail', '')
-        }]
-        
-        return JSONResponse(content=rdomains)
-    
-    elif feededit == '1' or feededit == 1:
-        # #region agent log
         try:
-            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                import json as json_lib
-                import time
-                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"article.py:1447","message":"feededit=1 branch entered","data":{"domain":domain,"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
-        except: pass
-        # #endregion
-        
-        logger.info(f"handle_apifeedwp59: Processing feededit=1 for domain={domain}, domainid={domainid}")
-        # Get agent parameter
-        agent = request.query_params.get('agent', '')
-        if form_data:
-            agent = form_data.get('agent', agent)
-        elif json_data:
-            agent = json_data.get('agent', agent)
-        
-        pagesarray = []
-        import html
-        
-        # a. Bubblefeed pages (if resourcesactive is true)
-        if domain_data.get('resourcesactive'):
+            domains = db.fetch_all(sql, (domain,))
+        except Exception as e:
             # #region agent log
             try:
                 with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
                     import json as json_lib
                     import time
-                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1460","message":"resourcesactive is true, querying bubblefeed","data":{"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
+                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1421","message":"db.fetch_all exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
+            except: pass
+            # #endregion
+            logger.error(f"Database query failed in handle_apifeedwp59: {e}", exc_info=True)
+            raise
+        
+        # #region agent log
+        try:
+            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                import json as json_lib
+                import time
+                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1421","message":"After db.fetch_all","data":{"domains_count":len(domains) if domains else 0},"timestamp":int(time.time()*1000)})+"\n")
+        except: pass
+        # #endregion
+        
+        if not domains:
+            return PlainTextResponse(content="Domain Does Not Exist", status_code=404)
+        
+        domain_data = domains[0]
+        domainid = domain_data['domainid']
+        
+        # #region agent log
+        try:
+            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                import json as json_lib
+                import time
+                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1427","message":"Domain data retrieved","data":{"domainid":domainid,"resourcesactive":domain_data.get('resourcesactive'),"linkexchange":domain_data.get('linkexchange')},"timestamp":int(time.time()*1000)})+"\n")
+        except: pass
+        # #endregion
+        
+        # Handle feededit parameter
+        if feededit == 'add':
+            # Update domain with wp_plugin=1, spydermap=0, script_version='5.9'
+            db.execute(
+                "UPDATE bwp_domains SET wp_plugin=1, spydermap=0, script_version='5.9' WHERE id = %s",
+                (domainid,)
+            )
+            
+            # Return limited domain data
+            rdomains = [{
+                'domainid': domain_data['domainid'],
+                'status': domain_data['status'],
+                'wr_name': domain_data.get('wr_name', ''),
+                'owneremail': domain_data.get('owneremail', '')
+            }]
+            
+            return JSONResponse(content=rdomains)
+        
+        elif feededit == '1' or feededit == 1:
+            # #region agent log
+            try:
+                with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    import json as json_lib
+                    import time
+                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"article.py:1447","message":"feededit=1 branch entered","data":{"domain":domain,"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
             except: pass
             # #endregion
             
-            sql = """
+            logger.info(f"handle_apifeedwp59: Processing feededit=1 for domain={domain}, domainid={domainid}")
+            # Get agent parameter
+            agent = request.query_params.get('agent', '')
+            if form_data:
+                agent = form_data.get('agent', agent)
+            elif json_data:
+                agent = json_data.get('agent', agent)
+            
+            pagesarray = []
+            import html
+            
+            # a. Bubblefeed pages (if resourcesactive is true)
+            if domain_data.get('resourcesactive'):
+                # #region agent log
+                try:
+                    with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                        import json as json_lib
+                        import time
+                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1460","message":"resourcesactive is true, querying bubblefeed","data":{"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
+                except: pass
+                # #endregion
+                
+                sql = """
                 SELECT b.*, c.category AS bubblecat, c.bubblefeedid AS bubblecatid, c.id AS bubblecatsid
                 FROM bwp_bubblefeed b
                 LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
                 WHERE b.active = 1 AND b.domainid = %s AND b.deleted != 1
-            """
-            try:
-                page_ex = db.fetch_all(sql, (domainid,))
-            except Exception as e:
-                # #region agent log
+                """
                 try:
-                    with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                        import json as json_lib
-                        import time
-                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1467","message":"bubblefeed query exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
-                except: pass
-                # #endregion
-                logger.error(f"Bubblefeed query failed: {e}", exc_info=True)
-                raise
-            
-            # #region agent log
-            try:
-                with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                    import json as json_lib
-                    import time
-                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1467","message":"bubblefeed query result","data":{"page_count":len(page_ex) if page_ex else 0},"timestamp":int(time.time()*1000)})+"\n")
-            except: pass
-            # #endregion
-            
-            for page in page_ex:
-                # #region agent log
-                try:
-                    with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                        import json as json_lib
-                        import time
-                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"article.py:1469","message":"Processing bubblefeed page","data":{"pageid":page.get('id')},"timestamp":int(time.time()*1000)})+"\n")
-                except: pass
-                # #endregion
-                
-                try:
-                    pageid = page['id']
-                    keyword = clean_title(seo_filter_text_custom(page['restitle']))
-                    
-                    # Generate meta title and keywords (with supporting keywords from same category)
-                    if page.get('metatitle') and page['metatitle'].strip():
-                        metaTitle = clean_title(seo_filter_text_custom(page['metatitle']))
-                        metaKeywords = seo_filter_text_custom(page['restitle']).lower()
-                        if page.get('bubblecat'):
-                            bubbles_sql = "SELECT restitle FROM bwp_bubblefeed WHERE domainid = %s AND categoryid = %s"
-                            bubbles = db.fetch_all(bubbles_sql, (domainid, page.get('categoryid')))
-                            for bub in bubbles:
-                                if bub['restitle'] != page['restitle']:
-                                    metaKeywords += ', ' + seo_filter_text_custom(bub['restitle']).lower()
-                    else:
-                        metaTitle = clean_title(seo_filter_text_custom(page['restitle']))
-                        metaKeywords = seo_filter_text_custom(page['restitle']).lower()
-                        if page.get('bubblecat'):
-                            bubbles_sql = "SELECT restitle FROM bwp_bubblefeed WHERE domainid = %s AND categoryid = %s"
-                            bubbles = db.fetch_all(bubbles_sql, (domainid, page.get('categoryid')))
-                            for bub in bubbles:
-                                if bub['restitle'] != page['restitle']:
-                                    metaTitle += ' - ' + clean_title(seo_filter_text_custom(bub['restitle']))
-                                    metaKeywords += ', ' + seo_filter_text_custom(bub['restitle']).lower()
-                    
-                    # Build excerpt from metadescription or resfulltext
-                    if page.get('metadescription') and page['metadescription'].strip():
-                        sorttext = seo_filter_text_custom(page['metadescription'])
-                    else:
-                        if len(page.get('resfulltext', '')) > 50:
-                            # Process resfulltext to match PHP exactly
-                            import re
-                            content = page.get('resfulltext', '')
-                            # PHP order: strip_tags, html_entity_decode, seo_filter_text_custom
-                            content = re.sub(r'<[^>]+>', '', content)  # Remove HTML tags (strip_tags)
-                            content = html.unescape(content)  # html_entity_decode
-                            content = seo_filter_text_custom(content)  # seo_filter_text_custom
-                            # Split into words and take first 20
-                            words = content.split()[:20]
-                            sorttext = ' '.join(words) + '... ' + metaTitle
-                        else:
-                            sorttext = ''
-                    
-                    # Create slug using PHP 5.9 order: toAscii(keyword) → seo_filter_text_custom(...) → html_entity_decode(...) → strtolower(...) → str_replace(' ', '-', ...) → append -pageid
-                    slug_text = to_ascii(keyword)  # toAscii first
-                    slug_text = seo_filter_text_custom(slug_text)  # seo_filter_text_custom2 (same as seo_filter_text_custom)
-                    slug_text = html.unescape(slug_text)  # html_entity_decode
-                    slug_text = slug_text.lower().replace(' ', '-')  # strtolower and str_replace
-                    slug = slug_text + '-' + str(pageid)
-                    
-                    # Convert datetime to string if needed
-                    post_date = page.get('createdDate', '')
-                    if post_date and hasattr(post_date, 'strftime'):
-                        post_date = post_date.strftime('%Y-%m-%d %H:%M:%S')
-                    elif post_date is None:
-                        post_date = ''
-                    
-                    pagearray = {
-                        'pageid': str(pageid),
-                        'post_title': keyword,
-                        'canonical': '',
-                        'post_type': 'page',
-                        'comment_status': 'closed',
-                        'ping_status': 'closed',
-                        'post_date': str(post_date),
-                        'post_excerpt': sorttext,
-                        'post_name': slug,
-                        'post_status': 'publish',
-                        'post_metatitle': metaTitle,
-                        'post_metakeywords': metaKeywords
-                    }
-                    pagesarray.append(pagearray)
+                    page_ex = db.fetch_all(sql, (domainid,))
                 except Exception as e:
                     # #region agent log
                     try:
                         with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
                             import json as json_lib
                             import time
-                            f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"article.py:1469","message":"Exception processing bubblefeed page","data":{"error":str(e),"error_type":type(e).__name__,"pageid":page.get('id') if page else None},"timestamp":int(time.time()*1000)})+"\n")
+                            f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1467","message":"bubblefeed query exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
                     except: pass
                     # #endregion
-                    logger.error(f"Error processing bubblefeed page: {e}", exc_info=True)
+                    logger.error(f"Bubblefeed query failed: {e}", exc_info=True)
                     raise
-        
-        # b. Link placement pages (if linkexchange == 1)
-        if domain_data.get('linkexchange') == 1:
-            # #region agent log
-            try:
-                with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                    import json as json_lib
-                    import time
-                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1542","message":"linkexchange is 1, querying link placement","data":{"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
-            except: pass
-            # #endregion
-            
-            sql = """
-                SELECT DISTINCT showonpgid
-                FROM bwp_link_placement
-                WHERE deleted != 1 AND showondomainid = %s
-                GROUP BY bubblefeedid
-                ORDER BY relevant DESC
-            """
-            try:
-                bcpage_ex = db.fetch_all(sql, (domainid,))
-            except Exception as e:
+                
                 # #region agent log
                 try:
                     with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
                         import json as json_lib
                         import time
-                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1551","message":"link placement query exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
+                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1467","message":"bubblefeed query result","data":{"page_count":len(page_ex) if page_ex else 0},"timestamp":int(time.time()*1000)})+"\n")
                 except: pass
                 # #endregion
-                logger.error(f"Link placement query failed: {e}", exc_info=True)
-                raise
-            
-            for bcpage in bcpage_ex:
-                try:
-                    pageid = bcpage['showonpgid']
-                    bpage = db.fetch_row(
-                        'SELECT restitle, resshorttext, createdDate FROM bwp_bubblefeed WHERE id = %s',
-                        (pageid,)
-                    )
+                
+                for page in page_ex:
+                    # #region agent log
+                    try:
+                        with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                            import json as json_lib
+                            import time
+                            f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"article.py:1469","message":"Processing bubblefeed page","data":{"pageid":page.get('id')},"timestamp":int(time.time()*1000)})+"\n")
+                    except: pass
+                    # #endregion
                     
-                    if bpage:
-                        if len(bpage.get('resshorttext', '')) > 50:
-                            sorttext = bpage['resshorttext']
+                    try:
+                        pageid = page['id']
+                        keyword = clean_title(seo_filter_text_custom(page['restitle']))
+                        
+                        # Generate meta title and keywords (with supporting keywords from same category)
+                        if page.get('metatitle') and page['metatitle'].strip():
+                            metaTitle = clean_title(seo_filter_text_custom(page['metatitle']))
+                            metaKeywords = seo_filter_text_custom(page['restitle']).lower()
+                            if page.get('bubblecat'):
+                                bubbles_sql = "SELECT restitle FROM bwp_bubblefeed WHERE domainid = %s AND categoryid = %s"
+                                bubbles = db.fetch_all(bubbles_sql, (domainid, page.get('categoryid')))
+                                for bub in bubbles:
+                                    if bub['restitle'] != page['restitle']:
+                                        metaKeywords += ', ' + seo_filter_text_custom(bub['restitle']).lower()
                         else:
-                            sorttext = ''
+                            metaTitle = clean_title(seo_filter_text_custom(page['restitle']))
+                            metaKeywords = seo_filter_text_custom(page['restitle']).lower()
+                            if page.get('bubblecat'):
+                                bubbles_sql = "SELECT restitle FROM bwp_bubblefeed WHERE domainid = %s AND categoryid = %s"
+                                bubbles = db.fetch_all(bubbles_sql, (domainid, page.get('categoryid')))
+                                for bub in bubbles:
+                                    if bub['restitle'] != page['restitle']:
+                                        metaTitle += ' - ' + clean_title(seo_filter_text_custom(bub['restitle']))
+                                        metaKeywords += ', ' + seo_filter_text_custom(bub['restitle']).lower()
                         
-                        keyword = clean_title(seo_filter_text_custom(bpage['restitle']))
+                        # Build excerpt from metadescription or resfulltext
+                        if page.get('metadescription') and page['metadescription'].strip():
+                            sorttext = seo_filter_text_custom(page['metadescription'])
+                        else:
+                            if len(page.get('resfulltext', '')) > 50:
+                                # Process resfulltext to match PHP exactly
+                                import re
+                                content = page.get('resfulltext', '')
+                                # PHP order: strip_tags, html_entity_decode, seo_filter_text_custom
+                                content = re.sub(r'<[^>]+>', '', content)  # Remove HTML tags (strip_tags)
+                                content = html.unescape(content)  # html_entity_decode
+                                content = seo_filter_text_custom(content)  # seo_filter_text_custom
+                                # Split into words and take first 20
+                                words = content.split()[:20]
+                                sorttext = ' '.join(words) + '... ' + metaTitle
+                            else:
+                                sorttext = ''
                         
-                        # Create slug using PHP 5.9 order: toAscii(keyword) → seo_filter_text_custom(...) → html_entity_decode(...) → strtolower(...) → str_replace(' ', '-', ...) → append -pageid-bc
+                        # Create slug using PHP 5.9 order: toAscii(keyword) → seo_filter_text_custom(...) → html_entity_decode(...) → strtolower(...) → str_replace(' ', '-', ...) → append -pageid
                         slug_text = to_ascii(keyword)  # toAscii first
                         slug_text = seo_filter_text_custom(slug_text)  # seo_filter_text_custom2 (same as seo_filter_text_custom)
                         slug_text = html.unescape(slug_text)  # html_entity_decode
                         slug_text = slug_text.lower().replace(' ', '-')  # strtolower and str_replace
-                        slug = slug_text + '-' + str(pageid) + 'bc'
+                        slug = slug_text + '-' + str(pageid)
                         
                         # Convert datetime to string if needed
-                        post_date = bpage.get('createdDate', '')
+                        post_date = page.get('createdDate', '')
                         if post_date and hasattr(post_date, 'strftime'):
                             post_date = post_date.strftime('%Y-%m-%d %H:%M:%S')
                         elif post_date is None:
                             post_date = ''
                         
-                        bcpagearray = {
-                            'pageid': str(pageid) + 'bc',
-                            'post_title': keyword.lower() + ' - ' + domain_data['domain_name'],
+                        pagearray = {
+                            'pageid': str(pageid),
+                            'post_title': keyword,
+                            'canonical': '',
                             'post_type': 'page',
                             'comment_status': 'closed',
                             'ping_status': 'closed',
@@ -1719,74 +1631,174 @@ async def handle_apifeedwp59(
                             'post_excerpt': sorttext,
                             'post_name': slug,
                             'post_status': 'publish',
-                            'post_metatitle': keyword.lower() + ' - ' + domain_data['domain_name'],
-                            'post_metakeywords': keyword.lower() + ', ' + domain_data['domain_name']
+                            'post_metatitle': metaTitle,
+                            'post_metakeywords': metaKeywords
                         }
-                        pagesarray.append(bcpagearray)
+                        pagesarray.append(pagearray)
+                    except Exception as e:
+                        # #region agent log
+                        try:
+                            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                                import json as json_lib
+                                import time
+                                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"article.py:1469","message":"Exception processing bubblefeed page","data":{"error":str(e),"error_type":type(e).__name__,"pageid":page.get('id') if page else None},"timestamp":int(time.time()*1000)})+"\n")
+                        except: pass
+                        # #endregion
+                        logger.error(f"Error processing bubblefeed page: {e}", exc_info=True)
+                        raise
+            
+            # b. Link placement pages (if linkexchange == 1)
+            if domain_data.get('linkexchange') == 1:
+                # #region agent log
+                try:
+                    with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                        import json as json_lib
+                        import time
+                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1542","message":"linkexchange is 1, querying link placement","data":{"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
+                except: pass
+                # #endregion
+                
+                sql = """
+                SELECT DISTINCT showonpgid
+                FROM bwp_link_placement
+                WHERE deleted != 1 AND showondomainid = %s
+                GROUP BY bubblefeedid
+                ORDER BY relevant DESC
+                """
+                try:
+                    bcpage_ex = db.fetch_all(sql, (domainid,))
                 except Exception as e:
                     # #region agent log
                     try:
                         with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
                             import json as json_lib
                             import time
-                            f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1553","message":"Exception processing link placement page","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
+                            f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1551","message":"link placement query exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
                     except: pass
                     # #endregion
-                    logger.error(f"Error processing link placement page: {e}", exc_info=True)
+                    logger.error(f"Link placement query failed: {e}", exc_info=True)
                     raise
+                
+                for bcpage in bcpage_ex:
+                    try:
+                        pageid = bcpage['showonpgid']
+                        bpage = db.fetch_row(
+                            'SELECT restitle, resshorttext, createdDate FROM bwp_bubblefeed WHERE id = %s',
+                            (pageid,)
+                        )
+                        
+                        if bpage:
+                            if len(bpage.get('resshorttext', '')) > 50:
+                                sorttext = bpage['resshorttext']
+                            else:
+                                sorttext = ''
+                            
+                            keyword = clean_title(seo_filter_text_custom(bpage['restitle']))
+                            
+                            # Create slug using PHP 5.9 order: toAscii(keyword) → seo_filter_text_custom(...) → html_entity_decode(...) → strtolower(...) → str_replace(' ', '-', ...) → append -pageid-bc
+                            slug_text = to_ascii(keyword)  # toAscii first
+                            slug_text = seo_filter_text_custom(slug_text)  # seo_filter_text_custom2 (same as seo_filter_text_custom)
+                            slug_text = html.unescape(slug_text)  # html_entity_decode
+                            slug_text = slug_text.lower().replace(' ', '-')  # strtolower and str_replace
+                            slug = slug_text + '-' + str(pageid) + 'bc'
+                            
+                            # Convert datetime to string if needed
+                            post_date = bpage.get('createdDate', '')
+                            if post_date and hasattr(post_date, 'strftime'):
+                                post_date = post_date.strftime('%Y-%m-%d %H:%M:%S')
+                            elif post_date is None:
+                                post_date = ''
+                            
+                            bcpagearray = {
+                                'pageid': str(pageid) + 'bc',
+                                'post_title': keyword.lower() + ' - ' + domain_data['domain_name'],
+                                'post_type': 'page',
+                                'comment_status': 'closed',
+                                'ping_status': 'closed',
+                                'post_date': str(post_date),
+                                'post_excerpt': sorttext,
+                                'post_name': slug,
+                                'post_status': 'publish',
+                                'post_metatitle': keyword.lower() + ' - ' + domain_data['domain_name'],
+                                'post_metakeywords': keyword.lower() + ', ' + domain_data['domain_name']
+                            }
+                            pagesarray.append(bcpagearray)
+                    except Exception as e:
+                        # #region agent log
+                        try:
+                            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                                import json as json_lib
+                                import time
+                                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1553","message":"Exception processing link placement page","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
+                        except: pass
+                        # #endregion
+                        logger.error(f"Error processing link placement page: {e}", exc_info=True)
+                        raise
         
-        # #region agent log
-        try:
-            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                import json as json_lib
-                import time
-                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"article.py:1597","message":"Before JSONResponse","data":{"pagesarray_count":len(pagesarray)},"timestamp":int(time.time()*1000)})+"\n")
-        except: pass
-        # #endregion
-        
-        try:
-            return JSONResponse(content=pagesarray)
-        except Exception as e:
             # #region agent log
             try:
                 with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
                     import json as json_lib
                     import time
-                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"article.py:1597","message":"JSONResponse exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
+                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"article.py:1597","message":"Before JSONResponse","data":{"pagesarray_count":len(pagesarray)},"timestamp":int(time.time()*1000)})+"\n")
             except: pass
             # #endregion
-            logger.error(f"JSONResponse failed: {e}", exc_info=True)
-            raise
-    
-    elif feededit == '2' or feededit == 2:
-        # Get domain settings
-        domain_settings = db.fetch_row(
-            "SELECT * FROM bwp_domain_settings WHERE domainid = %s",
-            (domainid,)
-        )
+            
+            try:
+                return JSONResponse(content=pagesarray)
+            except Exception as e:
+                # #region agent log
+                try:
+                    with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                        import json as json_lib
+                        import time
+                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"article.py:1597","message":"JSONResponse exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
+                except: pass
+                # #endregion
+                logger.error(f"JSONResponse failed: {e}", exc_info=True)
+                raise
         
-        if not domain_settings:
-            # Create default settings
-            db.execute(
-                "INSERT INTO bwp_domain_settings SET domainid = %s",
-                (domainid,)
-            )
+        elif feededit == '2' or feededit == 2:
+            # Get domain settings
             domain_settings = db.fetch_row(
                 "SELECT * FROM bwp_domain_settings WHERE domainid = %s",
                 (domainid,)
             )
+            
+            if not domain_settings:
+                # Create default settings
+                db.execute(
+                    "INSERT INTO bwp_domain_settings SET domainid = %s",
+                    (domainid,)
+                )
+                domain_settings = db.fetch_row(
+                    "SELECT * FROM bwp_domain_settings WHERE domainid = %s",
+                    (domainid,)
+                )
+            
+            # Build footer HTML
+            footer_html = build_footer_wp(domainid, domain_data, domain_settings)
+            
+            # Return footer content as JSON-encoded HTML entities
+            import json
+            import html
+            escaped_html = html.escape(footer_html)
+            return Response(
+                content=json.dumps(escaped_html),
+                media_type="application/json"
+            )
         
-        # Build footer HTML
-        footer_html = build_footer_wp(domainid, domain_data, domain_settings)
-        
-        # Return footer content as JSON-encoded HTML entities
-        import json
-        import html
-        escaped_html = html.escape(footer_html)
-        return Response(
-            content=json.dumps(escaped_html),
-            media_type="application/json"
-        )
-    
-    else:
-        return PlainTextResponse(content="Invalid Request F105", status_code=400)
+        else:
+            return PlainTextResponse(content="Invalid Request F105", status_code=400)
+    except Exception as e:
+        # #region agent log
+        try:
+            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                import json as json_lib
+                import time
+                import traceback
+                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"G","location":"article.py:1391","message":"Unhandled exception in handle_apifeedwp59","data":{"error":str(e),"error_type":type(e).__name__,"traceback":traceback.format_exc()},"timestamp":int(time.time()*1000)})+"\n")
+        except: pass
+        # #endregion
+        logger.error(f"Unhandled exception in handle_apifeedwp59: {e}", exc_info=True)
+        raise
