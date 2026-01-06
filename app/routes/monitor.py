@@ -564,8 +564,8 @@ def _extract_journalctl_log_level(line: str) -> str:
     
     Uses a three-step approach:
     1. Check for HTTP access logs with 2xx status codes (returns INFO)
-    2. Parse structured journalctl format (TIMESTAMP LEVEL PRIORITY HOSTNAME SERVICE[PID]: MESSAGE)
-    3. Fall back to keyword search if structured parsing fails
+    2. Extract log level from actual message content (after the colon) - this is the real log level
+    3. Fall back to journalctl priority level if no level found in message
     
     Args:
         line: Log line from journalctl output
@@ -582,7 +582,32 @@ def _extract_journalctl_log_level(line: str) -> str:
         if status_match:
             return "INFO"
     
-    # Step 2: Parse structured journalctl format
+    # Step 2: Extract log level from actual message content (after the colon)
+    # Format: TIMESTAMP LEVEL PRIORITY HOSTNAME SERVICE[PID]: ACTUAL_LOG_MESSAGE
+    # The ACTUAL_LOG_MESSAGE contains the real log level like "INFO - message"
+    colon_index = line.find(':')
+    if colon_index != -1:
+        # Get the message part after the colon
+        message_part = line[colon_index + 1:].strip()
+        # Look for log level patterns in the message: " - LEVEL - " or "LEVEL - "
+        # Pattern: timestamp - module - LEVEL - message
+        level_match = re.search(r'\s-\s+(\w+)\s+-\s+(ERROR|WARNING|INFO|DEBUG)\s+-\s+', message_part, re.IGNORECASE)
+        if level_match:
+            return level_match.group(2).upper()
+        # Also check for simpler pattern: "LEVEL - message"
+        simple_level_match = re.search(r'^\s*(ERROR|WARNING|INFO|DEBUG)\s+-\s+', message_part, re.IGNORECASE)
+        if simple_level_match:
+            return simple_level_match.group(1).upper()
+        # Fall back to keyword search in the message part
+        message_level = _extract_log_level(message_part)
+        # Only return if we found a specific level (not just default INFO)
+        # or if INFO is explicitly mentioned in the message
+        if message_level != "INFO":
+            return message_level
+        elif "INFO" in message_part.upper():
+            return "INFO"
+    
+    # Step 3: Fall back to journalctl priority level (but this is less reliable)
     # Format: TIMESTAMP LEVEL PRIORITY HOSTNAME SERVICE[PID]: MESSAGE
     parts = line.split(None, 3)  # Split into max 4 parts (timestamp, level, priority, rest)
     
@@ -590,13 +615,13 @@ def _extract_journalctl_log_level(line: str) -> str:
         # Check if first part looks like an ISO timestamp (contains 'T' separator)
         timestamp_part = parts[0]
         if 'T' in timestamp_part and len(timestamp_part) >= 10:
-            # Second part should be the log level
+            # Second part is the journalctl priority level (less reliable than message content)
             level_part = parts[1].upper()
             # Validate it's a known log level
             if level_part in ('ERROR', 'WARNING', 'INFO', 'DEBUG'):
                 return level_part
     
-    # Step 3: Fall back to keyword search if structured parsing fails
+    # Step 4: Final fallback to keyword search
     return _extract_log_level(line)
 
 
