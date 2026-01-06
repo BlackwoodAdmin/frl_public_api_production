@@ -34,6 +34,14 @@ except Exception as e:
     logger.error(traceback.format_exc())
     raise
 
+try:
+    from app.utils.logging import log_post_variables
+except Exception as e:
+    logger.error(f"Failed to import app.utils.logging: {e}")
+    logger.error(traceback.format_exc())
+    # Don't raise - logging is optional
+    log_post_variables = None
+
 router = APIRouter()
 
 
@@ -229,6 +237,49 @@ async def article_endpoint(
                             logger.warning(f"Raw body parsing also failed: {e3}")
         except Exception as e:
             logger.warning(f"Body parsing failed: {e}")
+    
+    # Log POST variables for debugging
+    if log_post_variables:
+        try:
+            # Get URL
+            url = str(request.url)
+            
+            # Get query params as dict
+            query_params_dict = dict(request.query_params)
+            
+            # Convert form_data to dict if it's a Form object
+            form_data_dict = None
+            if form_data:
+                try:
+                    form_data_dict = dict(form_data)
+                except Exception:
+                    form_data_dict = None
+            
+            # Get raw body as string if form_data and json_data are both None
+            raw_body_str = None
+            if not form_data_dict and not json_data and raw_body:
+                try:
+                    raw_body_str = raw_body.decode('utf-8')
+                except Exception:
+                    raw_body_str = None
+            
+            # Get headers
+            headers_dict = dict(request.headers)
+            
+            # Call logging function
+            log_post_variables(
+                endpoint="Article.php",
+                method=request.method,
+                url=url,
+                query_params=query_params_dict,
+                form_data=form_data_dict,
+                json_data=json_data,
+                raw_body=raw_body_str,
+                headers=headers_dict
+            )
+        except Exception as e:
+            # Don't let logging errors break the endpoint
+            logger.warning(f"Failed to log POST variables: {e}")
     
     # WordPress plugin feed routing (kkyy-based)
     if apiid and apikey and kkyy:

@@ -69,6 +69,14 @@ except Exception as e:
     logger.error(traceback.format_exc())
     raise
 
+try:
+    from app.utils.logging import log_post_variables
+except Exception as e:
+    logger.error(f"Failed to import app.utils.logging: {e}")
+    logger.error(traceback.format_exc())
+    # Don't raise - logging is optional
+    log_post_variables = None
+
 router = APIRouter()
 
 
@@ -100,6 +108,10 @@ async def articles_endpoint(
     Replicates the PHP Articles.php functionality.
     Handles both GET and POST requests (PHP $_REQUEST gets both).
     """
+    # Initialize variables for logging
+    form_data = None
+    raw_body = None
+    
     # For POST requests, also check form data and JSON body
     if request.method == "POST":
         query_params = dict(request.query_params)
@@ -205,6 +217,49 @@ async def articles_endpoint(
                             pass
         except Exception as e:
             logger.warning(f"Could not parse POST body: {e}")
+    
+    # Log POST variables for debugging
+    if log_post_variables:
+        try:
+            # Get URL
+            url = str(request.url)
+            
+            # Get query params as dict
+            query_params_dict = dict(request.query_params)
+            
+            # Convert form_data to dict if it exists
+            form_data_dict = None
+            if form_data:
+                try:
+                    form_data_dict = dict(form_data)
+                except Exception:
+                    form_data_dict = None
+            
+            # Get raw body as string if form_data is None
+            raw_body_str = None
+            if not form_data_dict and raw_body:
+                try:
+                    raw_body_str = raw_body.decode('utf-8')
+                except Exception:
+                    raw_body_str = None
+            
+            # Get headers
+            headers_dict = dict(request.headers)
+            
+            # Call logging function
+            log_post_variables(
+                endpoint="Articles.php",
+                method=request.method,
+                url=url,
+                query_params=query_params_dict,
+                form_data=form_data_dict,
+                json_data=None,  # Articles.php doesn't use json_data
+                raw_body=raw_body_str,
+                headers=headers_dict
+            )
+        except Exception as e:
+            # Don't let logging errors break the endpoint
+            logger.warning(f"Failed to log POST variables: {e}")
     
     # Normalize Action - treat empty string as None/empty
     # Check if Action is empty string from any source (GET query, POST form, POST JSON)
