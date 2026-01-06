@@ -1,19 +1,8 @@
 """Article.php endpoint - Main content router."""
 import logging
 import traceback
-import os
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
-
-# Cross-platform debug log path
-DEBUG_LOG_PATH = os.getenv("DEBUG_LOG_PATH", str(Path(__file__).parent.parent.parent / ".cursor" / "debug.log"))
-# Ensure log directory exists
-try:
-    log_dir = Path(DEBUG_LOG_PATH).parent
-    log_dir.mkdir(parents=True, exist_ok=True)
-except Exception:
-    pass  # If we can't create the directory, logging will just fail silently
 
 try:
     from fastapi import APIRouter, Request, Query, HTTPException, Form
@@ -85,16 +74,6 @@ async def article_endpoint(
     """
     # Log to standard logger first (always works)
     logger.info(f"article_endpoint called: method={request.method}, domain={domain}, kkyy={kkyy}, feededit={feededit}")
-    
-    # #region agent log
-    try:
-        with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-            import json as json_lib
-            import time
-            f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"I","location":"article.py:52","message":"article_endpoint entry","data":{"method":request.method,"domain":domain,"kkyy":kkyy,"feededit":feededit},"timestamp":int(time.time()*1000)})+"\n")
-    except Exception as log_err:
-        logger.warning(f"Failed to write debug log: {log_err}")
-    # #endregion
     
     # For POST requests, also check form data and JSON body (PHP $_REQUEST includes both GET and POST)
     # Note: POST requests can have parameters in query string OR body
@@ -309,16 +288,6 @@ async def article_endpoint(
         elif kkyy_normalized == 'AFfa0fd7KMD98enfawrut7cySa15yV7BXpS85':
             # Route to apifeedwp5.9
             logger.info(f"Matched kkyy for apifeedwp5.9: {kkyy_normalized}, feededit={feededit}, domain={domain}")
-            
-            # #region agent log
-            try:
-                with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                    import json as json_lib
-                    import time
-                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:310","message":"Routing to apifeedwp5.9","data":{"kkyy":kkyy_normalized,"feededit":feededit,"domain":domain},"timestamp":int(time.time()*1000)})+"\n")
-            except Exception as log_err:
-                logger.warning(f"Failed to write debug log: {log_err}")
-            # #endregion
             feededit_param = feededit or request.query_params.get('feedit')
             if not feededit_param:
                 if form_data:
@@ -326,61 +295,15 @@ async def article_endpoint(
                 elif json_data and isinstance(json_data, dict):
                     feededit_param = json_data.get('feedit')
             
-            # #region agent log
-            try:
-                with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                    import json as json_lib
-                    import time
-                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:295","message":"Before calling handle_apifeedwp59","data":{"feededit_param":feededit_param,"domain":domain},"timestamp":int(time.time()*1000)})+"\n")
-            except: pass
-            # #endregion
-            
             logger.info(f"Calling handle_apifeedwp59 with feededit={feededit_param}, domain={domain}")
-            
-            # #region agent log
-            try:
-                with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                    import json as json_lib
-                    import time
-                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:339","message":"About to await handle_apifeedwp59","data":{"feededit_param":feededit_param,"domain":domain},"timestamp":int(time.time()*1000)})+"\n")
-            except Exception as log_err:
-                logger.warning(f"Failed to write debug log: {log_err}")
-            # #endregion
-            
-            try:
-                logger.info(f"Starting await handle_apifeedwp59...")
-                result = await handle_apifeedwp59(
-                    domain=domain,
-                    request=request,
-                    form_data=form_data,
-                    json_data=json_data,
-                    feededit=feededit_param,
-                    kkyy=kkyy_normalized
-                )
-                # #region agent log
-                try:
-                    with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                        import json as json_lib
-                        import time
-                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:295","message":"handle_apifeedwp59 returned successfully","data":{},"timestamp":int(time.time()*1000)})+"\n")
-                except: pass
-                # #endregion
-                return result
-            except Exception as e:
-                logger.error(f"Exception in handle_apifeedwp59: {e}", exc_info=True)
-                
-                # #region agent log
-                try:
-                    with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                        import json as json_lib
-                        import time
-                        import traceback
-                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:357","message":"Exception calling handle_apifeedwp59","data":{"error":str(e),"error_type":type(e).__name__,"traceback":traceback.format_exc()},"timestamp":int(time.time()*1000)})+"\n")
-                except Exception as log_err:
-                    logger.warning(f"Failed to write debug log: {log_err}")
-                # #endregion
-                
-                raise
+            return await handle_apifeedwp59(
+                domain=domain,
+                request=request,
+                form_data=form_data,
+                json_data=json_data,
+                feededit=feededit_param,
+                kkyy=kkyy_normalized
+            )
         elif kkyy_normalized == 'KVFotrmIERNortemkl39jwetsdakfhklo8wer7':
             # Route to apifeedwp6
             logger.info(f"Matched kkyy for apifeedwp6: {kkyy_normalized}")
@@ -1481,15 +1404,6 @@ async def handle_apifeedwp59(
     Handle apifeedwp5.9.php requests (WordPress 5.9 plugin feed).
     """
     try:
-        # #region agent log
-        try:
-            with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                import json as json_lib
-                import time
-                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1391","message":"handle_apifeedwp59 entry","data":{"domain":domain,"feededit":feededit,"kkyy":kkyy},"timestamp":int(time.time()*1000)})+"\n")
-        except: pass
-        # #endregion
-        
         logger.info(f"handle_apifeedwp59 called: domain={domain}, feededit={feededit}, kkyy={kkyy}")
         
         # Validate domain parameter
@@ -1508,52 +1422,17 @@ async def handle_apifeedwp59(
         WHERE d.domain_name = %s AND d.deleted != 1
         """
         
-        # #region agent log
-        try:
-            with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                import json as json_lib
-                import time
-                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1421","message":"Before db.fetch_all","data":{"sql":sql,"domain":domain},"timestamp":int(time.time()*1000)})+"\n")
-        except: pass
-        # #endregion
-        
         try:
             domains = db.fetch_all(sql, (domain,))
         except Exception as e:
-            # #region agent log
-            try:
-                with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                    import json as json_lib
-                    import time
-                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1421","message":"db.fetch_all exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
-            except: pass
-            # #endregion
             logger.error(f"Database query failed in handle_apifeedwp59: {e}", exc_info=True)
             raise
-        
-        # #region agent log
-        try:
-            with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                import json as json_lib
-                import time
-                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1421","message":"After db.fetch_all","data":{"domains_count":len(domains) if domains else 0},"timestamp":int(time.time()*1000)})+"\n")
-        except: pass
-        # #endregion
         
         if not domains:
             return PlainTextResponse(content="Domain Does Not Exist", status_code=404)
         
         domain_data = domains[0]
         domainid = domain_data['domainid']
-        
-        # #region agent log
-        try:
-            with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                import json as json_lib
-                import time
-                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1427","message":"Domain data retrieved","data":{"domainid":domainid,"resourcesactive":domain_data.get('resourcesactive'),"linkexchange":domain_data.get('linkexchange')},"timestamp":int(time.time()*1000)})+"\n")
-        except: pass
-        # #endregion
         
         # Handle feededit parameter
         if feededit == 'add':
@@ -1574,14 +1453,6 @@ async def handle_apifeedwp59(
             return JSONResponse(content=rdomains)
         
         elif feededit == '1' or feededit == 1:
-            # #region agent log
-            try:
-                with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                    import json as json_lib
-                    import time
-                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"article.py:1447","message":"feededit=1 branch entered","data":{"domain":domain,"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
-            except: pass
-            # #endregion
             
             logger.info(f"handle_apifeedwp59: Processing feededit=1 for domain={domain}, domainid={domainid}")
             # Get agent parameter
@@ -1596,14 +1467,6 @@ async def handle_apifeedwp59(
             
             # a. Bubblefeed pages (if resourcesactive is true)
             if domain_data.get('resourcesactive'):
-                # #region agent log
-                try:
-                    with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                        import json as json_lib
-                        import time
-                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1460","message":"resourcesactive is true, querying bubblefeed","data":{"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
-                except: pass
-                # #endregion
                 
                 sql = """
                 SELECT b.*, c.category AS bubblecat, c.bubblefeedid AS bubblecatid, c.id AS bubblecatsid
@@ -1614,35 +1477,11 @@ async def handle_apifeedwp59(
                 try:
                     page_ex = db.fetch_all(sql, (domainid,))
                 except Exception as e:
-                    # #region agent log
-                    try:
-                        with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                            import json as json_lib
-                            import time
-                            f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1467","message":"bubblefeed query exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
-                    except: pass
-                    # #endregion
                     logger.error(f"Bubblefeed query failed: {e}", exc_info=True)
                     raise
                 
-                # #region agent log
-                try:
-                    with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                        import json as json_lib
-                        import time
-                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1467","message":"bubblefeed query result","data":{"page_count":len(page_ex) if page_ex else 0},"timestamp":int(time.time()*1000)})+"\n")
-                except: pass
-                # #endregion
                 
                 for page in page_ex:
-                    # #region agent log
-                    try:
-                        with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                            import json as json_lib
-                            import time
-                            f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"article.py:1469","message":"Processing bubblefeed page","data":{"pageid":page.get('id')},"timestamp":int(time.time()*1000)})+"\n")
-                    except: pass
-                    # #endregion
                     
                     try:
                         pageid = page['id']
@@ -1717,27 +1556,11 @@ async def handle_apifeedwp59(
                         }
                         pagesarray.append(pagearray)
                     except Exception as e:
-                        # #region agent log
-                        try:
-                            with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                                import json as json_lib
-                                import time
-                                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"article.py:1469","message":"Exception processing bubblefeed page","data":{"error":str(e),"error_type":type(e).__name__,"pageid":page.get('id') if page else None},"timestamp":int(time.time()*1000)})+"\n")
-                        except: pass
-                        # #endregion
                         logger.error(f"Error processing bubblefeed page: {e}", exc_info=True)
                         raise
             
             # b. Link placement pages (if linkexchange == 1)
             if domain_data.get('linkexchange') == 1:
-                # #region agent log
-                try:
-                    with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                        import json as json_lib
-                        import time
-                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1542","message":"linkexchange is 1, querying link placement","data":{"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
-                except: pass
-                # #endregion
                 
                 sql = """
                 SELECT DISTINCT showonpgid
@@ -1749,14 +1572,6 @@ async def handle_apifeedwp59(
                 try:
                     bcpage_ex = db.fetch_all(sql, (domainid,))
                 except Exception as e:
-                    # #region agent log
-                    try:
-                        with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                            import json as json_lib
-                            import time
-                            f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1551","message":"link placement query exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
-                    except: pass
-                    # #endregion
                     logger.error(f"Link placement query failed: {e}", exc_info=True)
                     raise
                 
@@ -1805,37 +1620,13 @@ async def handle_apifeedwp59(
                             }
                             pagesarray.append(bcpagearray)
                     except Exception as e:
-                        # #region agent log
-                        try:
-                            with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                                import json as json_lib
-                                import time
-                                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1553","message":"Exception processing link placement page","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
-                        except: pass
-                        # #endregion
                         logger.error(f"Error processing link placement page: {e}", exc_info=True)
                         raise
         
-            # #region agent log
-            try:
-                with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                    import json as json_lib
-                    import time
-                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"article.py:1597","message":"Before JSONResponse","data":{"pagesarray_count":len(pagesarray)},"timestamp":int(time.time()*1000)})+"\n")
-            except: pass
-            # #endregion
             
             try:
                 return JSONResponse(content=pagesarray)
             except Exception as e:
-                # #region agent log
-                try:
-                    with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                        import json as json_lib
-                        import time
-                        f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"article.py:1597","message":"JSONResponse exception","data":{"error":str(e),"error_type":type(e).__name__},"timestamp":int(time.time()*1000)})+"\n")
-                except: pass
-                # #endregion
                 logger.error(f"JSONResponse failed: {e}", exc_info=True)
                 raise
         
@@ -1872,14 +1663,5 @@ async def handle_apifeedwp59(
         else:
             return PlainTextResponse(content="Invalid Request F105", status_code=400)
     except Exception as e:
-        # #region agent log
-        try:
-            with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-                import json as json_lib
-                import time
-                import traceback
-                f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"G","location":"article.py:1391","message":"Unhandled exception in handle_apifeedwp59","data":{"error":str(e),"error_type":type(e).__name__,"traceback":traceback.format_exc()},"timestamp":int(time.time()*1000)})+"\n")
-        except: pass
-        # #endregion
         logger.error(f"Unhandled exception in handle_apifeedwp59: {e}", exc_info=True)
         raise
