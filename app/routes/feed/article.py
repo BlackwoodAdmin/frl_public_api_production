@@ -84,14 +84,14 @@ async def article_endpoint(
     Handles both GET and POST requests (PHP $_REQUEST gets both).
     """
     # Log to standard logger first (always works)
-    logger.info(f"article_endpoint called: method={request.method}, domain={domain}, kkyy={kkyy}, feededit={feedit}")
+    logger.info(f"article_endpoint called: method={request.method}, domain={domain}, kkyy={kkyy}, feededit={feededit}")
     
     # #region agent log
     try:
         with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
             import json as json_lib
             import time
-            f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"I","location":"article.py:52","message":"article_endpoint entry","data":{"method":request.method,"domain":domain,"kkyy":kkyy,"feededit":feedit},"timestamp":int(time.time()*1000)})+"\n")
+            f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"I","location":"article.py:52","message":"article_endpoint entry","data":{"method":request.method,"domain":domain,"kkyy":kkyy,"feededit":feededit},"timestamp":int(time.time()*1000)})+"\n")
     except Exception as log_err:
         logger.warning(f"Failed to write debug log: {log_err}")
     # #endregion
@@ -308,14 +308,14 @@ async def article_endpoint(
             )
         elif kkyy_normalized == 'AFfa0fd7KMD98enfawrut7cySa15yV7BXpS85':
             # Route to apifeedwp5.9
-            logger.info(f"Matched kkyy for apifeedwp5.9: {kkyy_normalized}, feededit={feedit}, domain={domain}")
+            logger.info(f"Matched kkyy for apifeedwp5.9: {kkyy_normalized}, feededit={feededit}, domain={domain}")
             
             # #region agent log
             try:
                 with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
                     import json as json_lib
                     import time
-                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:310","message":"Routing to apifeedwp5.9","data":{"kkyy":kkyy_normalized,"feededit":feedit,"domain":domain},"timestamp":int(time.time()*1000)})+"\n")
+                    f.write(json_lib.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"H","location":"article.py:310","message":"Routing to apifeedwp5.9","data":{"kkyy":kkyy_normalized,"feededit":feededit,"domain":domain},"timestamp":int(time.time()*1000)})+"\n")
             except Exception as log_err:
                 logger.warning(f"Failed to write debug log: {log_err}")
             # #endregion
