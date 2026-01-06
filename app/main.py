@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from fastapi import FastAPI
-    from fastapi.responses import HTMLResponse
+    from fastapi.responses import HTMLResponse, PlainTextResponse
     from fastapi.staticfiles import StaticFiles
 except Exception as e:
     logger.error(f"Failed to import FastAPI: {e}")
@@ -57,6 +57,12 @@ async def root():
 async def health():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+@app.get("/alive")
+async def alive():
+    """DNS rollover health check endpoint."""
+    return PlainTextResponse(content="alive")
 
 
 # Import routes
