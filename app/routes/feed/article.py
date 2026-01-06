@@ -236,6 +236,9 @@ async def article_endpoint(
         from urllib.parse import unquote
         kkyy_normalized = unquote(str(kkyy)).strip("'\"")
         
+        # Debug logging for parameter extraction
+        logger.info(f"WordPress plugin feed routing: apiid={apiid}, apikey={apikey[:10]}..., kkyy={kkyy}, kkyy_normalized={kkyy_normalized}")
+        
         # Route to WordPress plugin feeds based on kkyy value
         if kkyy_normalized == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy_normalized == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
             # Route to apifeedwp30 handler
@@ -281,12 +284,14 @@ async def article_endpoint(
             )
         elif kkyy_normalized == 'AFfa0fd7KMD98enfawrut7cySa15yV7BXpS85':
             # Route to apifeedwp5.9
+            logger.info(f"Matched kkyy for apifeedwp5.9: {kkyy_normalized}, feededit={feedit}")
             feededit_param = feededit or request.query_params.get('feedit')
             if not feededit_param:
                 if form_data:
                     feededit_param = form_data.get('feedit')
                 elif json_data:
                     feededit_param = json_data.get('feedit')
+            logger.info(f"Calling handle_apifeedwp59 with feededit={feededit_param}, domain={domain}")
             return await handle_apifeedwp59(
                 domain=domain,
                 request=request,
@@ -295,10 +300,17 @@ async def article_endpoint(
                 feededit=feededit_param,
                 kkyy=kkyy_normalized
             )
-        elif kkyy == 'KVFotrmIERNortemkl39jwetsdakfhklo8wer7':
+        elif kkyy_normalized == 'KVFotrmIERNortemkl39jwetsdakfhklo8wer7':
             # Route to apifeedwp6
+            logger.info(f"Matched kkyy for apifeedwp6: {kkyy_normalized}")
             pass
-        # ... other kkyy values
+        else:
+            # Unknown kkyy value - return error instead of falling through to standard routing
+            logger.warning(f"Unknown kkyy value: {kkyy_normalized} (original: {kkyy})")
+            return JSONResponse(
+                content={"error": "Invalid kkyy parameter", "kkyy": kkyy_normalized},
+                status_code=400
+            )
     
     # Standard Article.php routing (without API auth)
     if not domain:
@@ -1388,6 +1400,8 @@ async def handle_apifeedwp59(
     Handle apifeedwp5.9.php requests (WordPress 5.9 plugin feed).
     """
     
+    logger.info(f"handle_apifeedwp59 called: domain={domain}, feededit={feedit}, kkyy={kkyy}")
+    
     # Validate domain parameter
     if not domain:
         return PlainTextResponse(content="Invalid Request F105", status_code=400)
@@ -1431,6 +1445,7 @@ async def handle_apifeedwp59(
         return JSONResponse(content=rdomains)
     
     elif feededit == '1' or feededit == 1:
+        logger.info(f"handle_apifeedwp59: Processing feededit=1 for domain={domain}, domainid={domainid}")
         # Get agent parameter
         agent = request.query_params.get('agent', '')
         if form_data:
