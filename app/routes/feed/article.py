@@ -502,7 +502,12 @@ async def article_endpoint(
     # Handle other actions (non-WP plugin)
     if Action == '1':
         # Website Reference (non-WP) - use same function as WP but it handles wp_plugin internally
-        from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
+        from app.services.content import (
+            build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer,
+            code_url, seo_slug, seo_filter_text_custom, clean_title, build_article_links
+        )
+        import html
+        
         # Extract pageid and keyword
         pageid_param = pageid or ''
         keyword_param = k or key or ''
@@ -515,6 +520,135 @@ async def article_endpoint(
             except ValueError:
                 bubbleid = None
         
+        # Check if we should show keyword listing page
+        # Show listing if both k and PageID are empty/None OR if the record is not found in database
+        show_keyword_listing = False
+        
+        if not keyword_param and not bubbleid:
+            # Both are empty - show listing
+            show_keyword_listing = True
+        else:
+            # Check if the record exists in the database
+            if bubbleid:
+                # Check by PageID
+                bubble_check_sql = """
+                    SELECT id FROM bwp_bubblefeed 
+                    WHERE domainid = %s AND id = %s AND active = 1 AND deleted != 1
+                """
+                bubble_check = db.fetch_row(bubble_check_sql, (domainid, bubbleid))
+                if not bubble_check:
+                    show_keyword_listing = True
+            elif keyword_param:
+                # Check by keyword - handle both slug format (hyphens) and space format
+                keyword_param_lower = keyword_param.lower().strip()
+                keyword_param_for_matching = keyword_param_lower.replace('-', ' ')
+                
+                # Try matching with spaces first (database format)
+                keyword_check_sql = """
+                    SELECT id FROM bwp_bubblefeed 
+                    WHERE domainid = %s AND LOWER(restitle) = %s AND active = 1 AND deleted != 1
+                """
+                keyword_check = db.fetch_row(keyword_check_sql, (domainid, keyword_param_for_matching))
+                
+                # If not found, try with original format (might be stored as slug)
+                if not keyword_check:
+                    keyword_check = db.fetch_row(keyword_check_sql, (domainid, keyword_param_lower))
+                
+                if not keyword_check:
+                    show_keyword_listing = True
+        
+        # Generate keyword listing page if needed
+        if show_keyword_listing:
+            # Query for all active main keywords
+            keywords_sql = """
+                SELECT id, restitle, resshorttext 
+                FROM bwp_bubblefeed 
+                WHERE domainid = %s AND active = 1 AND deleted != 1 
+                ORDER BY restitle ASC
+            """
+            keywords_list = db.fetch_all(keywords_sql, (domainid,))
+            
+            # Build keyword listing HTML
+            listing_content = ''
+            if keywords_list:
+                # Build base URL using code_url
+                base_url = code_url(domainid, domain_category, domain_settings)
+                
+                for keyword_entry in keywords_list:
+                    keyword_id = keyword_entry.get('id')
+                    keyword_title = keyword_entry.get('restitle', '')
+                    keyword_shorttext = keyword_entry.get('resshorttext', '')
+                    
+                    if keyword_title:
+                        # Build the main content page URL
+                        keyword_slug = seo_slug(seo_filter_text_custom(keyword_title))
+                        keyword_url = f"{base_url}?Action=1&k={keyword_slug}&PageID={keyword_id}"
+                        
+                        # Create h2 with link
+                        clean_keyword_title = clean_title(seo_filter_text_custom(keyword_title))
+                        listing_content += f'<h2><a href="{keyword_url}">{clean_keyword_title}</a></h2>\n'
+                        
+                        # Add shorttext in p tag if available
+                        if keyword_shorttext:
+                            # HTML unescape and filter the shorttext
+                            shorttext_cleaned = html.unescape(str(keyword_shorttext))
+                            shorttext_cleaned = seo_filter_text_custom(shorttext_cleaned)
+                            listing_content += f'<p>{shorttext_cleaned}</p>\n'
+            else:
+                listing_content = '<p>No keywords found for this domain.</p>'
+            
+            # Add footer links at the end
+            article_links_html = build_article_links(
+                pageid=0,
+                domainid=domainid,
+                domain_data=domain_category,
+                domain_settings=domain_settings,
+                domain_category=domain_category
+            )
+            listing_content += article_links_html
+            
+            # Get header/footer
+            header_footer_data = get_header_footer(domainid, domain_category.get('status'), '')
+            
+            # Build canonical URL
+            if domain_settings.get('usedurl') == 1 and domain_category.get('domain_url'):
+                linkdomain = domain_category['domain_url'].rstrip('/')
+            else:
+                if domain_category.get('ishttps') == 1:
+                    linkdomain = 'https://'
+                else:
+                    linkdomain = 'http://'
+                if domain_category.get('usewww') == 1:
+                    linkdomain += 'www.' + domain_category['domain_name']
+                else:
+                    linkdomain += domain_category['domain_name']
+            
+            canonical_url = linkdomain + '/?Action=1'
+            
+            # Build metaheader (no specific keyword)
+            metaheader = build_metaheader(
+                domainid=domainid,
+                domain_data=domain_category,
+                domain_settings=domain_settings,
+                action='1',
+                keyword='',
+                pageid=0,
+                bubble=None
+            )
+            
+            # Wrap content with header/footer
+            full_page = wrap_content_with_header_footer(
+                content=listing_content,
+                header=header_footer_data['header'],
+                footer=header_footer_data['footer'],
+                metaheader=metaheader,
+                canonical_url=canonical_url,
+                wp_plugin=wp_plugin
+            )
+            
+            return HTMLResponse(content=full_page)
+        
+        # Continue with normal single keyword page handling
         wpage = build_page_wp(
             bubbleid=bubbleid,
             domainid=domainid,
