@@ -1252,11 +1252,19 @@ async def handle_apifeedwp61(
                 elif post_date is None:
                     post_date = ''
                 
+                # Set post_content: resfulltext if exists, else resshorttext if exists, else empty string
+                post_content = ''
+                if page.get('resfulltext') and page['resfulltext'].strip():
+                    post_content = page['resfulltext']
+                elif page.get('resshorttext') and page['resshorttext'].strip():
+                    post_content = page['resshorttext']
+                
                 pagearray = {
                     'pageid': str(pageid),
                     'post_title': keyword,
                     'canonical': '',
                     'post_type': 'page',
+                    'post_content': post_content,
                     'comment_status': 'closed',
                     'ping_status': 'closed',
                     'post_date': str(post_date),
@@ -1282,7 +1290,7 @@ async def handle_apifeedwp61(
         for bcpage in bcpage_ex:
             pageid = bcpage['showonpgid']
             bpage = db.fetch_row(
-                'SELECT restitle, resshorttext, createdDate FROM bwp_bubblefeed WHERE id = %s',
+                'SELECT restitle, resshorttext, resfulltext, createdDate FROM bwp_bubblefeed WHERE id = %s',
                 (pageid,)
             )
             
@@ -1308,10 +1316,18 @@ async def handle_apifeedwp61(
                 elif post_date is None:
                     post_date = ''
                 
+                # Set post_content: resfulltext if exists, else resshorttext if exists, else empty string
+                post_content = ''
+                if bpage.get('resfulltext') and bpage['resfulltext'].strip():
+                    post_content = bpage['resfulltext']
+                elif bpage.get('resshorttext') and bpage['resshorttext'].strip():
+                    post_content = bpage['resshorttext']
+                
                 bcpagearray = {
                     'pageid': str(pageid) + 'bc',
                     'post_title': keyword.lower() + ' - ' + domain_data['domain_name'],
                     'post_type': 'page',
+                    'post_content': post_content,
                     'comment_status': 'closed',
                     'ping_status': 'closed',
                     'post_date': str(post_date),
