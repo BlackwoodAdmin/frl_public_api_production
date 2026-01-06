@@ -19,6 +19,7 @@ def _write_debug_log(message: str, data: dict = None):
         debug_log_path = app_root / "debug.log"
         
         import json
+        import os
         from datetime import datetime
         log_entry = {
             "timestamp": datetime.now().isoformat(),
@@ -27,9 +28,15 @@ def _write_debug_log(message: str, data: dict = None):
         }
         
         # Write to file (creates file if it doesn't exist)
-        with open(debug_log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(log_entry) + "\n")
+        # Use 'a' mode (append) - file will be created if it doesn't exist
+        with open(str(debug_log_path), "a", encoding="utf-8") as f:
+            json_str = json.dumps(log_entry) + "\n"
+            bytes_written = f.write(json_str)
             f.flush()  # Ensure data is written immediately
+            os.fsync(f.fileno())  # Force write to disk
+        
+        # Log success to standard logger for verification
+        logger.info(f"Debug log written: {bytes_written} bytes to {debug_log_path}")
     except PermissionError as e:
         # Log permission errors to standard logger
         logger.error(f"Permission denied writing debug log to {debug_log_path}: {e}")
@@ -226,6 +233,7 @@ async def articles_endpoint(
         # PHP returns empty/404 for invalid domains
         error_msg = f"Articles.php: Invalid domain '{domain}' - not found in database"
         logger.warning(error_msg)
+        logger.info(f"Calling _write_debug_log for invalid domain: {domain}")
         _write_debug_log(error_msg, {"domain": domain, "status_code": 404, "error_type": "invalid_domain"})
         return HTMLResponse(content="<!-- Invalid Domain -->", status_code=404)
     
@@ -244,6 +252,7 @@ async def articles_endpoint(
         # This should rarely happen - domain exists but full query fails
         error_msg = f"Articles.php: Domain '{domain}' (id={domainid}) found but domain_category query returned no results"
         logger.warning(error_msg)
+        logger.info(f"Calling _write_debug_log for domain_category_not_found: {domain} (id={domainid})")
         _write_debug_log(error_msg, {"domain": domain, "domainid": domainid, "status_code": 404, "error_type": "domain_category_not_found"})
         return HTMLResponse(content="<!-- Domain not found -->", status_code=404)
     
