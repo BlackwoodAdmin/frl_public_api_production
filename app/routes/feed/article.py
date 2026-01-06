@@ -1714,8 +1714,19 @@ async def handle_apifeedwp59(
                 
                 return JSONResponse(content=pagesarray)
             except Exception as e:
+                error_trace = traceback.format_exc()
                 logger.error(f"Error in handle_apifeedwp59 feededit=1: {e}")
-                logger.error(traceback.format_exc())
+                logger.error(f"Error type: {type(e).__name__}")
+                logger.error(f"Error args: {e.args}")
+                logger.error(f"Full traceback:\n{error_trace}")
+                # #region agent log
+                try:
+                    with open(str(DEBUG_LOG_PATH), "a", encoding="utf-8") as f:
+                        import json, time
+                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"article.py:1716","message":"feededit=1 exception","data":{"error":str(e),"error_type":type(e).__name__,"traceback":error_trace},"timestamp":int(time.time()*1000)})+"\n")
+                        f.flush()
+                except: pass
+                # #endregion
                 return PlainTextResponse(content="Internal Server Error", status_code=500)
         
         elif feededit == '2' or feededit == 2:
@@ -1758,8 +1769,19 @@ async def handle_apifeedwp59(
                     media_type="application/json"
                 )
             except Exception as e:
+                error_trace = traceback.format_exc()
                 logger.error(f"Error in handle_apifeedwp59 feededit=2: {e}")
-                logger.error(traceback.format_exc())
+                logger.error(f"Error type: {type(e).__name__}")
+                logger.error(f"Error args: {e.args}")
+                logger.error(f"Full traceback:\n{error_trace}")
+                # #region agent log
+                try:
+                    with open(str(DEBUG_LOG_PATH), "a", encoding="utf-8") as f:
+                        import json, time
+                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"F","location":"article.py:1765","message":"feededit=2 exception","data":{"error":str(e),"error_type":type(e).__name__,"traceback":error_trace},"timestamp":int(time.time()*1000)})+"\n")
+                        f.flush()
+                except: pass
+                # #endregion
                 return PlainTextResponse(content="Internal Server Error", status_code=500)
         
         else:
