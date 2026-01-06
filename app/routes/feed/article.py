@@ -1490,7 +1490,7 @@ async def handle_apifeedwp59(
         except: pass
         # #endregion
         
-        logger.info(f"handle_apifeedwp59 called: domain={domain}, feededit={feedit}, kkyy={kkyy}")
+        logger.info(f"handle_apifeedwp59 called: domain={domain}, feededit={feededit}, kkyy={kkyy}")
         
         # Validate domain parameter
         if not domain:
