@@ -1339,6 +1339,108 @@ def _extract_metadata_from_message(message: str) -> Dict[str, Any]:
             metadata['query_string'] = query_string
             break
     
+    # Try to extract POST variables from log message
+    # Look for various patterns including text-based, JSON structures, form-encoded, and dictionary-like
+    from urllib.parse import parse_qs, unquote
+    
+    # Text-based patterns: "post_data: {...}", "POST data: {...}", "form_data: {...}", etc.
+    post_text_patterns = [
+        r'post[_\s]*data[:\s]+(\{[^}]+\})',  # "post_data: {...}"
+        r'POST[_\s]*data[:\s]+(\{[^}]+\})',  # "POST data: {...}"
+        r'form[_\s]*data[:\s]+(\{[^}]+\})',  # "form_data: {...}"
+        r'POST[_\s]*variables[:\s]+(\{[^}]+\})',  # "POST variables: {...}"
+        r'post[_\s]*body[:\s]+(\{[^}]+\})',  # "post_body: {...}"
+    ]
+    
+    for pattern in post_text_patterns:
+        post_match = re.search(pattern, message, re.IGNORECASE)
+        if post_match:
+            post_data_str = post_match.group(1)
+            try:
+                # Try to parse as JSON
+                post_data = json.loads(post_data_str)
+                metadata['post_variables'] = post_data
+                break
+            except (json.JSONDecodeError, ValueError):
+                # If JSON parsing fails, try to extract as string
+                metadata['post_variables'] = post_data_str
+                break
+    
+    # JSON structures: '"post_data": {...}', '"form_data": {...}', '"POST": {...}'
+    if 'post_variables' not in metadata:
+        json_post_patterns = [
+            r'["\']post[_\s]*data["\']\s*:\s*(\{[^}]+\})',
+            r'["\']form[_\s]*data["\']\s*:\s*(\{[^}]+\})',
+            r'["\']POST["\']\s*:\s*(\{[^}]+\})',
+            r'["\']post[_\s]*variables["\']\s*:\s*(\{[^}]+\})',
+        ]
+        
+        for pattern in json_post_patterns:
+            json_post_match = re.search(pattern, message, re.IGNORECASE)
+            if json_post_match:
+                post_data_str = json_post_match.group(1)
+                try:
+                    post_data = json.loads(post_data_str)
+                    metadata['post_variables'] = post_data
+                    break
+                except (json.JSONDecodeError, ValueError):
+                    metadata['post_variables'] = post_data_str
+                    break
+    
+    # Form-encoded data: "key1=value1&key2=value2" (without leading ?)
+    if 'post_variables' not in metadata:
+        # Look for form-encoded patterns (param=value&param2=value2)
+        form_encoded_pattern = r'(?:post[_\s]*data|form[_\s]*data|POST[_\s]*body)[:\s]+([a-zA-Z0-9_\-\.=&%]+(?:&[a-zA-Z0-9_\-\.=&%]+)+)'
+        form_match = re.search(form_encoded_pattern, message, re.IGNORECASE)
+        if form_match:
+            form_data_str = form_match.group(1)
+            try:
+                # Parse as form-encoded data
+                parsed = parse_qs(form_data_str, keep_blank_values=True)
+                # Convert lists to single values for cleaner display
+                post_data = {k: v[0] if len(v) == 1 else v for k, v in parsed.items()}
+                metadata['post_variables'] = post_data
+            except Exception:
+                metadata['post_variables'] = form_data_str
+        
+        # Also check for standalone form-encoded patterns (not preceded by labels)
+        if 'post_variables' not in metadata:
+            standalone_form_pattern = r'\b([a-zA-Z0-9_\-\.]+=[a-zA-Z0-9_\-\.%]+(?:&[a-zA-Z0-9_\-\.]+=[a-zA-Z0-9_\-\.%]+)+)\b'
+            standalone_match = re.search(standalone_form_pattern, message)
+            if standalone_match and '=' in standalone_match.group(1) and '&' in standalone_match.group(1):
+                form_data_str = standalone_match.group(1)
+                try:
+                    parsed = parse_qs(form_data_str, keep_blank_values=True)
+                    post_data = {k: v[0] if len(v) == 1 else v for k, v in parsed.items()}
+                    metadata['post_variables'] = post_data
+                except Exception:
+                    pass
+    
+    # Dictionary-like structures: {'key': 'value'}, {"key": "value"}
+    if 'post_variables' not in metadata:
+        dict_patterns = [
+            r"\{'[^']+':\s*'[^']*'(?:,\s*'[^']+':\s*'[^']*')*\}",  # Single quotes
+            r'\{"[^"]+":\s*"[^"]*"(?:,\s*"[^"]+":\s*"[^"]*")*\}',  # Double quotes
+        ]
+        
+        for pattern in dict_patterns:
+            dict_match = re.search(pattern, message)
+            if dict_match:
+                dict_str = dict_match.group(0)
+                try:
+                    # Try to parse as Python dict (using eval with safety check)
+                    # First convert single quotes to double quotes for JSON parsing
+                    if dict_str.startswith("{'") or "'" in dict_str:
+                        dict_str = dict_str.replace("'", '"')
+                    post_data = json.loads(dict_str)
+                    metadata['post_variables'] = post_data
+                    break
+                except (json.JSONDecodeError, ValueError):
+                    # If it looks like POST data contextually, store as string
+                    if 'post' in message.lower()[:100] or 'form' in message.lower()[:100]:
+                        metadata['post_variables'] = dict_str
+                        break
+    
     return metadata
 
 
@@ -4348,6 +4450,26 @@ async def get_log_detail_page(log_hash: str, username: str = Depends(verify_dash
                     html += '<div class="metadata-item">';
                     html += '<div class="metadata-label">Query String</div>';
                     html += '<div class="metadata-value" style="font-family: monospace; font-size: 12px; word-break: break-all;">' + escapeHtml(data.metadata.query_string) + '</div>';
+                    html += '</div>';
+                }}
+                // Add POST variables if they exist in metadata
+                if (data.metadata && data.metadata.post_variables) {{
+                    html += '<div class="metadata-item" style="grid-column: 1 / -1;">';
+                    html += '<div class="metadata-label">POST Variables</div>';
+                    const postVars = data.metadata.post_variables;
+                    if (typeof postVars === 'object' && postVars !== null && !Array.isArray(postVars)) {{
+                        // Display as formatted key-value list
+                        let postVarsHtml = '<div style="font-family: monospace; font-size: 12px; word-break: break-all; line-height: 1.6;">';
+                        for (const [key, value] of Object.entries(postVars)) {{
+                            const displayValue = Array.isArray(value) ? value.join(', ') : String(value);
+                            postVarsHtml += '<div style="margin-bottom: 4px;"><strong>' + escapeHtml(String(key)) + ':</strong> ' + escapeHtml(displayValue) + '</div>';
+                        }}
+                        postVarsHtml += '</div>';
+                        html += '<div class="metadata-value">' + postVarsHtml + '</div>';
+                    }} else {{
+                        // Display as string
+                        html += '<div class="metadata-value" style="font-family: monospace; font-size: 12px; word-break: break-all;">' + escapeHtml(String(postVars)) + '</div>';
+                    }}
                     html += '</div>';
                 }}
                 html += '</div>';
