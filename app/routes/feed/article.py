@@ -1,8 +1,15 @@
 """Article.php endpoint - Main content router."""
 import logging
 import traceback
+import os
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# Debug log path - cross-platform
+DEBUG_LOG_PATH = Path(__file__).parent.parent.parent / ".cursor" / "debug.log"
+# Ensure .cursor directory exists
+DEBUG_LOG_PATH.parent.mkdir(exist_ok=True)
 
 try:
     from fastapi import APIRouter, Request, Query, HTTPException, Form
@@ -338,11 +345,12 @@ async def article_endpoint(
             logger.info(f"Matched kkyy for apifeedwp5.9: {kkyy_normalized}, feededit={feedit}")
             # #region agent log
             try:
-                with open(r"c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log", "a", encoding="utf-8") as f:
+                with open(str(DEBUG_LOG_PATH), "a", encoding="utf-8") as f:
                     import json, time
                     f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:337","message":"Before calling handle_apifeedwp59","data":{"kkyy":kkyy_normalized,"feededit":str(feededit),"domain":str(domain)},"timestamp":int(time.time()*1000)})+"\n")
                     f.flush()
-            except: pass
+            except Exception as e:
+                logger.warning(f"Failed to write debug log: {e}")
             # #endregion
             feededit_param = feededit or request.query_params.get('feedit')
             if not feededit_param:
@@ -1462,11 +1470,12 @@ async def handle_apifeedwp59(
         logger.info(f"handle_apifeedwp59 called: domain={domain}, feededit={feedit}, kkyy={kkyy}")
         # #region agent log
         try:
-            with open(r"c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log", "a", encoding="utf-8") as f:
+            with open(str(DEBUG_LOG_PATH), "a", encoding="utf-8") as f:
                 import json, time
-                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1453","message":"handle_apifeedwp59 entry","data":{"domain":str(domain),"feededit":str(feededit),"kkyy":str(kkyy)},"timestamp":int(time.time()*1000)})+"\n")
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A","location":"article.py:1461","message":"handle_apifeedwp59 entry","data":{"domain":str(domain),"feededit":str(feededit),"kkyy":str(kkyy)},"timestamp":int(time.time()*1000)})+"\n")
                 f.flush()
-        except: pass
+        except Exception as e:
+            logger.warning(f"Failed to write debug log: {e}")
         # #endregion
         
         # Validate domain parameter
@@ -1488,17 +1497,12 @@ async def handle_apifeedwp59(
         domains = db.fetch_all(sql, (domain,))
         # #region agent log
         try:
-            with open(r"c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log", "a", encoding="utf-8") as f:
+            with open(str(DEBUG_LOG_PATH), "a", encoding="utf-8") as f:
                 import json, time
-                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"article.py:1485","message":"After domain query","data":{"domain_count":len(domains) if domains else 0,"domain":str(domain)},"timestamp":int(time.time()*1000)})+"\n")
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"article.py:1493","message":"After domain query","data":{"domain_count":len(domains) if domains else 0,"domain":str(domain)},"timestamp":int(time.time()*1000)})+"\n")
                 f.flush()
         except Exception as e:
-            try:
-                with open(r"c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log", "a", encoding="utf-8") as f:
-                    import json, time
-                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B","location":"article.py:1485","message":"Debug log write failed","data":{"error":str(e)},"timestamp":int(time.time()*1000)})+"\n")
-                    f.flush()
-            except: pass
+            logger.warning(f"Failed to write debug log: {e}")
         # #endregion
         
         if not domains:
@@ -1508,22 +1512,24 @@ async def handle_apifeedwp59(
         domainid = domain_data['domainid']
         # #region agent log
         try:
-            with open(r"c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log", "a", encoding="utf-8") as f:
+            with open(str(DEBUG_LOG_PATH), "a", encoding="utf-8") as f:
                 import json, time
-                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1478","message":"Before feededit handling","data":{"domainid":domainid,"feededit":str(feededit)},"timestamp":int(time.time()*1000)})+"\n")
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1507","message":"Before feededit handling","data":{"domainid":domainid,"feededit":str(feededit)},"timestamp":int(time.time()*1000)})+"\n")
                 f.flush()
-        except: pass
+        except Exception as e:
+            logger.warning(f"Failed to write debug log: {e}")
         # #endregion
         
         # Handle feededit parameter
         if feededit == 'add':
             # #region agent log
             try:
-                with open(r"c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log", "a", encoding="utf-8") as f:
+                with open(str(DEBUG_LOG_PATH), "a", encoding="utf-8") as f:
                     import json, time
-                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1489","message":"feededit=add handler entry","data":{"feededit":str(feededit),"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1513","message":"feededit=add handler entry","data":{"feededit":str(feededit),"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
                     f.flush()
-            except: pass
+            except Exception as e:
+                logger.warning(f"Failed to write debug log: {e}")
             # #endregion
             try:
                 # Update domain with wp_plugin=1, spydermap=0, script_version='5.9'
@@ -1549,11 +1555,12 @@ async def handle_apifeedwp59(
         elif feededit == '1' or feededit == 1:
             # #region agent log
             try:
-                with open(r"c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log", "a", encoding="utf-8") as f:
+                with open(str(DEBUG_LOG_PATH), "a", encoding="utf-8") as f:
                     import json, time
-                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1505","message":"feededit=1 handler entry","data":{"feededit":str(feededit),"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1529","message":"feededit=1 handler entry","data":{"feededit":str(feededit),"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
                     f.flush()
-            except: pass
+            except Exception as e:
+                logger.warning(f"Failed to write debug log: {e}")
             # #endregion
             try:
                 logger.info(f"handle_apifeedwp59: Processing feededit=1 for domain={domain}, domainid={domainid}")
@@ -1714,11 +1721,12 @@ async def handle_apifeedwp59(
         elif feededit == '2' or feededit == 2:
             # #region agent log
             try:
-                with open(r"c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log", "a", encoding="utf-8") as f:
+                with open(str(DEBUG_LOG_PATH), "a", encoding="utf-8") as f:
                     import json, time
-                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1693","message":"feededit=2 handler entry","data":{"feededit":str(feededit),"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"E","location":"article.py:1717","message":"feededit=2 handler entry","data":{"feededit":str(feededit),"domainid":domainid},"timestamp":int(time.time()*1000)})+"\n")
                     f.flush()
-            except: pass
+            except Exception as e:
+                logger.warning(f"Failed to write debug log: {e}")
             # #endregion
             try:
                 # Get domain settings
@@ -1763,9 +1771,9 @@ async def handle_apifeedwp59(
         logger.error(error_trace)
         # #region agent log
         try:
-            with open(r"c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log", "a", encoding="utf-8") as f:
+            with open(str(DEBUG_LOG_PATH), "a", encoding="utf-8") as f:
                 import json, time
-                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"article.py:1730","message":"Top-level exception caught","data":{"error":str(e),"error_type":type(e).__name__,"traceback":error_trace[:500]},"timestamp":int(time.time()*1000)})+"\n")
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"D","location":"article.py:1763","message":"Top-level exception caught","data":{"error":str(e),"error_type":type(e).__name__,"traceback":error_trace[:500]},"timestamp":int(time.time()*1000)})+"\n")
                 f.flush()
         except Exception as log_err:
             # Even if debug log fails, try to log the original error
