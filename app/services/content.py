@@ -3710,19 +3710,33 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
     resourcesactive = str(domain_data.get('resourcesactive', ''))
     resourcesactive_val = (resourcesactive == '1' or resourcesactive == 1)
     
-    # Only process articles if resourcesactive == 1
-    if articles and resourcesactive_val:
+    # Check if BRON service type
+    is_bron_val = is_bron(domain_data.get('servicetype'))
+    
+    # Process articles based on resourcesactive setting
+    if articles:
         for item in articles:
             if item.get('id'):
-                # If linkouturl exists and is valid (> 5 chars), show as external link
-                if len(item.get('linkouturl', '').strip()) > 5:
-                    feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item["restitle"]))}</a></li>\n'
-                    num_lnks += 1
+                # Build Resources link (Business Collective page - Action=2 format for non-WP)
+                # For non-WP plugins, use Action=2 format: /?Action=2&k=keyword-slug
+                keyword_slug = seo_filter_text_custom(item['restitle']).lower().replace(' ', '-')
+                resources_link = linkdomain + '/?Action=2&amp;k=' + keyword_slug
+                newsf = f' <a style="padding-left: 0px !important;" href="{resources_link}">Resources</a>'
+                
+                if resourcesactive_val:
+                    # Resources active - show main article link (Action=1) + Resources link (Action=2)
+                    # If linkouturl exists and is valid (> 5 chars), show as external link
+                    if len(item.get('linkouturl', '').strip()) > 5:
+                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item["restitle"]))}</a>{newsf}</li>\n'
+                        num_lnks += 1
+                    else:
+                        # Otherwise, show as internal link (ignore NoContent)
+                        main_link = linkdomain + '/?Action=1&amp;k=' + keyword_slug + '&amp;PageID=' + str(item['id'])
+                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}">{clean_title(seo_filter_text_custom(item["restitle"]))}</a>{newsf}</li>\n'
+                        num_lnks += 1
                 else:
-                    # Otherwise, show as internal link (ignore NoContent)
-                    keyword_slug = seo_filter_text_custom(item['restitle']).lower().replace(' ', '-')
-                    main_link = linkdomain + '/?Action=1&amp;k=' + keyword_slug + '&amp;PageID=' + str(item['id'])
-                    feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}">{clean_title(seo_filter_text_custom(item["restitle"]))}</a></li>\n'
+                    # Resources not active - show only Business Collective link (Action=2)
+                    feedlinks += f'<li><a style="padding-right: 0px !important;" href="{resources_link}">{clean_title(seo_filter_text_custom(item["restitle"]))}</a></li>\n'
                     num_lnks += 1
     
     # Add Blog and FAQ links (PHP lines 1827-1834)
