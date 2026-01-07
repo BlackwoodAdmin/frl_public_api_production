@@ -295,8 +295,7 @@ def wrap_content_with_header_footer(
     metaheader: str,
     canonical_url: str = '',
     websitereferencesimple: bool = False,
-    wp_plugin: int = 0,
-    domain_settings: Optional[Dict[str, Any]] = None
+    wp_plugin: int = 0
 ) -> str:
     """
     Wrap content with header and footer HTML.
@@ -310,7 +309,6 @@ def wrap_content_with_header_footer(
         canonical_url: Canonical link URL
         websitereferencesimple: If True, skip header/footer (for simple mode)
         wp_plugin: If 1, skip header/footer (WordPress handles it)
-        domain_settings: Domain settings dictionary to check resourcesdivdisplay
     """
     # WordPress plugin doesn't use header/footer (WordPress handles it)
     if wp_plugin == 1:
@@ -804,14 +802,6 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
     footer_html += '.seo-footer-nav li ul li ul {\n'
     footer_html += '\tleft:70px !important;;\n'
     footer_html += '}\n'
-    # Add overflow hidden CSS when wp_plugin = 1 and resourcesdivdisplay = 1
-    wp_plugin = domain_data.get('wp_plugin', 0)
-    if wp_plugin == 1:
-        resourcesdivdisplay = domain_settings.get('resourcesdivdisplay')
-        if resourcesdivdisplay == 1 or resourcesdivdisplay == '1':
-            footer_html += 'html, body {\n'
-            footer_html += '\toverflow: hidden !important;\n'
-            footer_html += '}\n'
     footer_html += '</style>\n'
     footer_html += '</div>'
     
