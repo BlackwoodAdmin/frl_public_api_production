@@ -3855,6 +3855,20 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                     bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
                     newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
                     feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
+                    num_lnks += 1
+                
+                # Fallback: if item doesn't match any of the above conditions, add it with default format
+                else:
+                    # Build Resources link
+                    bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
+                    newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
+                    
+                    # Build main link (Action=1 format)
+                    linkurl = code_url(domainid, domain_data, domain_settings)
+                    slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
+                    main_link = f'{linkurl}?Action=1&amp;k={slug}&amp;PageID={item_id}'
+                    feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
+                    num_lnks += 1
             
             # Add Bubba feed links (drip content) (PHP lines 1795-1823)
             dripcontent = domain_data.get('dripcontent', 0)
