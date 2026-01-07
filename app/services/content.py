@@ -3697,7 +3697,7 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
     feedlinks += '<ul class="mdubgwi-sub-nav">\n'
     
     # Add main article links from bwp_bubblefeed (simplified, no nested categories)
-    # Query for all active articles for the domain
+    # Query for all active articles for the domain (active = 1 and deleted != 1 are required)
     articles_sql = """
         SELECT b.restitle, b.id, b.linkouturl, b.NoContent
         FROM bwp_bubblefeed b
@@ -3706,29 +3706,23 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
     """
     articles = db.fetch_all(articles_sql, (domainid,))
     
-    if articles:
-        is_bron_val = is_bron(domain_data.get('servicetype'))
-        resourcesactive = str(domain_data.get('resourcesactive', ''))
-        resourcesactive_val = (resourcesactive == '1' or resourcesactive == 1)
-        
+    # Check resourcesactive first - if not 1, don't show any article links
+    resourcesactive = str(domain_data.get('resourcesactive', ''))
+    resourcesactive_val = (resourcesactive == '1' or resourcesactive == 1)
+    
+    # Only process articles if resourcesactive == 1
+    if articles and resourcesactive_val:
         for item in articles:
             if item.get('id'):
-                # Check if we should show this article
-                if resourcesactive_val:
-                    # Resources active - show main article link
-                    if (item.get('NoContent') == 0 or is_bron_val) and len(item.get('linkouturl', '').strip()) > 5:
-                        # External link
-                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item["restitle"]))}</a></li>\n'
-                        num_lnks += 1
-                    elif item.get('NoContent') == 0 or is_bron_val:
-                        # Internal link to main content page - use PHP plugin URL format
-                        keyword_slug = seo_filter_text_custom(item['restitle']).lower().replace(' ', '-')
-                        main_link = linkdomain + '/?Action=1&amp;k=' + keyword_slug + '&amp;PageID=' + str(item['id'])
-                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}">{clean_title(seo_filter_text_custom(item["restitle"]))}</a></li>\n'
-                        num_lnks += 1
-                elif len(item.get('linkouturl', '').strip()) > 5:
-                    # External link when resources not active
+                # If linkouturl exists and is valid (> 5 chars), show as external link
+                if len(item.get('linkouturl', '').strip()) > 5:
                     feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item["restitle"]))}</a></li>\n'
+                    num_lnks += 1
+                else:
+                    # Otherwise, show as internal link (ignore NoContent)
+                    keyword_slug = seo_filter_text_custom(item['restitle']).lower().replace(' ', '-')
+                    main_link = linkdomain + '/?Action=1&amp;k=' + keyword_slug + '&amp;PageID=' + str(item['id'])
+                    feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}">{clean_title(seo_filter_text_custom(item["restitle"]))}</a></li>\n'
                     num_lnks += 1
     
     # Add Blog and FAQ links (PHP lines 1827-1834)
