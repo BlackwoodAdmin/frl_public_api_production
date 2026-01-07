@@ -1819,6 +1819,38 @@ def build_page_wp(
     wpage = f'<div class="{css_prefix}-main-table" style="margin-left:auto;margin-right:auto;display:block;">\n'
     wpage += f'<div class="{css_prefix}-spacer"></div>\n'
     
+    # Add H1 header for non-WP plugins (PHP plugin)
+    wp_plugin_val = domain_data.get('wp_plugin', 0)
+    # Normalize wp_plugin to integer for comparison
+    if isinstance(wp_plugin_val, str):
+        wp_plugin_val = 1 if wp_plugin_val.strip() == '1' else 0
+    else:
+        wp_plugin_val = 1 if wp_plugin_val == 1 else 0
+    
+    if wp_plugin_val != 1:
+        # Non-WP plugin: add top-container with H1 header
+        wpage += f'<div class="{css_prefix}-top-container">\n'
+        
+        # Build resurl for H1 link - use PHP plugin URL format for non-WP
+        domain_status = domain_data.get('status')
+        domain_status_str = str(domain_status) if domain_status is not None else ''
+        
+        if domain_status_str in ['2', '10']:
+            # Build URL using code_url and seo_slug for PHP plugin format
+            # Note: code_url and seo_slug are defined later in this file, but Python allows forward references
+            h1_resurl = code_url(domainid, domain_data, domain_settings) + "?Action=1&amp;k=" + seo_slug(seo_filter_text_custom(res.get('restitle', ''))) + '&amp;PageID=' + str(res.get('id', ''))
+        else:
+            h1_resurl = linkdomain
+        
+        # For BRON domains only: if linkouturl exists, use it for H1 link (like footer links)
+        servicetype = domain_data.get('servicetype')
+        if is_bron(servicetype) and res.get('linkouturl') and len(str(res.get('linkouturl', '')).strip()) > 5:
+            h1_resurl = str(res['linkouturl']).strip()
+        
+        # Add H1 with keyword link (no " - Resources" suffix for Action=1 pages)
+        wpage += f'<h1 class="h1"><a href="{h1_resurl}" style="">{clean_title(seo_filter_text_custom(res.get("restitle", "")))}</a></h1>\n'
+        wpage += f'</div>\n'  # Close top-container
+    
     # Check if resfulltext contains Bootstrap container classes and add Bootstrap CSS/JS if needed (PHP lines 266-275)
     resfulltext = res.get('resfulltext', '')
     if resfulltext and 'container justify-content-center' in resfulltext.lower():
