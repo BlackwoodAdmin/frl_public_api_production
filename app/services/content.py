@@ -3696,35 +3696,40 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
     feedlinks += '<li>'
     feedlinks += '<ul class="mdubgwi-sub-nav">\n'
     
-    # Add Bubba feed links (drip content) (PHP lines 1795-1823)
-    dripcontent = domain_data.get('dripcontent', 0)
-    if dripcontent and dripcontent > 3:
-        bubba_sql = """
-            SELECT ba.*
-            FROM bwp_bubbafeed ba
-            LEFT JOIN bwp_bubblefeed bb ON bb.id = ba.bubblefeedid
-            WHERE ba.domainid = %s
-            AND ba.deleted != 1
-            AND bb.deleted != 1
-            AND bb.id IS NOT NULL
-            AND LENGTH(ba.resfulltext) > 300
-            ORDER BY ba.id DESC
-            LIMIT 20
-        """
-        allbubba = db.fetch_all(bubba_sql, (domainid,))
-        if allbubba:
-            for bubba in allbubba:
-                slug_text = seo_text_custom(bubba.get('bubbatitle', ''))
-                slug_text = html.unescape(slug_text)
-                slug_text = to_ascii(slug_text)
-                slug_text = slug_text.lower()
-                slug_text = slug_text.replace(' ', '-')
-                linkurl = code_url(domainid, domain_data, domain_settings) + '?Action=3&amp;k=' + slug_text + '&amp;PageID=' + str(bubba.get('id', ''))
-                feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkurl}"> {clean_title(html.unescape(seo_filter_text_custom(bubba.get("bubbatitle", ""))))} </a></li>\n'
-            feedlinks += '</ul>\n'
-            wrlabel = f'<a href="{code_url(domainid, domain_data, domain_settings)}?Action=3">Blog</a>'
-            feedlinks += wrlabel + '</li>\n'
-            num_lnks += 1
+    # Add main article links from bwp_bubblefeed (simplified, no nested categories)
+    # Query for all active articles for the domain
+    articles_sql = """
+        SELECT b.restitle, b.id, b.linkouturl, b.NoContent
+        FROM bwp_bubblefeed b
+        WHERE b.domainid = %s AND b.deleted != 1 AND b.active = 1
+        ORDER BY b.restitle
+    """
+    articles = db.fetch_all(articles_sql, (domainid,))
+    
+    if articles:
+        is_bron_val = is_bron(domain_data.get('servicetype'))
+        resourcesactive = str(domain_data.get('resourcesactive', ''))
+        resourcesactive_val = (resourcesactive == '1' or resourcesactive == 1)
+        
+        for item in articles:
+            if item.get('id'):
+                # Check if we should show this article
+                if resourcesactive_val:
+                    # Resources active - show main article link
+                    if (item.get('NoContent') == 0 or is_bron_val) and len(item.get('linkouturl', '').strip()) > 5:
+                        # External link
+                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item["restitle"]))}</a></li>\n'
+                        num_lnks += 1
+                    elif item.get('NoContent') == 0 or is_bron_val:
+                        # Internal link to main content page - use PHP plugin URL format
+                        keyword_slug = seo_filter_text_custom(item['restitle']).lower().replace(' ', '-')
+                        main_link = linkdomain + '/?Action=1&amp;k=' + keyword_slug + '&amp;PageID=' + str(item['id'])
+                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}">{clean_title(seo_filter_text_custom(item["restitle"]))}</a></li>\n'
+                        num_lnks += 1
+                elif len(item.get('linkouturl', '').strip()) > 5:
+                    # External link when resources not active
+                    feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item["restitle"]))}</a></li>\n'
+                    num_lnks += 1
     
     # Add Blog and FAQ links (PHP lines 1827-1834)
     if domain_settings.get('blogUrl') and len(domain_settings['blogUrl']) > 10:
