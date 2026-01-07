@@ -419,7 +419,8 @@ async def articles_endpoint(
                     metaheader=metaheader,
                     canonical_url=canonical_url,
                     websitereferencesimple=False,
-                    wp_plugin=domain_category.get('wp_plugin', 0)
+                    wp_plugin=domain_category.get('wp_plugin', 0),
+                    domain_settings=domain_settings
                 )
                 
                 # PHP Articles.php includes feed-home.css.php at lines 255 and 471

@@ -295,7 +295,8 @@ def wrap_content_with_header_footer(
     metaheader: str,
     canonical_url: str = '',
     websitereferencesimple: bool = False,
-    wp_plugin: int = 0
+    wp_plugin: int = 0,
+    domain_settings: Optional[Dict[str, Any]] = None
 ) -> str:
     """
     Wrap content with header and footer HTML.
@@ -309,9 +310,16 @@ def wrap_content_with_header_footer(
         canonical_url: Canonical link URL
         websitereferencesimple: If True, skip header/footer (for simple mode)
         wp_plugin: If 1, skip header/footer (WordPress handles it)
+        domain_settings: Domain settings dictionary to check resourcesdivdisplay
     """
     # WordPress plugin doesn't use header/footer (WordPress handles it)
     if wp_plugin == 1:
+        # Add overflow hidden CSS when resourcesdivdisplay = 1
+        if domain_settings:
+            resourcesdivdisplay = domain_settings.get('resourcesdivdisplay')
+            if resourcesdivdisplay == 1 or resourcesdivdisplay == '1':
+                css_style = '<style>html, body { overflow: hidden !important; }</style>\n'
+                return css_style + content
         return content
     
     # Simple mode doesn't use header/footer
