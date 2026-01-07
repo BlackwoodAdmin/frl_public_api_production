@@ -666,15 +666,17 @@ async def article_endpoint(
             else:
                 listing_content = '<p>No keywords found for this domain.</p>'
             
-            # Add footer links at the end
-            article_links_html = build_article_links(
-                pageid=0,
-                domainid=domainid,
-                domain_data=domain_category,
-                domain_settings=domain_settings,
-                domain_category=domain_category
-            )
-            listing_content += article_links_html
+            # Add footer links at the end (only for non-WP plugins)
+            # wp_plugin is already normalized earlier in the function
+            if wp_plugin != 1:
+                article_links_html = build_article_links(
+                    pageid=0,
+                    domainid=domainid,
+                    domain_data=domain_category,
+                    domain_settings=domain_settings,
+                    domain_category=domain_category
+                )
+                listing_content += article_links_html
             
             # Get header/footer
             header_footer_data = get_header_footer(domainid, domain_category.get('status'), '')

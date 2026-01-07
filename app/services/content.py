@@ -2393,6 +2393,31 @@ def build_bcpage_wp(
     if not bubbleid or not domainid:
         return ""
     
+    # Normalize wp_plugin to integer at the beginning for consistent use throughout the function
+    wp_plugin_raw = domain_data.get('wp_plugin', 0)
+    if wp_plugin_raw is None:
+        wp_plugin = 0
+    elif isinstance(wp_plugin_raw, str):
+        # Handle string values ('0', '1', '', etc.)
+        wp_plugin_str = wp_plugin_raw.strip()
+        if wp_plugin_str == '' or wp_plugin_str == '0':
+            wp_plugin = 0
+        else:
+            try:
+                wp_plugin = int(wp_plugin_str)
+                # Ensure it's 0 or 1 (boolean-like)
+                wp_plugin = 1 if wp_plugin != 0 else 0
+            except (ValueError, TypeError):
+                wp_plugin = 0
+    else:
+        # Already an integer or numeric type
+        try:
+            wp_plugin = int(wp_plugin_raw)
+            # Ensure it's 0 or 1 (boolean-like)
+            wp_plugin = 1 if wp_plugin != 0 else 0
+        except (ValueError, TypeError):
+            wp_plugin = 0
+    
     import html
     import re
     from urllib.parse import quote
@@ -3420,7 +3445,7 @@ def build_bcpage_wp(
     
     # Add ArticleLinks (PHP line 1680: echo ArticleLinks($res['id']))
     # Only add ArticleLinks for non-WordPress plugin calls (PHP plugin calls)
-    if domain_data.get('wp_plugin') != 1:
+    if wp_plugin != 1:
         # Get domain_category for ArticleLinks (it's the same as domain_data in this context)
         domain_category = domain_data
         article_links_html = build_article_links(
@@ -3667,8 +3692,11 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
     domain_status_str = str(domain_status) if domain_status is not None else ''
     
     # Silo functionality removed - no longer used
+    # Always add opening tags for footer structure (copyright link will always be added)
+    feedlinks += '<li>'
+    feedlinks += '<ul class="mdubgwi-sub-nav">\n'
+    
     # Add Bubba feed links (drip content) (PHP lines 1795-1823)
-    has_content = False
     dripcontent = domain_data.get('dripcontent', 0)
     if dripcontent and dripcontent > 3:
         bubba_sql = """
@@ -3685,10 +3713,6 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
         """
         allbubba = db.fetch_all(bubba_sql, (domainid,))
         if allbubba:
-            if not has_content:
-                feedlinks += '<li>'
-                feedlinks += '<ul class="mdubgwi-sub-nav">\n'
-                has_content = True
             for bubba in allbubba:
                 slug_text = seo_text_custom(bubba.get('bubbatitle', ''))
                 slug_text = html.unescape(slug_text)
@@ -3704,27 +3728,19 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
     
     # Add Blog and FAQ links (PHP lines 1827-1834)
     if domain_settings.get('blogUrl') and len(domain_settings['blogUrl']) > 10:
-        if not has_content:
-            feedlinks += '<li>'
-            feedlinks += '<ul class="mdubgwi-sub-nav">\n'
-            has_content = True
         feedlinks += f'<li><a class="url" style="width: 100%;font-size:12px;line-height:13px;" target="_blank" href="{domain_settings["blogUrl"]}">Blog</a></li>\n'
         num_lnks += 1
     if domain_settings.get('faqUrl') and len(domain_settings['faqUrl']) > 10:
-        if not has_content:
-            feedlinks += '<li>'
-            feedlinks += '<ul class="mdubgwi-sub-nav">\n'
-            has_content = True
         feedlinks += f'<li><a class="url" style="width: 100%;font-size:12px;line-height:13px;" target="_blank" href="{domain_settings["faqUrl"]}">FAQ</a></li>\n'
         num_lnks += 1
     
-    # Add closing tags only if we added opening tags (has_content is True)
-    if has_content:
-        feedlinks += '</ul>\n'
-        wrlabel = f'<a href="{code_url(domainid, domain_data, domain_settings)}?Action=1">Articles</a>'
-        feedlinks += wrlabel + '</li>\n'
+    # Always add closing tags for the list structure (Articles link)
+    feedlinks += '</ul>\n'
+    wrlabel = f'<a href="{code_url(domainid, domain_data, domain_settings)}?Action=1">Articles</a>'
+    feedlinks += wrlabel + '</li>\n'
     
     # Build final wrapper HTML (PHP lines 1965-1992)
+    # Copyright link is always added
     ispay = 'bronze'
     if (price > 0 and domain_category.get('skipaddurllinks') == '0') or domain_category.get('skipaddurllinks') == '0' or True:
         ispay = 'gold'
@@ -3732,21 +3748,9 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
             ltest = domain_data['wr_name']
         else:
             ltest = domain_data['domain_name']
-        if has_content:
-            feedlinks += f'</ul><a href="{linkdomain}/"><div class="mdubgwi-button-ktue" style="background:transparent;text-align:center;white-space:nowrap;">&copy; {datetime.now().year} {ltest}</div></a><div id="mdubgwi-hidden-button"></div></li>'
-        else:
-            # If no content, add opening tags for the copyright link
-            feedlinks += '<li>'
-            feedlinks += '<ul class="mdubgwi-sub-nav">\n'
-            feedlinks += f'</ul><a href="{linkdomain}/"><div class="mdubgwi-button-ktue" style="background:transparent;text-align:center;white-space:nowrap;">&copy; {datetime.now().year} {ltest}</div></a><div id="mdubgwi-hidden-button"></div></li>'
+        feedlinks += f'</ul><a href="{linkdomain}/"><div class="mdubgwi-button-ktue" style="background:transparent;text-align:center;white-space:nowrap;">&copy; {datetime.now().year} {ltest}</div></a><div id="mdubgwi-hidden-button"></div></li>'
     else:
-        if has_content:
-            feedlinks += '</ul><a target="_blank" href="/" title="Home"><div class="mdubgwi-button"></div></a><div id="mdubgwi-hidden-button"></div></li>'
-        else:
-            # If no content, add opening tags for the home link
-            feedlinks += '<li>'
-            feedlinks += '<ul class="mdubgwi-sub-nav">\n'
-            feedlinks += '</ul><a target="_blank" href="/" title="Home"><div class="mdubgwi-button"></div></a><div id="mdubgwi-hidden-button"></div></li>'
+        feedlinks += '</ul><a target="_blank" href="/" title="Home"><div class="mdubgwi-button"></div></a><div id="mdubgwi-hidden-button"></div></li>'
     
     feedlinks += '</ul></div>'
     
