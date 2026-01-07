@@ -2320,7 +2320,8 @@ def build_page_wp(
 </div>
 '''
                 
-                wpage += '</div>\n'
+                wpage += '</div>\n'  # Close schema.org LocalBusiness div
+                wpage += '</div>\n'  # Close google-map div
     
     # Social media icons (PHP lines 1493-1508)
     if (len(res.get('resgoogle', '')) > 10 or len(res.get('resfb', '')) > 10 or 
