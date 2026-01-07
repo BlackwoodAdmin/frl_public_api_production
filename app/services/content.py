@@ -3666,282 +3666,63 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
     domain_status = domain_data.get('status')
     domain_status_str = str(domain_status) if domain_status is not None else ''
     
-    # PHP lines 1623-1835: Build silo links for status 2, 10, 4, 1
-    if domain_status_str in ['2', '10', '4', '1']:
-        silo_sql = """
-            SELECT b.restitle, b.id, b.linkouturl, b.categoryid, c.category, c.bubblefeedid, 
-                   b.resfulltext, b.resshorttext, b.NoContent,
-                   (SELECT COUNT(*) FROM bwp_link_placement WHERE showonpgid = b.id AND deleted != 1) AS links_per_page
-            FROM bwp_bubblefeed b
-            LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != '1'
-            WHERE b.domainid = %s AND b.deleted != '1'
-            ORDER BY b.restitle
+    # Silo functionality removed - no longer used
+    # Add Bubba feed links (drip content) (PHP lines 1795-1823)
+    has_content = False
+    dripcontent = domain_data.get('dripcontent', 0)
+    if dripcontent and dripcontent > 3:
+        bubba_sql = """
+            SELECT ba.*
+            FROM bwp_bubbafeed ba
+            LEFT JOIN bwp_bubblefeed bb ON bb.id = ba.bubblefeedid
+            WHERE ba.domainid = %s
+            AND ba.deleted != 1
+            AND bb.deleted != 1
+            AND bb.id IS NOT NULL
+            AND LENGTH(ba.resfulltext) > 300
+            ORDER BY ba.id DESC
+            LIMIT 20
         """
-        silo = db.fetch_all(silo_sql, (domainid,))
-        
-        # Always add opening tags, even if silo is empty, to ensure proper HTML structure
-        feedlinks += '<li>'
-        sssnav = ''
-        feedlinks += '<ul class="mdubgwi-sub-nav">\n'
-        
-        if silo:
-            
-            for item in silo:
-                bubblefeedid = item.get('bubblefeedid', '')
-                item_id = item.get('id')
-                sssnav = ''  # Reset sssnav for each item
-                
-                # PHP line 1644: if(strlen($silo[$i]['bubblefeedid']) == 0)
-                if not bubblefeedid or len(str(bubblefeedid)) == 0:
-                    links_per_page = item.get('links_per_page', 0) or 0
-                    
-                    # Always build Resources link regardless of links_per_page
-                    bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                    newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
-                    
-                    if links_per_page >= 1:
-                        # Get related links (PHP lines 1651-1690)
-                        links_sql = """
-                            SELECT l.*, d.linkexchange, d.contentshare, d.status, d.linkskipfeedchecker, d.servicetype, b.linkouturl, b.restitle
-                            FROM bwp_link_placement l
-                            LEFT JOIN bwp_bubblefeed b ON b.id = l.bubblefeedid
-                            LEFT JOIN bwp_domains d ON d.id = l.domainid
-                            WHERE l.showonpgid = %s
-                            AND d.servicetype != 356
-                            AND d.status IN (2,10)
-                            AND d.contentshare = 1
-                            AND d.linkexchange = 1
-                            AND (d.skipfeedchecker != 1 OR (d.skipfeedchecker = 1 AND d.linkskipfeedchecker = 1))
-                            AND (b.linkouturl IS NULL OR b.linkouturl = '')
-                            AND CHAR_LENGTH(b.resfulltext) > 500 AND b.resfulltext IS NOT NULL
-                        """
-                        links = db.fetch_all(links_sql, (item_id,))
-                        for link in links:
-                            # Fetch domain data for CodeURL
-                            link_domain_sql = "SELECT id, domain_name, uses0308, usescontent_resource, usewww, domain_url FROM bwp_domains WHERE id = %s"
-                            link_domain = db.fetch_row(link_domain_sql, (link['id'],))
-                            if link_domain:
-                                link_domain_settings_sql = "SELECT * FROM bwp_domain_settings WHERE domainid = %s"
-                                link_domain_settings = db.fetch_row(link_domain_settings_sql, (link['id'],))
-                                if not link_domain_settings:
-                                    db.execute("INSERT INTO bwp_domain_settings SET domainid = %s", (link['id'],))
-                                    link_domain_settings = db.fetch_row(link_domain_settings_sql, (link['id'],))
-                                linkurl = code_url(link['id'], link_domain, link_domain_settings or {})
-                            else:
-                                linkurl = ''
-                            slug = seo_slug(seo_filter_text_custom(link.get('restitle', '')))
-                            sssnav += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;k={slug}&amp;PageID={link.get("bubblefeedid", "")}"> {clean_title(seo_filter_text_custom(link.get("restitle", "")))} </a></li>\n'
-                        
-                        # Offsite links (PHP lines 1671-1690)
-                        linkso_sql = """
-                            SELECT l.*, d.linkexchange, d.contentshare, d.status, d.linkskipfeedchecker, d.servicetype, b.linkouturl, b.restitle
-                            FROM bwp_link_placement l
-                            LEFT JOIN bwp_bubblefeedoffsite bo ON bo.id = l.bubblefeedid
-                            LEFT JOIN bwp_bubblefeed b ON b.id = bo.bubblefeedid
-                            LEFT JOIN bwp_domains d ON d.id = l.domainid
-                            WHERE l.showonpgid = %s
-                            AND l.linkformat = 'offsite'
-                            AND d.servicetype != 356
-                            AND d.status IN (2,10)
-                            AND d.contentshare = 1
-                            AND d.linkexchange = 1
-                            AND (d.skipfeedchecker != 1 OR (d.skipfeedchecker = 1 AND d.linkskipfeedchecker = 1))
-                        """
-                        linkso = db.fetch_all(linkso_sql, (item_id,))
-                        for link in linkso:
-                            # Fetch domain data for CodeURL
-                            link_domain_sql = "SELECT id, domain_name, uses0308, usescontent_resource, usewww, domain_url FROM bwp_domains WHERE id = %s"
-                            link_domain = db.fetch_row(link_domain_sql, (link['id'],))
-                            if link_domain:
-                                link_domain_settings_sql = "SELECT * FROM bwp_domain_settings WHERE domainid = %s"
-                                link_domain_settings = db.fetch_row(link_domain_settings_sql, (link['id'],))
-                                if not link_domain_settings:
-                                    db.execute("INSERT INTO bwp_domain_settings SET domainid = %s", (link['id'],))
-                                    link_domain_settings = db.fetch_row(link_domain_settings_sql, (link['id'],))
-                                linkurl = code_url(link['id'], link_domain, link_domain_settings or {})
-                            else:
-                                linkurl = ''
-                            slug = seo_slug(seo_filter_text_custom(link.get('restitle', '')))
-                            sssnav += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;k={slug}&amp;PageID={link.get("bubblefeedid", "")}"> {clean_title(seo_filter_text_custom(link.get("restitle", "")))} </a></li>\n'
-                    
-                    # Add sssnav (related/nested links) to feedlinks before the main link
-                    if sssnav:
-                        feedlinks += sssnav
-                        sssnav = ''  # Reset for next item
-                    
-                    # Build main link (PHP lines 1700-1716)
-                    if domain_category.get('resourcesactive') == '1':
-                        if item.get('NoContent') == 0 and len(item.get('linkouturl', '').strip()) > 5:
-                            feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
-                        else:
-                            linkurl = code_url(domainid, domain_data, domain_settings)
-                            slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                            main_link = f'{linkurl}?Action=1&amp;k={slug}&amp;PageID={item_id}'
-                            feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
-                    else:
-                        # Keyword link should always point to Action=1 (resfulltext) - main content page
-                        # Resources link (newsf) already points to Action=2 (resfeedtext)
-                        linkurl = code_url(domainid, domain_data, domain_settings)
-                        slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                        main_link = f'{linkurl}?Action=1&amp;k={slug}&amp;PageID={item_id}'
-                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
-                    
-                    num_lnks += 1
-                
-                # PHP line 1723: elseif($silo[$i]['bubblefeedid'] == $silo[$i]['id'])
-                elif bubblefeedid == item_id:
-                    links_per_page = item.get('links_per_page', 0) or 0
-                    
-                    # Always build Resources link regardless of links_per_page
-                    bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                    newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
-                    
-                    if links_per_page >= 1:
-                        # Get related links (similar to above)
-                        links_sql = """
-                            SELECT l.*, d.linkexchange, d.contentshare, d.status, d.linkskipfeedchecker, d.servicetype, d.dripcontent, b.linkouturl, b.restitle
-                            FROM bwp_link_placement l
-                            LEFT JOIN bwp_bubblefeed b ON b.id = l.bubblefeedid
-                            LEFT JOIN bwp_domains d ON d.id = l.domainid
-                            WHERE l.showonpgid = %s
-                            AND d.servicetype != 356
-                            AND d.status IN (2,10)
-                            AND d.contentshare = 1
-                            AND d.linkexchange = 1
-                            AND (d.skipfeedchecker != 1 OR (d.skipfeedchecker = 1 AND d.linkskipfeedchecker = 1))
-                            AND (b.linkouturl IS NULL OR b.linkouturl = '')
-                            AND CHAR_LENGTH(b.resfulltext) > 500 AND b.resfulltext IS NOT NULL
-                        """
-                        links = db.fetch_all(links_sql, (item_id,))
-                        for link in links:
-                            # Fetch domain data for CodeURL
-                            link_domain_sql = "SELECT id, domain_name, uses0308, usescontent_resource, usewww, domain_url FROM bwp_domains WHERE id = %s"
-                            link_domain = db.fetch_row(link_domain_sql, (link['id'],))
-                            if link_domain:
-                                link_domain_settings_sql = "SELECT * FROM bwp_domain_settings WHERE domainid = %s"
-                                link_domain_settings = db.fetch_row(link_domain_settings_sql, (link['id'],))
-                                if not link_domain_settings:
-                                    db.execute("INSERT INTO bwp_domain_settings SET domainid = %s", (link['id'],))
-                                    link_domain_settings = db.fetch_row(link_domain_settings_sql, (link['id'],))
-                                linkurl = code_url(link['id'], link_domain, link_domain_settings or {})
-                            else:
-                                linkurl = ''
-                            slug = seo_slug(seo_filter_text_custom(link.get('restitle', '')))
-                            sssnav += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;k={slug}&amp;PageID={link.get("bubblefeedid", "")}"> {clean_title(seo_filter_text_custom(link.get("restitle", "")))} </a></li>\n'
-                    
-                    # Add sssnav (related/nested links) to feedlinks before the main link
-                    if sssnav:
-                        feedlinks += sssnav
-                        sssnav = ''  # Reset for next item
-                    
-                    # Build category link (PHP lines 1758-1764)
-                    if domain_category.get('resourcesactive') == '1':
-                        linkurl = code_url(domainid, domain_data, domain_settings)
-                        category_slug = seo_slug(seo_filter_text_custom(item.get('category', '')))
-                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;category={category_slug}&amp;c={item.get("categoryid", "")}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
-                    else:
-                        # Keyword link should always point to Action=1 (resfulltext) - main content page
-                        # Resources link (newsf) already points to Action=2 (resfeedtext)
-                        linkurl = code_url(domainid, domain_data, domain_settings)
-                        slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                        main_link = f'{linkurl}?Action=1&amp;k={slug}&amp;PageID={item_id}'
-                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
-                    
-                    num_lnks += 1
-                
-                # PHP line 1767: elseif(strlen(trim($silo[$i]['linkouturl'])) > 5)
-                elif len(item.get('linkouturl', '').strip()) > 5:
-                    # Always build Resources link regardless of links_per_page
-                    bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                    newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
-                    feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
-                    num_lnks += 1
-                
-                # Fallback: if item doesn't match any of the above conditions, add it with default format
-                else:
-                    # Build Resources link
-                    bclink = code_url(domainid, domain_data, domain_settings) + '?Action=2&amp;k=' + seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                    newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
-                    
-                    # Build main link (Action=1 format)
-                    linkurl = code_url(domainid, domain_data, domain_settings)
-                    slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                    main_link = f'{linkurl}?Action=1&amp;k={slug}&amp;PageID={item_id}'
-                    feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
-                    num_lnks += 1
-            
-            # Add Bubba feed links (drip content) (PHP lines 1795-1823)
-            dripcontent = domain_data.get('dripcontent', 0)
-            if dripcontent and dripcontent > 3:
-                bubba_sql = """
-                    SELECT ba.*
-                    FROM bwp_bubbafeed ba
-                    LEFT JOIN bwp_bubblefeed bb ON bb.id = ba.bubblefeedid
-                    WHERE ba.domainid = %s
-                    AND ba.deleted != 1
-                    AND bb.deleted != 1
-                    AND bb.id IS NOT NULL
-                    AND LENGTH(ba.resfulltext) > 300
-                    ORDER BY ba.id DESC
-                    LIMIT 20
-                """
-                allbubba = db.fetch_all(bubba_sql, (domainid,))
-                if allbubba:
-                    feedlinks += '<li>'
-                    feedlinks += '<ul class="mdubgwi-sub-nav">\n'
-                    for bubba in allbubba:
-                        slug_text = seo_text_custom(bubba.get('bubbatitle', ''))
-                        slug_text = html.unescape(slug_text)
-                        slug_text = to_ascii(slug_text)
-                        slug_text = slug_text.lower()
-                        slug_text = slug_text.replace(' ', '-')
-                        linkurl = code_url(domainid, domain_data, domain_settings) + '?Action=3&amp;k=' + slug_text + '&amp;PageID=' + str(bubba.get('id', ''))
-                        feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkurl}"> {clean_title(html.unescape(seo_filter_text_custom(bubba.get("bubbatitle", ""))))} </a></li>\n'
-                    feedlinks += '</ul>\n'
-                    wrlabel = f'<a href="{code_url(domainid, domain_data, domain_settings)}?Action=3">Blog</a>'
-                    feedlinks += wrlabel + '</li>\n'
-                    num_lnks += 1
-        
-        # Always add closing tags to match the opening tags (even if silo was empty)
+        allbubba = db.fetch_all(bubba_sql, (domainid,))
+        if allbubba:
+            if not has_content:
+                feedlinks += '<li>'
+                feedlinks += '<ul class="mdubgwi-sub-nav">\n'
+                has_content = True
+            for bubba in allbubba:
+                slug_text = seo_text_custom(bubba.get('bubbatitle', ''))
+                slug_text = html.unescape(slug_text)
+                slug_text = to_ascii(slug_text)
+                slug_text = slug_text.lower()
+                slug_text = slug_text.replace(' ', '-')
+                linkurl = code_url(domainid, domain_data, domain_settings) + '?Action=3&amp;k=' + slug_text + '&amp;PageID=' + str(bubba.get('id', ''))
+                feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkurl}"> {clean_title(html.unescape(seo_filter_text_custom(bubba.get("bubbatitle", ""))))} </a></li>\n'
+            feedlinks += '</ul>\n'
+            wrlabel = f'<a href="{code_url(domainid, domain_data, domain_settings)}?Action=3">Blog</a>'
+            feedlinks += wrlabel + '</li>\n'
+            num_lnks += 1
+    
+    # Add Blog and FAQ links (PHP lines 1827-1834)
+    if domain_settings.get('blogUrl') and len(domain_settings['blogUrl']) > 10:
+        if not has_content:
+            feedlinks += '<li>'
+            feedlinks += '<ul class="mdubgwi-sub-nav">\n'
+            has_content = True
+        feedlinks += f'<li><a class="url" style="width: 100%;font-size:12px;line-height:13px;" target="_blank" href="{domain_settings["blogUrl"]}">Blog</a></li>\n'
+        num_lnks += 1
+    if domain_settings.get('faqUrl') and len(domain_settings['faqUrl']) > 10:
+        if not has_content:
+            feedlinks += '<li>'
+            feedlinks += '<ul class="mdubgwi-sub-nav">\n'
+            has_content = True
+        feedlinks += f'<li><a class="url" style="width: 100%;font-size:12px;line-height:13px;" target="_blank" href="{domain_settings["faqUrl"]}">FAQ</a></li>\n'
+        num_lnks += 1
+    
+    # Add closing tags only if we added opening tags (has_content is True)
+    if has_content:
         feedlinks += '</ul>\n'
         wrlabel = f'<a href="{code_url(domainid, domain_data, domain_settings)}?Action=1">Articles</a>'
         feedlinks += wrlabel + '</li>\n'
-        
-        # Add Blog and FAQ links (PHP lines 1827-1834)
-        if domain_settings.get('blogUrl') and len(domain_settings['blogUrl']) > 10:
-            feedlinks += f'<li><a class="url" style="width: 100%;font-size:12px;line-height:13px;" target="_blank" href="{domain_settings["blogUrl"]}">Blog</a></li>\n'
-        if domain_settings.get('faqUrl') and len(domain_settings['faqUrl']) > 10:
-            feedlinks += f'<li><a class="url" style="width: 100%;font-size:12px;line-height:13px;" target="_blank" href="{domain_settings["faqUrl"]}">FAQ</a></li>\n'
-    
-    # PHP lines 1837-1912: Status 8 handling (simplified)
-    if domain_status_str == '8':
-        # Similar logic but simplified for status 8
-        silo_sql = """
-            SELECT b.restitle, b.id, b.linkouturl, c.bubblefeedid, b.resfulltext, b.resshorttext,
-                   (SELECT COUNT(*) FROM bwp_link_placement WHERE showonpgid = b.id AND deleted != 1) AS links_per_page
-            FROM bwp_bubblefeed b
-            LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != '1'
-            WHERE b.domainid = %s AND b.deleted != '1'
-            ORDER BY b.restitle
-        """
-        silo = db.fetch_all(silo_sql, (domainid,))
-        # Always add opening tags, even if silo is empty, to ensure proper HTML structure
-        feedlinks += '<li>'
-        feedlinks += '<ul class="mdubgwi-sub-nav">\n'
-        if silo:
-            for item in silo:
-                script_version_num = get_script_version_num(domain_data.get('script_version'))
-                if script_version_num >= 3 and domain_data.get('wp_plugin') != 1 and domain_data.get('iswin') != 1 and domain_data.get('usepurl') != 0:
-                    slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                    feedlinks += f'<li><a style="padding-right: 0px !important;" href="{linkdomain}/{vardomain}/{slug}/{item.get("id", "")}bc/"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a></li>\n'
-                else:
-                    linkurl = code_url(domainid, domain_data, domain_settings)
-                    slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
-                    feedlinks += f'<li><a href="{linkurl}?Action=2&amp;k={slug}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a></li>\n'
-                num_lnks += 1
-        # Always add closing tags to match the opening tags (even if silo was empty)
-        feedlinks += '</ul>\n'
-        feedlinks += 'Articles</li>\n'
     
     # Build final wrapper HTML (PHP lines 1965-1992)
     ispay = 'bronze'
@@ -3951,9 +3732,21 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
             ltest = domain_data['wr_name']
         else:
             ltest = domain_data['domain_name']
-        feedlinks += f'</ul><a href="{linkdomain}/"><div class="mdubgwi-button-ktue" style="background:transparent;text-align:center;white-space:nowrap;">&copy; {datetime.now().year} {ltest}</div></a><div id="mdubgwi-hidden-button"></div></li>'
+        if has_content:
+            feedlinks += f'</ul><a href="{linkdomain}/"><div class="mdubgwi-button-ktue" style="background:transparent;text-align:center;white-space:nowrap;">&copy; {datetime.now().year} {ltest}</div></a><div id="mdubgwi-hidden-button"></div></li>'
+        else:
+            # If no content, add opening tags for the copyright link
+            feedlinks += '<li>'
+            feedlinks += '<ul class="mdubgwi-sub-nav">\n'
+            feedlinks += f'</ul><a href="{linkdomain}/"><div class="mdubgwi-button-ktue" style="background:transparent;text-align:center;white-space:nowrap;">&copy; {datetime.now().year} {ltest}</div></a><div id="mdubgwi-hidden-button"></div></li>'
     else:
-        feedlinks += '</ul><a target="_blank" href="/" title="Home"><div class="mdubgwi-button"></div></a><div id="mdubgwi-hidden-button"></div></li>'
+        if has_content:
+            feedlinks += '</ul><a target="_blank" href="/" title="Home"><div class="mdubgwi-button"></div></a><div id="mdubgwi-hidden-button"></div></li>'
+        else:
+            # If no content, add opening tags for the home link
+            feedlinks += '<li>'
+            feedlinks += '<ul class="mdubgwi-sub-nav">\n'
+            feedlinks += '</ul><a target="_blank" href="/" title="Home"><div class="mdubgwi-button"></div></a><div id="mdubgwi-hidden-button"></div></li>'
     
     feedlinks += '</ul></div>'
     
