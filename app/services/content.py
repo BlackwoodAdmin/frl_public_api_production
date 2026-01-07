@@ -3679,10 +3679,12 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
         """
         silo = db.fetch_all(silo_sql, (domainid,))
         
+        # Always add opening tags, even if silo is empty, to ensure proper HTML structure
+        feedlinks += '<li>'
+        sssnav = ''
+        feedlinks += '<ul class="mdubgwi-sub-nav">\n'
+        
         if silo:
-            feedlinks += '<li>'
-            sssnav = ''
-            feedlinks += '<ul class="mdubgwi-sub-nav">\n'
             
             for item in silo:
                 bubblefeedid = item.get('bubblefeedid', '')
@@ -3843,10 +3845,6 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                     newsf = f' <a style="padding-left: 0px !important;" href="{bclink}">Resources</a>'
                     feedlinks += f'<li><a style="padding-right: 0px !important;" href="{item["linkouturl"]}">{clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a>{newsf}</li>\n'
             
-            feedlinks += '</ul>\n'
-            wrlabel = f'<a href="{code_url(domainid, domain_data, domain_settings)}?Action=1">Articles</a>'
-            feedlinks += wrlabel + '</li>\n'
-            
             # Add Bubba feed links (drip content) (PHP lines 1795-1823)
             dripcontent = domain_data.get('dripcontent', 0)
             if dripcontent and dripcontent > 3:
@@ -3879,6 +3877,11 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                     feedlinks += wrlabel + '</li>\n'
                     num_lnks += 1
         
+        # Always add closing tags to match the opening tags (even if silo was empty)
+        feedlinks += '</ul>\n'
+        wrlabel = f'<a href="{code_url(domainid, domain_data, domain_settings)}?Action=1">Articles</a>'
+        feedlinks += wrlabel + '</li>\n'
+        
         # Add Blog and FAQ links (PHP lines 1827-1834)
         if domain_settings.get('blogUrl') and len(domain_settings['blogUrl']) > 10:
             feedlinks += f'<li><a class="url" style="width: 100%;font-size:12px;line-height:13px;" target="_blank" href="{domain_settings["blogUrl"]}">Blog</a></li>\n'
@@ -3897,9 +3900,10 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
             ORDER BY b.restitle
         """
         silo = db.fetch_all(silo_sql, (domainid,))
+        # Always add opening tags, even if silo is empty, to ensure proper HTML structure
+        feedlinks += '<li>'
+        feedlinks += '<ul class="mdubgwi-sub-nav">\n'
         if silo:
-            feedlinks += '<li>'
-            feedlinks += '<ul class="mdubgwi-sub-nav">\n'
             for item in silo:
                 script_version_num = get_script_version_num(domain_data.get('script_version'))
                 if script_version_num >= 3 and domain_data.get('wp_plugin') != 1 and domain_data.get('iswin') != 1 and domain_data.get('usepurl') != 0:
@@ -3910,8 +3914,9 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                     slug = seo_slug(seo_filter_text_custom(item.get('restitle', '')))
                     feedlinks += f'<li><a href="{linkurl}?Action=2&amp;k={slug}"> {clean_title(seo_filter_text_custom(item.get("restitle", "")))}</a></li>\n'
                 num_lnks += 1
-            feedlinks += '</ul>\n'
-            feedlinks += 'Articles</li>\n'
+        # Always add closing tags to match the opening tags (even if silo was empty)
+        feedlinks += '</ul>\n'
+        feedlinks += 'Articles</li>\n'
     
     # Build final wrapper HTML (PHP lines 1965-1992)
     ispay = 'bronze'
