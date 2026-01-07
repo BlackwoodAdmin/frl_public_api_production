@@ -432,7 +432,6 @@ img.align-left { max-width:100%!important; }
 .snapshot-container { vertical-align:middle!important; text-align:center!important; width:120px !important;   margin: 5px 0 35px 10px !important; padding: 0px !important; float:right!important; overflow:hidden!important; }
 .snapshot-container img { float:right!important; border:0px !important; margin:0!important; }
 .ngodkrbsitr-tag-container { text-align:left!important; font-size:13px;}
-.ngodkrbsitr-top-container { min-height:220px  }
 .ngodkrbsitr-container { text-align:justify!important; vertical-align:top!important; padding:0px !important; min-height:130px !important;	!important; background: inherit !important; }
 .ngodkrbsitr-containerwr { text-align:justify!important; vertical-align:top!important; padding:0 15px 5px !important; }
 .h1 a {clear:none !important;display:block !important;border:none !important;text-decoration:none !important; color: inherit!important; }
