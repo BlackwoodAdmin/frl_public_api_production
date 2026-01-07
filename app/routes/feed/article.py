@@ -321,8 +321,16 @@ async def article_endpoint(
         raise HTTPException(status_code=400, detail="Domain parameter required")
     
     # Handle CheckFiles endpoint (case-insensitive) - public health check
-    # This must be checked before database validation since it doesn't require domain to exist in DB
+    # Validates domain exists in DB (domain_name match and deleted != 1)
     if Action and isinstance(Action, str) and Action.lower() == "checkfiles":
+        domain_data = db.fetch_row(
+            "SELECT id FROM bwp_domains WHERE domain_name = %s AND deleted != 1",
+            (domain,)
+        )
+        
+        if not domain_data:
+            raise HTTPException(status_code=404, detail="Invalid domain")
+        
         return PlainTextResponse(content="FRL CheckFiles OK")
     
     # Validate domain exists
