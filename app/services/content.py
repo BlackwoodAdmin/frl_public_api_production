@@ -3689,6 +3689,7 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
             for item in silo:
                 bubblefeedid = item.get('bubblefeedid', '')
                 item_id = item.get('id')
+                sssnav = ''  # Reset sssnav for each item
                 
                 # PHP line 1644: if(strlen($silo[$i]['bubblefeedid']) == 0)
                 if not bubblefeedid or len(str(bubblefeedid)) == 0:
@@ -3763,6 +3764,11 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                             slug = seo_slug(seo_filter_text_custom(link.get('restitle', '')))
                             sssnav += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;k={slug}&amp;PageID={link.get("bubblefeedid", "")}"> {clean_title(seo_filter_text_custom(link.get("restitle", "")))} </a></li>\n'
                     
+                    # Add sssnav (related/nested links) to feedlinks before the main link
+                    if sssnav:
+                        feedlinks += sssnav
+                        sssnav = ''  # Reset for next item
+                    
                     # Build main link (PHP lines 1700-1716)
                     if domain_category.get('resourcesactive') == '1':
                         if item.get('NoContent') == 0 and len(item.get('linkouturl', '').strip()) > 5:
@@ -3822,6 +3828,11 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                                 linkurl = ''
                             slug = seo_slug(seo_filter_text_custom(link.get('restitle', '')))
                             sssnav += f'<li><a style="padding-right: 0px !important;" href="{linkurl}?Action=1&amp;k={slug}&amp;PageID={link.get("bubblefeedid", "")}"> {clean_title(seo_filter_text_custom(link.get("restitle", "")))} </a></li>\n'
+                    
+                    # Add sssnav (related/nested links) to feedlinks before the main link
+                    if sssnav:
+                        feedlinks += sssnav
+                        sssnav = ''  # Reset for next item
                     
                     # Build category link (PHP lines 1758-1764)
                     if domain_category.get('resourcesactive') == '1':
