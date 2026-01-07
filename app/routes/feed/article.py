@@ -380,7 +380,31 @@ async def article_endpoint(
     except (ValueError, IndexError, TypeError):
         script_version = 0.0
     
-    wp_plugin = domain_category.get('wp_plugin') or 0
+    # Normalize wp_plugin to integer (handle None, empty strings, and string values)
+    wp_plugin_raw = domain_category.get('wp_plugin')
+    if wp_plugin_raw is None:
+        wp_plugin = 0
+    elif isinstance(wp_plugin_raw, str):
+        # Handle string values ('0', '1', '', etc.)
+        wp_plugin_str = wp_plugin_raw.strip()
+        if wp_plugin_str == '' or wp_plugin_str == '0':
+            wp_plugin = 0
+        else:
+            try:
+                wp_plugin = int(wp_plugin_str)
+                # Ensure it's 0 or 1 (boolean-like)
+                wp_plugin = 1 if wp_plugin != 0 else 0
+            except (ValueError, TypeError):
+                wp_plugin = 0
+    else:
+        # Already an integer or numeric type
+        try:
+            wp_plugin = int(wp_plugin_raw)
+            # Ensure it's 0 or 1 (boolean-like)
+            wp_plugin = 1 if wp_plugin != 0 else 0
+        except (ValueError, TypeError):
+            wp_plugin = 0
+    
     if wp_plugin == 1 and script_version >= 5:
         # Extract pageid from slug if needed
         pageid_param = pageid or ''
