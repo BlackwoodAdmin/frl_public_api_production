@@ -1691,6 +1691,31 @@ def build_page_wp(
         logger.warning(f"build_page_wp early return: bubbleid={bubbleid}, domainid={domainid}")
         return ""
     
+    # Normalize wp_plugin to integer at the beginning for consistent use throughout the function
+    wp_plugin_raw = domain_data.get('wp_plugin', 0)
+    if wp_plugin_raw is None:
+        wp_plugin = 0
+    elif isinstance(wp_plugin_raw, str):
+        # Handle string values ('0', '1', '', etc.)
+        wp_plugin_str = wp_plugin_raw.strip()
+        if wp_plugin_str == '' or wp_plugin_str == '0':
+            wp_plugin = 0
+        else:
+            try:
+                wp_plugin = int(wp_plugin_str)
+                # Ensure it's 0 or 1 (boolean-like)
+                wp_plugin = 1 if wp_plugin != 0 else 0
+            except (ValueError, TypeError):
+                wp_plugin = 0
+    else:
+        # Already an integer or numeric type
+        try:
+            wp_plugin = int(wp_plugin_raw)
+            # Ensure it's 0 or 1 (boolean-like)
+            wp_plugin = 1 if wp_plugin != 0 else 0
+        except (ValueError, TypeError):
+            wp_plugin = 0
+    
     # Get bubblefeed data - handle multiple scenarios (PHP lines 52-108)
     res = None
     if offpageid != 0 and support != 1:
@@ -1820,14 +1845,7 @@ def build_page_wp(
     wpage += f'<div class="{css_prefix}-spacer"></div>\n'
     
     # Add H1 header for non-WP plugins (PHP plugin)
-    wp_plugin_val = domain_data.get('wp_plugin', 0)
-    # Normalize wp_plugin to integer for comparison
-    if isinstance(wp_plugin_val, str):
-        wp_plugin_val = 1 if wp_plugin_val.strip() == '1' else 0
-    else:
-        wp_plugin_val = 1 if wp_plugin_val == 1 else 0
-    
-    if wp_plugin_val != 1:
+    if wp_plugin != 1:
         # Non-WP plugin: add top-container with H1 header
         wpage += f'<div class="{css_prefix}-top-container">\n'
         
@@ -2326,7 +2344,7 @@ def build_page_wp(
     
     # Add ArticleLinks (PHP line 1560: echocr(ArticleLinks($pageid)))
     # Only add ArticleLinks for non-WordPress plugin calls (PHP plugin calls)
-    if domain_data.get('wp_plugin') != 1:
+    if wp_plugin != 1:
         # Get domain_category for ArticleLinks (it's the same as domain_data in this context)
         domain_category = domain_data
         article_links_html = build_article_links(
