@@ -9,13 +9,25 @@ from pathlib import Path
 
 # Determine log file path (works on both Windows and Linux)
 _log_file = Path(__file__).parent / ".cursor" / "debug.log"
-_log_file.parent.mkdir(exist_ok=True)
+try:
+    _log_file.parent.mkdir(exist_ok=True)
+except: pass
+
+# Helper function to write debug logs (with stderr fallback)
+def _debug_log(location, message, data, hypothesis_id="B"):
+    log_entry = json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": hypothesis_id, "location": location, "message": message, "data": data, "timestamp": int(datetime.now().timestamp() * 1000)})
+    # Try file first
+    try:
+        with open(_log_file, "a") as f:
+            f.write(log_entry + "\n")
+    except:
+        # Fallback to stderr (captured by systemd)
+        try:
+            print(f"DEBUG: {log_entry}", file=sys.stderr, flush=True)
+        except: pass
 
 # #region agent log
-try:
-    with open(_log_file, "a") as f:
-        f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "gunicorn_config.py:10", "message": "Gunicorn config module loading", "data": {"step": "module_import", "log_file": str(_log_file)}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
-except: pass
+_debug_log("gunicorn_config.py:18", "Gunicorn config module loading", {"step": "module_import", "log_file": str(_log_file)})
 # #endregion
 
 # Configure logging
@@ -27,20 +39,14 @@ logging.basicConfig(
 logger = logging.getLogger("gunicorn.error")
 
 # #region agent log
-try:
-    with open(_log_file, "a") as f:
-        f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "gunicorn_config.py:21", "message": "Gunicorn config logger configured", "data": {"step": "logger_setup"}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
-except: pass
+_debug_log("gunicorn_config.py:35", "Gunicorn config logger configured", {"step": "logger_setup"})
 # #endregion
 
 # Server socket
 port = os.getenv('PORT', '8000')
 bind_addr = f"127.0.0.1:{port}"
 # #region agent log
-try:
-    with open(_log_file, "a") as f:
-        f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "gunicorn_config.py:28", "message": "Gunicorn bind address configured", "data": {"bind": bind_addr, "port": port, "port_from_env": os.getenv('PORT')}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
-except: pass
+_debug_log("gunicorn_config.py:42", "Gunicorn bind address configured", {"bind": bind_addr, "port": port, "port_from_env": os.getenv('PORT')})
 # #endregion
 bind = bind_addr
 backlog = 2048
@@ -49,10 +55,7 @@ backlog = 2048
 cpu_count = multiprocessing.cpu_count()
 workers_count = cpu_count * 2 + 1
 # #region agent log
-try:
-    with open(_log_file, "a") as f:
-        f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "gunicorn_config.py:36", "message": "Gunicorn workers configured", "data": {"cpu_count": cpu_count, "workers": workers_count, "worker_class": "uvicorn.workers.UvicornWorker"}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
-except: pass
+_debug_log("gunicorn_config.py:50", "Gunicorn workers configured", {"cpu_count": cpu_count, "workers": workers_count, "worker_class": "uvicorn.workers.UvicornWorker"})
 # #endregion
 workers = workers_count
 worker_class = "uvicorn.workers.UvicornWorker"
@@ -85,13 +88,9 @@ def on_starting(server):
     """Called just before the master process is initialized."""
     # #region agent log
     try:
-        with open(_log_file, "a") as f:
-            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "gunicorn_config.py:60", "message": "Gunicorn on_starting hook called", "data": {"server_address": str(server.address) if hasattr(server, 'address') else None}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
+        _debug_log("gunicorn_config.py:84", "Gunicorn on_starting hook called", {"server_address": str(server.address) if hasattr(server, 'address') else None})
     except Exception as e:
-        try:
-            with open(_log_file, "a") as f:
-                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "gunicorn_config.py:60", "message": "Gunicorn on_starting hook error", "data": {"error": str(e)}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
-        except: pass
+        _debug_log("gunicorn_config.py:84", "Gunicorn on_starting hook error", {"error": str(e)})
     # #endregion
     logger.info("Gunicorn starting...")
 
@@ -100,13 +99,9 @@ def when_ready(server):
     """Called just after the server is started."""
     # #region agent log
     try:
-        with open(_log_file, "a") as f:
-            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "gunicorn_config.py:73", "message": "Gunicorn when_ready hook called", "data": {"server_address": str(server.address) if hasattr(server, 'address') else None}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
+        _debug_log("gunicorn_config.py:97", "Gunicorn when_ready hook called", {"server_address": str(server.address) if hasattr(server, 'address') else None})
     except Exception as e:
-        try:
-            with open(_log_file, "a") as f:
-                f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "gunicorn_config.py:73", "message": "Gunicorn when_ready hook error", "data": {"error": str(e)}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
-        except: pass
+        _debug_log("gunicorn_config.py:97", "Gunicorn when_ready hook error", {"error": str(e)})
     # #endregion
     logger.info("Gunicorn is ready to accept connections")
 
@@ -126,10 +121,7 @@ def worker_abort(worker):
 def on_exit(server):
     """Called just before exiting Gunicorn."""
     # #region agent log
-    try:
-        with open(_log_file, "a") as f:
-            f.write(json.dumps({"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B", "location": "gunicorn_config.py:92", "message": "Gunicorn on_exit hook called", "data": {}, "timestamp": int(datetime.now().timestamp() * 1000)}) + "\n")
-    except: pass
+    _debug_log("gunicorn_config.py:116", "Gunicorn on_exit hook called", {})
     # #endregion
     logger.info("Gunicorn is shutting down")
 
