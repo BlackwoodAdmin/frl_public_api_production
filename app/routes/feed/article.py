@@ -320,6 +320,11 @@ async def article_endpoint(
     if not domain:
         raise HTTPException(status_code=400, detail="Domain parameter required")
     
+    # Handle CheckFiles endpoint (case-insensitive) - public health check
+    # This must be checked before database validation since it doesn't require domain to exist in DB
+    if Action and isinstance(Action, str) and Action.lower() == "checkfiles":
+        return PlainTextResponse(content="FRL CheckFiles OK")
+    
     # Validate domain exists
     domain_data = db.fetch_row(
         "SELECT id FROM bwp_domains WHERE domain_name = %s AND deleted != 1",
@@ -334,10 +339,6 @@ async def article_endpoint(
     # Route based on Action parameter
     if not Action:
         Action = ''
-    
-    # Handle CheckFiles endpoint (case-insensitive) - public health check
-    if Action and isinstance(Action, str) and Action.lower() == "checkfiles":
-        return PlainTextResponse(content="FRL CheckFiles OK")
     
     # Get full domain data for Action handlers
     domain_full_sql = """
