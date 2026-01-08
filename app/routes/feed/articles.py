@@ -348,14 +348,32 @@ async def articles_endpoint(
                 # - If Action is empty, use cmspage as the homepage ID
                 action_empty = not Action or (isinstance(Action, str) and Action.strip() == '')
                 
+                # Track whether we should build the CMS homepage
+                should_build_cms_page = False
+                page_id_to_use = None
+                article = None
+                
                 if action_empty:
-                    # Action is empty - use cmspage as the homepage
-                    page_id_to_use = cmspage
-                    # Get article from bwp_bubblefeed for keyword data
-                    article_sql = "SELECT * FROM bwp_bubblefeed WHERE id = %s"
-                    article = db.fetch_row(article_sql, (cmspage,))
+                    # Action is empty - validate cmspage exists in bwp_bubblefeed with matching domainid
+                    cmspage_validation = db.fetch_row(
+                        "SELECT id FROM bwp_bubblefeed WHERE id = %s AND domainid = %s",
+                        (cmspage, domainid)
+                    )
+                    
+                    if cmspage_validation:
+                        # cmspage validation passed - use cmspage as the homepage
+                        should_build_cms_page = True
+                        page_id_to_use = cmspage
+                        # Get article from bwp_bubblefeed for keyword data
+                        article_sql = "SELECT * FROM bwp_bubblefeed WHERE id = %s AND domainid = %s"
+                        article = db.fetch_row(article_sql, (cmspage, domainid))
+                    else:
+                        # cmspage validation failed - return footer code
+                        footer_html = build_footer_wp(domainid, domain_category, domain_settings)
+                        return HTMLResponse(content=footer_html)
                 else:
                     # Action is set - use pageid (PageID) from request as the article ID
+                    should_build_cms_page = True
                     if pageid:
                         try:
                             page_id_to_use = int(pageid)
@@ -368,64 +386,66 @@ async def articles_endpoint(
                     article_sql = "SELECT * FROM bwp_bubblefeed WHERE id = %s"
                     article = db.fetch_row(article_sql, (page_id_to_use,))
                 
-                # Use article data for keyword if found
-                keyword_text = article.get('restitle', '') if article else ''
-                
-                # Build the page using build_page_wp
-                page_content = build_page_wp(
-                    bubbleid=page_id_to_use,  # Use determined page ID (pageid if Action set, cmspage if Action empty)
-                    domainid=domainid,
-                    agent=agent or '',
-                    keyword=keyword_text,
-                    domain_data=domain_category,
-                    domain_settings=domain_settings,
-                    artpageid=page_id_to_use,
-                    artdomainid=domainid
-                )
-                
-                # Get header and footer
-                header_data = get_header_footer(domainid, domain_category.get('status'))
-                header = header_data['header']
-                footer = header_data['footer']
-                
-                # Build metaheader
-                metaheader = build_metaheader(
-                    domainid=domainid,
-                    domain_data=domain_category,
-                    domain_settings=domain_settings,
-                    action='1',
-                    keyword=keyword_text,
-                    pageid=page_id_to_use,  # Use determined page ID
-                    city=city or cty or '',
-                    state=state or st or ''
-                )
-                
-                # Build canonical URL
-                if domain_category.get('ishttps') == 1:
-                    canonical_url = 'https://'
-                else:
-                    canonical_url = 'http://'
-                if domain_category.get('usewww') == 1:
-                    canonical_url += 'www.' + domain_category.get('domain_name', '')
-                else:
-                    canonical_url += domain_category.get('domain_name', '')
-                canonical_url += '/'
-                
-                # Wrap content with header and footer
-                full_page_html = wrap_content_with_header_footer(
-                    content=page_content,
-                    header=header,
-                    footer=footer,
-                    metaheader=metaheader,
-                    canonical_url=canonical_url,
-                    websitereferencesimple=False,
-                    wp_plugin=domain_category.get('wp_plugin', 0),
-                    domain_settings=domain_settings
-                )
-                
-                # PHP Articles.php includes feed-home.css.php at lines 255 and 471
-                # Add feed-home.css.php CSS before </head> or at the end of <head>
-                feed_home_css = '''<style type="text/css">
+                # Only build CMS homepage if validation passed (for empty Action) or Action is set
+                if should_build_cms_page:
+                    # Use article data for keyword if found
+                    keyword_text = article.get('restitle', '') if article else ''
+                    
+                    # Build the page using build_page_wp
+                    page_content = build_page_wp(
+                        bubbleid=page_id_to_use,  # Use determined page ID (pageid if Action set, cmspage if Action empty)
+                        domainid=domainid,
+                        agent=agent or '',
+                        keyword=keyword_text,
+                        domain_data=domain_category,
+                        domain_settings=domain_settings,
+                        artpageid=page_id_to_use,
+                        artdomainid=domainid
+                    )
+                    
+                    # Get header and footer
+                    header_data = get_header_footer(domainid, domain_category.get('status'))
+                    header = header_data['header']
+                    footer = header_data['footer']
+                    
+                    # Build metaheader
+                    metaheader = build_metaheader(
+                        domainid=domainid,
+                        domain_data=domain_category,
+                        domain_settings=domain_settings,
+                        action='1',
+                        keyword=keyword_text,
+                        pageid=page_id_to_use,  # Use determined page ID
+                        city=city or cty or '',
+                        state=state or st or ''
+                    )
+                    
+                    # Build canonical URL
+                    if domain_category.get('ishttps') == 1:
+                        canonical_url = 'https://'
+                    else:
+                        canonical_url = 'http://'
+                    if domain_category.get('usewww') == 1:
+                        canonical_url += 'www.' + domain_category.get('domain_name', '')
+                    else:
+                        canonical_url += domain_category.get('domain_name', '')
+                    canonical_url += '/'
+                    
+                    # Wrap content with header and footer
+                    full_page_html = wrap_content_with_header_footer(
+                        content=page_content,
+                        header=header,
+                        footer=footer,
+                        metaheader=metaheader,
+                        canonical_url=canonical_url,
+                        websitereferencesimple=False,
+                        wp_plugin=domain_category.get('wp_plugin', 0),
+                        domain_settings=domain_settings
+                    )
+                    
+                    # PHP Articles.php includes feed-home.css.php at lines 255 and 471
+                    # Add feed-home.css.php CSS before </head> or at the end of <head>
+                    feed_home_css = '''<style type="text/css">
 ul.mdubgwi-footer-nav {margin:0 auto !important;padding: 0px !important;overflow:visible !important}
 
 #mdubgwi-hidden-button {  height:0px !important; width:0px !important;	 }
@@ -461,16 +481,16 @@ img.align-left { max-width:100%!important;" }
 .mdubgwi-sub-nav li:hover ul {display:block !important; visibility:visible !important;}
 </style>
 '''
-                
-                # Insert feed-home.css.php CSS before </head>
-                if '</head>' in full_page_html:
-                    head_pos = full_page_html.lower().find('</head>')
-                    full_page_html = full_page_html[:head_pos] + feed_home_css + full_page_html[head_pos:]
-                else:
-                    # If no </head> found, append to the end
-                    full_page_html += feed_home_css
-                
-                return HTMLResponse(content=full_page_html)
+                    
+                    # Insert feed-home.css.php CSS before </head>
+                    if '</head>' in full_page_html:
+                        head_pos = full_page_html.lower().find('</head>')
+                        full_page_html = full_page_html[:head_pos] + feed_home_css + full_page_html[head_pos:]
+                    else:
+                        # If no </head> found, append to the end
+                        full_page_html += feed_home_css
+                    
+                    return HTMLResponse(content=full_page_html)
             
             elif cmspagetype == 5 and cmspage:
                 # Get article from bwp_blog_post (Action=5 - not yet implemented)
