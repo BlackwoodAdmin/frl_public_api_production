@@ -288,7 +288,6 @@ async def articles_endpoint(
         # PHP returns empty/404 for invalid domains
         error_msg = f"Articles.php: Invalid domain '{domain}' - not found in database"
         logger.warning(error_msg)
-        logger.info(f"Calling _write_debug_log for invalid domain: {domain}")
         _write_debug_log(error_msg, {"domain": domain, "status_code": 404, "error_type": "invalid_domain"})
         return HTMLResponse(content="<!-- Invalid Domain -->", status_code=404)
     
@@ -307,7 +306,6 @@ async def articles_endpoint(
         # This should rarely happen - domain exists but full query fails
         error_msg = f"Articles.php: Domain '{domain}' (id={domainid}) found but domain_category query returned no results"
         logger.warning(error_msg)
-        logger.info(f"Calling _write_debug_log for domain_category_not_found: {domain} (id={domainid})")
         _write_debug_log(error_msg, {"domain": domain, "domainid": domainid, "status_code": 404, "error_type": "domain_category_not_found"})
         return HTMLResponse(content="<!-- Domain not found -->", status_code=404)
     

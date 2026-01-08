@@ -239,9 +239,6 @@ async def article_endpoint(
         from urllib.parse import unquote
         kkyy_normalized = unquote(str(kkyy)).strip("'\"")
         
-        # Debug logging for parameter extraction
-        logger.info(f"WordPress plugin feed routing: apiid={apiid}, apikey={apikey[:10]}..., kkyy={kkyy}, kkyy_normalized={kkyy_normalized}")
-        
         # Route to WordPress plugin feeds based on kkyy value
         if kkyy_normalized == 'AKhpU6QAbMtUDTphRPCezo96CztR9EXR' or kkyy_normalized == '1u1FHacsrHy6jR5ztB6tWfzm30hDPL':
             # Route to apifeedwp30 handler
@@ -295,7 +292,6 @@ async def article_endpoint(
                 elif json_data and isinstance(json_data, dict):
                     feededit_param = json_data.get('feedit')
             
-            logger.info(f"Calling handle_apifeedwp59 with feededit={feededit_param}, domain={domain}")
             return await handle_apifeedwp59(
                 domain=domain,
                 request=request,
