@@ -449,8 +449,7 @@ async def articles_endpoint(
                             metaheader=metaheader,
                             canonical_url=canonical_url,
                             websitereferencesimple=False,
-                            wp_plugin=domain_category.get('wp_plugin', 0),
-                            domain_settings=domain_settings
+                            wp_plugin=domain_category.get('wp_plugin', 0)
                         )
                         if not full_page_html:
                             raise ValueError("wrap_content_with_header_footer returned None")
