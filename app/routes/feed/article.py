@@ -28,7 +28,7 @@ except Exception as e:
     raise
 
 try:
-    from app.services.content import build_footer_wp, build_pages_array, clean_title, seo_filter_text_custom, to_ascii
+    from app.services.content import build_footer_wp, build_pages_array, clean_title, seo_filter_text_custom, to_ascii, get_domain_php_filename
 except Exception as e:
     logger.error(f"Failed to import app.services.content: {e}")
     logger.error(traceback.format_exc())
@@ -503,7 +503,7 @@ async def article_endpoint(
         
         elif Action == '2':
             # Business Collective page
-            from app.services.content import build_bcpage_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
+            from app.services.content import build_bcpage_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer, get_domain_php_filename
             wpage = build_bcpage_wp(
                 bubbleid=bubbleid,
                 domainid=domainid,
@@ -541,7 +541,13 @@ async def article_endpoint(
                 else:
                     linkdomain += domain_category['domain_name']
             
-            canonical_url = linkdomain + '/?Action=2&k=' + (keyword_param or '').lower().replace(' ', '-') if keyword_param else linkdomain
+            # Build canonical URL - use PHP filename for non-WP plugins
+            wp_plugin = domain_category.get('wp_plugin', 0)
+            if wp_plugin != 1:
+                php_filename = get_domain_php_filename(domain_category)
+                canonical_url = linkdomain + '/' + php_filename + '?Action=2&k=' + (keyword_param or '').lower().replace(' ', '-') if keyword_param else linkdomain
+            else:
+                canonical_url = linkdomain + '/?Action=2&k=' + (keyword_param or '').lower().replace(' ', '-') if keyword_param else linkdomain
             
             # Build metaheader
             metaheader = build_metaheader(
@@ -771,7 +777,8 @@ img.align-left { max-width:100%!important;" }
         # Website Reference (non-WP) - use same function as WP but it handles wp_plugin internally
         from app.services.content import (
             build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer,
-            code_url, seo_slug, seo_filter_text_custom, clean_title, build_article_links
+            code_url, seo_slug, seo_filter_text_custom, clean_title, build_article_links,
+            get_domain_php_filename
         )
         import html
         
@@ -892,7 +899,13 @@ img.align-left { max-width:100%!important;" }
                 else:
                     linkdomain += domain_category['domain_name']
             
-            canonical_url = linkdomain + '/?Action=1'
+            # Build canonical URL - use PHP filename for non-WP plugins
+            wp_plugin = domain_category.get('wp_plugin', 0)
+            if wp_plugin != 1:
+                php_filename = get_domain_php_filename(domain_category)
+                canonical_url = linkdomain + '/' + php_filename + '?Action=1'
+            else:
+                canonical_url = linkdomain + '/?Action=1'
             
             # Build metaheader (no specific keyword)
             metaheader = build_metaheader(
@@ -952,7 +965,13 @@ img.align-left { max-width:100%!important;" }
             else:
                 linkdomain += domain_category['domain_name']
         
-        canonical_url = linkdomain + '/?Action=1&k=' + keyword_param.lower().replace(' ', '-') + ('&PageID=' + str(bubbleid) if bubbleid else '') if keyword_param else linkdomain
+        # Build canonical URL - use PHP filename for non-WP plugins
+        wp_plugin = domain_category.get('wp_plugin', 0)
+        if wp_plugin != 1:
+            php_filename = get_domain_php_filename(domain_category)
+            canonical_url = linkdomain + '/' + php_filename + '?Action=1&k=' + keyword_param.lower().replace(' ', '-') + ('&PageID=' + str(bubbleid) if bubbleid else '') if keyword_param else linkdomain
+        else:
+            canonical_url = linkdomain + '/?Action=1&k=' + keyword_param.lower().replace(' ', '-') + ('&PageID=' + str(bubbleid) if bubbleid else '') if keyword_param else linkdomain
         
         # Build metaheader
         metaheader = build_metaheader(
@@ -978,7 +997,7 @@ img.align-left { max-width:100%!important;" }
         return HTMLResponse(content=full_page)
     elif Action == '2':
         # Business Collective (non-WP) - use same function as WP but it handles wp_plugin internally
-        from app.services.content import build_bcpage_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer, get_domain_keywords_from_bubblefeed
+        from app.services.content import build_bcpage_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer, get_domain_keywords_from_bubblefeed, get_domain_php_filename
         from fastapi.responses import RedirectResponse
         
         # PHP businesscollective.php lines 10-15: Redirect if category is set
@@ -1000,7 +1019,13 @@ img.align-left { max-width:100%!important;" }
             
             keyword_param = k or key or ''
             pageid_param = pageid or ''
-            redirect_url = f"{linkdomain}/?Action=1&k={keyword_param.replace(' ', '-')}"
+            # Build redirect URL - use PHP filename for non-WP plugins
+            wp_plugin = domain_category.get('wp_plugin', 0)
+            if wp_plugin != 1:
+                php_filename = get_domain_php_filename(domain_category)
+                redirect_url = f"{linkdomain}/{php_filename}?Action=1&k={keyword_param.replace(' ', '-')}"
+            else:
+                redirect_url = f"{linkdomain}/?Action=1&k={keyword_param.replace(' ', '-')}"
             if pageid_param:
                 redirect_url += f"&PageID={pageid_param}"
             return HTMLResponse(content=f'<script>document.location=\'{redirect_url}\';</script><noscript><div style="text-align:center;">404 - Page does not exist</div>')
@@ -1102,7 +1127,13 @@ img.align-left { max-width:100%!important;" }
                 else:
                     linkdomain += domain_category['domain_name']
             
-            redirect_url = f"{linkdomain}/?Action=2"
+            # Build redirect URL - use PHP filename for non-WP plugins
+            wp_plugin = domain_category.get('wp_plugin', 0)
+            if wp_plugin != 1:
+                php_filename = get_domain_php_filename(domain_category)
+                redirect_url = f"{linkdomain}/{php_filename}?Action=2"
+            else:
+                redirect_url = f"{linkdomain}/?Action=2"
             return HTMLResponse(content=f'<meta http-equiv="refresh" content="0;URL={redirect_url}">')
         
         wpage = build_bcpage_wp(
@@ -1138,7 +1169,13 @@ img.align-left { max-width:100%!important;" }
             else:
                 linkdomain += domain_category['domain_name']
         
-        canonical_url = linkdomain + '/?Action=2&k=' + keyword_param.lower().replace(' ', '-') if keyword_param else linkdomain
+        # Build canonical URL - use PHP filename for non-WP plugins
+        wp_plugin = domain_category.get('wp_plugin', 0)
+        if wp_plugin != 1:
+            php_filename = get_domain_php_filename(domain_category)
+            canonical_url = linkdomain + '/' + php_filename + '?Action=2&k=' + keyword_param.lower().replace(' ', '-') if keyword_param else linkdomain
+        else:
+            canonical_url = linkdomain + '/?Action=2&k=' + keyword_param.lower().replace(' ', '-') if keyword_param else linkdomain
         
         # Build metaheader
         metaheader = build_metaheader(

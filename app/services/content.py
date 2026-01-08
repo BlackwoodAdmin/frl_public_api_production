@@ -701,9 +701,10 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                             slug_text = slug_text.replace(' ', '-')  # str_replace(' ', '-', ...)
                             main_link = linkdomain + '/' + slug_text + '-' + str(item['id']) + '/'
                         else:
-                            # PHP plugin: use ?Action=1&k=keyword&PageID=id format
+                            # PHP plugin: use /{domain_filename}.php?Action=1&k=keyword&PageID=id format
                             keyword_slug = seo_filter_text_custom(item['restitle']).lower().replace(' ', '-')
-                            main_link = linkdomain + '/?Action=1&k=' + keyword_slug + '&PageID=' + str(item['id'])
+                            php_filename = get_domain_php_filename(domain_data)
+                            main_link = linkdomain + '/' + php_filename + '?Action=1&k=' + keyword_slug + '&PageID=' + str(item['id'])
                         foot += '<li><a style="padding-right: 0px !important;" href="' + main_link + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a>' + newsf + '</li>\n'
                 else:
                     # Resources not active - show only Business Collective link (resfeedtext)
@@ -2719,7 +2720,8 @@ def build_bcpage_wp(
                 elif link.get('wp_plugin') != 1 and link.get('servicetype') == 356 and link.get('status') in ['2', '10']:
                     # PHP line 322-324: CodeURL for non-WP plugin with servicetype 356
                     # Use current link data directly
-                    linkurl = linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', '')))
+                    php_filename = get_domain_php_filename(domain_data)
+                    linkurl = linkdomain + '/' + php_filename + '?Action=2&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', '')))
                 elif link.get('wp_plugin') == 1 and link.get('servicetype') == 356 and link.get('status') in ['2', '10']:
                     # PHP line 326-331: WP plugin with servicetype 356
                     # Use current link data directly
@@ -2755,7 +2757,8 @@ def build_bcpage_wp(
                         linkurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '/' + str(link.get('bubblefeedid', '')) + '/'
                     else:
                         # CodeURL equivalent - simplified
-                        linkurl = linkdomain + '/?Action=1&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '&PageID=' + str(link.get('bubblefeedid', ''))
+                        php_filename = get_domain_php_filename(domain_data)
+                        linkurl = linkdomain + '/' + php_filename + '?Action=1&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '&PageID=' + str(link.get('bubblefeedid', ''))
                 elif link.get('wp_plugin') != 1 and link.get('status') in ['2', '10']:
                     # PHP line 357-362: Non-WP plugin with bubblecat
                     script_version_num = get_script_version_num(link.get('script_version'))
@@ -2763,7 +2766,8 @@ def build_bcpage_wp(
                         linkurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(link.get('bubblecat', ''))) + '/' + str(link.get('bubblecatid', '')) + '/'
                     else:
                         # CodeURL equivalent - simplified
-                        linkurl = linkdomain + '/?Action=1&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '&PageID=' + str(link.get('bubblefeedid', ''))
+                        php_filename = get_domain_php_filename(domain_data)
+                        linkurl = linkdomain + '/' + php_filename + '?Action=1&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '&PageID=' + str(link.get('bubblefeedid', ''))
                 else:
                     # Default fallback: build main content page URL instead of homepage
                     # This ensures links point to the main content page when packageoverride is false and linkouturl is not set
@@ -2778,7 +2782,8 @@ def build_bcpage_wp(
                         linkurl = linkdomain + '/' + slug_text + '-' + str(link.get('bubblefeedid', '')) + '/'
                     else:
                         # Non-WP plugin: build Action=1 URL
-                        linkurl = linkdomain + '/?Action=1&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '&PageID=' + str(link.get('bubblefeedid', ''))
+                        php_filename = get_domain_php_filename(domain_data)
+                        linkurl = linkdomain + '/' + php_filename + '?Action=1&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '&PageID=' + str(link.get('bubblefeedid', ''))
                 
                 follow = ' rel="nofollow"' if link.get('forceinboundnofollow') == 1 else ''
                 
@@ -2834,7 +2839,8 @@ def build_bcpage_wp(
                                 else:
                                     # PHP line 429: CodeURL($links[$i]['id']) . '?Action=1&amp;k=' ...
                                     # Use &amp; for HTML entities like PHP
-                                    suppurl = linkdomain + '/?Action=1&amp;k=' + seo_slug(seo_filter_text_custom(supp['restitle'])) + '&amp;PageID=' + str(supp['id'])
+                                    php_filename = get_domain_php_filename(domain_data)
+                                    suppurl = linkdomain + '/' + php_filename + '?Action=1&amp;k=' + seo_slug(seo_filter_text_custom(supp['restitle'])) + '&amp;PageID=' + str(supp['id'])
                             elif link.get('wp_plugin') == 1 and link_status in [2, 10]:
                                 # Use toAscii(html_entity_decode(seo_text_custom(...))) for WP plugin
                                 import html
@@ -2872,7 +2878,8 @@ def build_bcpage_wp(
                             imageurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '/' + str(link.get('bubblefeedid', '')) + 'bc/'
                         else:
                             # CodeURL equivalent - simplified Action=2 format
-                            imageurl = linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', '')))
+                            php_filename = get_domain_php_filename(domain_data)
+                            imageurl = linkdomain + '/' + php_filename + '?Action=2&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', '')))
                     elif is_bron(link.get('servicetype')):
                         # BRON service type: use bubblefeedid with 'bc' suffix
                         imageurl = linkdomain + '/' + str(link.get('bubblefeedid', '')) + 'bc/'
@@ -3131,7 +3138,8 @@ def build_bcpage_wp(
                             orphlink = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(orphanlinkspg.get('restitle', ''))) + '/' + str(orphanlinkspg.get('bubblefeedid', '')) + 'bc/'
                         else:
                             # CodeURL equivalent - simplified
-                            orphlink = linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(orphanlinkspg.get('restitle', '')))
+                            php_filename = get_domain_php_filename(domain_data)
+                            orphlink = linkdomain + '/' + php_filename + '?Action=2&k=' + seo_slug(seo_filter_text_custom(orphanlinkspg.get('restitle', '')))
                     elif orphanlinkspg and link.get('wp_plugin') == 1:
                         # PHP line 728-733: WP plugin orphan link
                         if is_bron(link.get('servicetype')):
@@ -3294,7 +3302,8 @@ def build_bcpage_wp(
                     linkurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(linkdc.get('bubbatitle', ''))) + '/' + str(linkdc.get('bubbafeedid', '')) + 'dc'
                 else:
                     # CodeURL equivalent - simplified
-                    linkurl = linkdomain + '/?Action=3&k=' + seo_slug(seo_filter_text_custom(linkdc.get('bubbatitle', ''))) + '&PageID=' + str(linkdc.get('bubbafeedid', ''))
+                    php_filename = get_domain_php_filename(domain_data)
+                    linkurl = linkdomain + '/' + php_filename + '?Action=3&k=' + seo_slug(seo_filter_text_custom(linkdc.get('bubbatitle', ''))) + '&PageID=' + str(linkdc.get('bubbafeedid', ''))
             else:
                 # PHP line 924-926: Default fallback
                 linkurl = linkdomainalone
@@ -3336,7 +3345,8 @@ def build_bcpage_wp(
                     imageurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(haslinkspg_dc.get('restitle', ''))) + '/' + str(haslinkspg_dc.get('bubblefeedid', '')) + 'bc/'
                 else:
                     # CodeURL equivalent - simplified
-                    imageurl = linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(haslinkspg_dc.get('restitle', '')))
+                    php_filename = get_domain_php_filename(domain_data)
+                    imageurl = linkdomain + '/' + php_filename + '?Action=2&k=' + seo_slug(seo_filter_text_custom(haslinkspg_dc.get('restitle', '')))
             elif haslinkspg_dc_count > 0 and linkdc.get('wp_plugin') == 1 and linkdc.get('status') in ['2', '10', '8']:
                 # PHP line 945-947: WP plugin with haslinkspg - use toAscii(html_entity_decode(seo_text_custom(...)))
                 import html
@@ -3534,6 +3544,37 @@ def build_bubba_page_wp(
     return wpage
 
 
+def get_domain_php_filename(domain_data: Dict[str, Any]) -> str:
+    """
+    Derive PHP filename from domain name for non-WP plugins.
+    The filename is derived from the first part of the domain name (before the first dot).
+    www. is always stripped if present.
+    
+    Args:
+        domain_data: Dict containing 'domain_name' key, or a string with the domain name
+    
+    Examples:
+    - www.anydomain.com -> anydomain.php
+    - anydomain.com -> anydomain.php
+    - anysub.anydomain.com -> anysub.php
+    """
+    # Handle both Dict and string input
+    if isinstance(domain_data, str):
+        domain_name = domain_data
+    else:
+        domain_name = domain_data.get('domain_name', '')
+    
+    if not domain_name:
+        return ''
+    
+    # Strip www. if present (domain_name already doesn't include www. prefix when stored)
+    # Split on . and take the first part
+    parts = domain_name.split('.')
+    if parts:
+        return parts[0] + '.php'
+    return ''
+
+
 def code_url(domainid: int, domain_data: Dict[str, Any], domain_settings: Dict[str, Any]) -> str:
     """
     Build CodeURL for a domain (replicates PHP CodeURL function).
@@ -3615,7 +3656,11 @@ def build_feedtext_url(
             return linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', ''))) + '/' + str(haslinkspg.get('bubblefeedid', '')) + 'bc/'
         else:
             # CodeURL equivalent - simplified Action=2 format
-            return linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', '')))
+            php_filename = get_domain_php_filename(link.get('domain_name', ''))
+            if php_filename:
+                return linkdomain + '/' + php_filename + '?Action=2&k=' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', '')))
+            else:
+                return linkdomain + '/?Action=2&k=' + seo_slug(seo_filter_text_custom(haslinkspg.get('restitle', '')))
     elif (haslinkspg and len(haslinkspg) > 0 or is_bron(link.get('servicetype'))) and link.get('status') in ['2', '10', '8']:
         # PHP line 397-402: haslinkspg > 0 OR isBRON
         if is_bron(link.get('servicetype')):
@@ -3718,9 +3763,14 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
         for item in articles:
             if item.get('id'):
                 # Build Resources link (Business Collective page - Action=2 format for non-WP)
-                # For non-WP plugins, use Action=2 format: /?Action=2&k=keyword-slug
+                # For non-WP plugins, use Action=2 format: /{domain_filename}.php?Action=2&k=keyword-slug
                 keyword_slug = seo_filter_text_custom(item['restitle']).lower().replace(' ', '-')
-                resources_link = linkdomain + '/?Action=2&amp;k=' + keyword_slug
+                wp_plugin = domain_data.get('wp_plugin', 0)
+                if wp_plugin != 1:
+                    php_filename = get_domain_php_filename(domain_data)
+                    resources_link = linkdomain + '/' + php_filename + '?Action=2&amp;k=' + keyword_slug
+                else:
+                    resources_link = linkdomain + '/?Action=2&amp;k=' + keyword_slug
                 newsf = f' <a style="padding-left: 0px !important;" href="{resources_link}">Resources</a>'
                 
                 if resourcesactive_val:
@@ -3731,7 +3781,11 @@ def build_article_links(pageid: int, domainid: int, domain_data: Dict[str, Any],
                         num_lnks += 1
                     else:
                         # Otherwise, show as internal link (ignore NoContent)
-                        main_link = linkdomain + '/?Action=1&amp;k=' + keyword_slug + '&amp;PageID=' + str(item['id'])
+                        if wp_plugin != 1:
+                            php_filename = get_domain_php_filename(domain_data)
+                            main_link = linkdomain + '/' + php_filename + '?Action=1&amp;k=' + keyword_slug + '&amp;PageID=' + str(item['id'])
+                        else:
+                            main_link = linkdomain + '/?Action=1&amp;k=' + keyword_slug + '&amp;PageID=' + str(item['id'])
                         feedlinks += f'<li><a style="padding-right: 0px !important;" href="{main_link}">{clean_title(seo_filter_text_custom(item["restitle"]))}</a>{newsf}</li>\n'
                         num_lnks += 1
                 else:
