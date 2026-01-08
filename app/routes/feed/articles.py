@@ -388,64 +388,76 @@ async def articles_endpoint(
                 
                 # Only build CMS homepage if validation passed (for empty Action) or Action is set
                 if should_build_cms_page:
-                    # Use article data for keyword if found
-                    keyword_text = article.get('restitle', '') if article else ''
-                    
-                    # Build the page using build_page_wp
-                    page_content = build_page_wp(
-                        bubbleid=page_id_to_use,  # Use determined page ID (pageid if Action set, cmspage if Action empty)
-                        domainid=domainid,
-                        agent=agent or '',
-                        keyword=keyword_text,
-                        domain_data=domain_category,
-                        domain_settings=domain_settings,
-                        artpageid=page_id_to_use,
-                        artdomainid=domainid
-                    )
-                    
-                    # Get header and footer
-                    header_data = get_header_footer(domainid, domain_category.get('status'))
-                    header = header_data['header']
-                    footer = header_data['footer']
-                    
-                    # Build metaheader
-                    metaheader = build_metaheader(
-                        domainid=domainid,
-                        domain_data=domain_category,
-                        domain_settings=domain_settings,
-                        action='1',
-                        keyword=keyword_text,
-                        pageid=page_id_to_use,  # Use determined page ID
-                        city=city or cty or '',
-                        state=state or st or ''
-                    )
-                    
-                    # Build canonical URL
-                    if domain_category.get('ishttps') == 1:
-                        canonical_url = 'https://'
-                    else:
-                        canonical_url = 'http://'
-                    if domain_category.get('usewww') == 1:
-                        canonical_url += 'www.' + domain_category.get('domain_name', '')
-                    else:
-                        canonical_url += domain_category.get('domain_name', '')
-                    canonical_url += '/'
-                    
-                    # Wrap content with header and footer
-                    full_page_html = wrap_content_with_header_footer(
-                        content=page_content,
-                        header=header,
-                        footer=footer,
-                        metaheader=metaheader,
-                        canonical_url=canonical_url,
-                        websitereferencesimple=False,
-                        wp_plugin=domain_category.get('wp_plugin', 0),
-                        domain_settings=domain_settings
-                    )
-                    
-                    # PHP Articles.php includes feed-home.css.php at lines 255 and 471
-                    # Add feed-home.css.php CSS before </head> or at the end of <head>
-                    feed_home_css = '''<style type="text/css">
+                    try:
+                        # Use article data for keyword if found
+                        keyword_text = article.get('restitle', '') if article else ''
+                        
+                        # Build the page using build_page_wp
+                        page_content = build_page_wp(
+                            bubbleid=page_id_to_use,  # Use determined page ID (pageid if Action set, cmspage if Action empty)
+                            domainid=domainid,
+                            agent=agent or '',
+                            keyword=keyword_text,
+                            domain_data=domain_category,
+                            domain_settings=domain_settings,
+                            artpageid=page_id_to_use,
+                            artdomainid=domainid
+                        )
+                        
+                        # Validate page_content
+                        if not page_content:
+                            raise ValueError("build_page_wp returned empty content")
+                        
+                        # Get header and footer
+                        header_data = get_header_footer(domainid, domain_category.get('status'))
+                        if not header_data:
+                            raise ValueError("get_header_footer returned None")
+                        
+                        header = header_data.get('header', '')
+                        footer = header_data.get('footer', '')
+                        
+                        # Build metaheader
+                        metaheader = build_metaheader(
+                            domainid=domainid,
+                            domain_data=domain_category,
+                            domain_settings=domain_settings,
+                            action='1',
+                            keyword=keyword_text,
+                            pageid=page_id_to_use,  # Use determined page ID
+                            city=city or cty or '',
+                            state=state or st or ''
+                        )
+                        if not metaheader:
+                            metaheader = ''  # Default to empty string
+                        
+                        # Build canonical URL
+                        if domain_category.get('ishttps') == 1:
+                            canonical_url = 'https://'
+                        else:
+                            canonical_url = 'http://'
+                        if domain_category.get('usewww') == 1:
+                            canonical_url += 'www.' + domain_category.get('domain_name', '')
+                        else:
+                            canonical_url += domain_category.get('domain_name', '')
+                        canonical_url += '/'
+                        
+                        # Wrap content with header and footer
+                        full_page_html = wrap_content_with_header_footer(
+                            content=page_content,
+                            header=header,
+                            footer=footer,
+                            metaheader=metaheader,
+                            canonical_url=canonical_url,
+                            websitereferencesimple=False,
+                            wp_plugin=domain_category.get('wp_plugin', 0),
+                            domain_settings=domain_settings
+                        )
+                        if not full_page_html:
+                            raise ValueError("wrap_content_with_header_footer returned None")
+                        
+                        # PHP Articles.php includes feed-home.css.php at lines 255 and 471
+                        # Add feed-home.css.php CSS before </head> or at the end of <head>
+                        feed_home_css = '''<style type="text/css">
 ul.mdubgwi-footer-nav {margin:0 auto !important;padding: 0px !important;overflow:visible !important}
 
 #mdubgwi-hidden-button {  height:0px !important; width:0px !important;	 }
@@ -481,16 +493,39 @@ img.align-left { max-width:100%!important;" }
 .mdubgwi-sub-nav li:hover ul {display:block !important; visibility:visible !important;}
 </style>
 '''
+                        
+                        # Insert feed-home.css.php CSS before </head>
+                        if '</head>' in full_page_html:
+                            head_pos = full_page_html.lower().find('</head>')
+                            full_page_html = full_page_html[:head_pos] + feed_home_css + full_page_html[head_pos:]
+                        else:
+                            # If no </head> found, append to the end
+                            full_page_html += feed_home_css
+                        
+                        return HTMLResponse(content=full_page_html)
                     
-                    # Insert feed-home.css.php CSS before </head>
-                    if '</head>' in full_page_html:
-                        head_pos = full_page_html.lower().find('</head>')
-                        full_page_html = full_page_html[:head_pos] + feed_home_css + full_page_html[head_pos:]
-                    else:
-                        # If no </head> found, append to the end
-                        full_page_html += feed_home_css
-                    
-                    return HTMLResponse(content=full_page_html)
+                    except Exception as e:
+                        # Log detailed error information
+                        error_msg = f"Articles.php: Error building CMS homepage for domain={domain}, page_id={page_id_to_use}, domainid={domainid}"
+                        logger.error(f"{error_msg}: {type(e).__name__}: {str(e)}")
+                        logger.error(traceback.format_exc())
+                        _write_debug_log(error_msg, {
+                            "domain": domain,
+                            "domainid": domainid,
+                            "page_id_to_use": page_id_to_use,
+                            "error_type": type(e).__name__,
+                            "error_message": str(e),
+                            "traceback": traceback.format_exc()
+                        })
+                        
+                        # Return footer code as fallback (same as validation failure)
+                        try:
+                            footer_html = build_footer_wp(domainid, domain_category, domain_settings)
+                            return HTMLResponse(content=footer_html)
+                        except Exception as footer_error:
+                            # If even footer building fails, return minimal error response
+                            logger.error(f"Articles.php: Footer building also failed: {footer_error}")
+                            return HTMLResponse(content="<!-- Error building page -->", status_code=500)
             
             elif cmspagetype == 5 and cmspage:
                 # Get article from bwp_blog_post (Action=5 - not yet implemented)
