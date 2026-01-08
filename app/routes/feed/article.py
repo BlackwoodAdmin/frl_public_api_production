@@ -725,8 +725,7 @@ async def article_endpoint(
                 footer=header_footer_data['footer'],
                 metaheader=metaheader,
                 canonical_url=canonical_url,
-                wp_plugin=wp_plugin,
-                domain_settings=domain_settings
+                wp_plugin=wp_plugin
             )
             
             return HTMLResponse(content=full_page)
