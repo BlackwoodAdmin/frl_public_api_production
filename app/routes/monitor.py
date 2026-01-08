@@ -803,6 +803,69 @@ async def get_stats():
         }
 
 
+@router.get("/metrics", response_class=JSONResponse)
+async def get_metrics():
+    """Get minimal application metrics.
+    
+    Returns only essential metrics without system details.
+    """
+    try:
+        # Load stats from shared file (reuse existing logic)
+        stats = _load_stats()
+        current_time = time.time()
+        
+        # Clean old request times periodically (same as /stats endpoint)
+        should_clean = stats.get("total_requests", 0) % 10 == 0
+        if should_clean:
+            original_count = len(stats["last_minute_requests"])
+            stats["last_minute_requests"] = [
+                t for t in stats["last_minute_requests"]
+                if current_time - t < 300
+            ]
+            if len(stats["last_minute_requests"]) < original_count:
+                _save_stats(stats)
+        
+        # Calculate average response time
+        avg_response_time = 0
+        if stats["request_times"]:
+            recent_times = stats["request_times"][-100:]
+            avg_response_time = sum(recent_times) / len(recent_times) if recent_times else 0
+        
+        # Calculate error rate
+        total_requests = stats["total_requests"]
+        error_rate = stats["errors"] / total_requests if total_requests > 0 else 0
+        
+        # Get active workers from cached metrics
+        cached_metrics = _get_cached_system_metrics()
+        active_workers = cached_metrics["active_workers"]
+        
+        # Calculate average requests per minute
+        requests_per_minute = round(len(stats["last_minute_requests"]) / 5, 2) if stats["last_minute_requests"] else 0
+        
+        # Return only requested fields
+        return {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "total_requests": total_requests,
+            "requests_per_minute": requests_per_minute,
+            "average_response_time_ms": round(avg_response_time * 1000, 2),
+            "error_rate": round(error_rate, 4),
+            "active_workers": active_workers,
+            "uptime_seconds": int(current_time - stats["start_time"])
+        }
+    except Exception as e:
+        logger.error(f"Error getting metrics: {e}")
+        # Return minimal error response with all fields as zero/defaults
+        return {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "total_requests": 0,
+            "requests_per_minute": 0,
+            "average_response_time_ms": 0,
+            "error_rate": 0,
+            "active_workers": 0,
+            "uptime_seconds": 0
+        }
+
+
 @router.get("/dashboard", response_class=JSONResponse)
 async def get_dashboard():
     """Get dashboard data (combined stats and workers)."""
