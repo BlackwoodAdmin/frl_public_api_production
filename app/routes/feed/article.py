@@ -346,7 +346,7 @@ async def article_endpoint(
     
     # Get full domain data for Action handlers
     domain_full_sql = """
-        SELECT d.*, s.servicetype, s.keywords as service_keywords, d.script_version, d.wp_plugin
+        SELECT d.*, s.servicetype, s.keywords as service_keywords, d.script_version, d.wp_plugin, d.iswin, d.usepurl, d.webworkscms
         FROM bwp_domains d
         LEFT JOIN bwp_services s ON d.servicetype = s.id
         WHERE d.id = %s AND d.deleted != 1
@@ -355,6 +355,11 @@ async def article_endpoint(
     
     if not domain_category:
         raise HTTPException(status_code=404, detail="Domain not found")
+    
+    # Check domain status
+    domain_status = domain_category.get('status')
+    if domain_status == 6:  # Rejected
+        return HTMLResponse(content="<!-- Domain Rejected -->", status_code=403)
     
     # Get domain settings
     domain_settings = db.fetch_row(
@@ -574,6 +579,192 @@ async def article_endpoint(
                 domain_settings=domain_settings
             )
             return HTMLResponse(content=wpage)
+    
+    # Handle empty Action - match Articles.php behavior
+    # Normalize Action - treat empty string as None/empty
+    action_empty = not Action or (isinstance(Action, str) and Action.strip() == '')
+    
+    # Check for webworkscms and CMS functionality
+    webworkscms = domain_category.get('webworkscms') or 0
+    if webworkscms == 1:
+        cms_sql = "SELECT * FROM bwp_cms WHERE domainid = %s"
+        cms = db.fetch_row(cms_sql, (domainid,))
+        
+        if cms and cms.get('cmsactive') == 1:
+            cmspagetype = cms.get('cmspagetype')
+            cmspage = cms.get('cmspage')
+            
+            if cmspagetype == 1 and cmspage:
+                if action_empty:
+                    # Action is empty - validate cmspage exists in bwp_bubblefeed with matching domainid
+                    cmspage_validation = db.fetch_row(
+                        "SELECT id FROM bwp_bubblefeed WHERE id = %s AND domainid = %s",
+                        (cmspage, domainid)
+                    )
+                    
+                    if cmspage_validation:
+                        # cmspage validation passed - use cmspage as the homepage
+                        from app.services.content import build_page_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer
+                        
+                        # Get article from bwp_bubblefeed for keyword data
+                        article_sql = "SELECT * FROM bwp_bubblefeed WHERE id = %s AND domainid = %s"
+                        article = db.fetch_row(article_sql, (cmspage, domainid))
+                        
+                        try:
+                            # Use article data for keyword if found
+                            keyword_text = article.get('restitle', '') if article else ''
+                            
+                            # Build the page using build_page_wp
+                            page_content = build_page_wp(
+                                bubbleid=cmspage,
+                                domainid=domainid,
+                                agent=agent or '',
+                                keyword=keyword_text,
+                                domain_data=domain_category,
+                                domain_settings=domain_settings,
+                                artpageid=cmspage,
+                                artdomainid=domainid
+                            )
+                            
+                            # Validate page_content
+                            if not page_content:
+                                raise ValueError("build_page_wp returned empty content")
+                            
+                            # Get header and footer
+                            header_data = get_header_footer(domainid, domain_category.get('status'))
+                            if not header_data:
+                                raise ValueError("get_header_footer returned None")
+                            
+                            header = header_data.get('header', '')
+                            footer = header_data.get('footer', '')
+                            
+                            # Build metaheader
+                            metaheader = build_metaheader(
+                                domainid=domainid,
+                                domain_data=domain_category,
+                                domain_settings=domain_settings,
+                                action='1',
+                                keyword=keyword_text,
+                                pageid=cmspage,
+                                city=city or cty or '',
+                                state=state or st or ''
+                            )
+                            if not metaheader:
+                                metaheader = ''  # Default to empty string
+                            
+                            # Build canonical URL
+                            if domain_category.get('ishttps') == 1:
+                                canonical_url = 'https://'
+                            else:
+                                canonical_url = 'http://'
+                            if domain_category.get('usewww') == 1:
+                                canonical_url += 'www.' + domain_category.get('domain_name', '')
+                            else:
+                                canonical_url += domain_category.get('domain_name', '')
+                            canonical_url += '/'
+                            
+                            # Wrap content with header and footer
+                            full_page_html = wrap_content_with_header_footer(
+                                content=page_content,
+                                header=header,
+                                footer=footer,
+                                metaheader=metaheader,
+                                canonical_url=canonical_url,
+                                websitereferencesimple=False,
+                                wp_plugin=wp_plugin
+                            )
+                            if not full_page_html:
+                                raise ValueError("wrap_content_with_header_footer returned None")
+                            
+                            # PHP Articles.php includes feed-home.css.php CSS
+                            feed_home_css = '''<style type="text/css">
+ul.mdubgwi-footer-nav {margin:0 auto !important;padding: 0px !important;overflow:visible !important}
+
+#mdubgwi-hidden-button {  height:0px !important; width:0px !important;	 }
+
+.mdubgwi-button { display:block!important; visibility:visible!important; height:20px !important; width:250px !important; margin:0px !important; padding:0 !important; }
+
+.mdubgwi-footer-section {z-index: 99999999 !important; overflow:visible !important; display:block !important; position: relative !important; bottom: 0px !important; width: 250px !important; margin:0 auto !important; }
+.mdubgwi-footer-section.plain ul {list-style: none !important; margin:0 auto !important; text-align:center!important;}
+
+.mdubgwi-footer-nav li ul li {border:none !important;overflow-x: visible !important;overflow-y: visible !important;text-align:center !important; margin:0px !important;position: relative!important; color: #00397c !important; padding:0px !important; display:block !important; }
+.mdubgwi-footer-section.num-plain li {list-style: none !important; display:inline !important;}
+.num-lite li ul  { position: absolute !important; bottom: 45px !important; }
+.mdubgwi-footer-nav li ul  {position: absolute !important;left:53% !important; min-width:100px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-sub-nav {width:450px;}
+.mdubgwi-footer-nav li ul li ul {min-width:450px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-footer-nav:hover li ul {-ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; list-style:none !important; display: block !important; visibility: visible !important; z-index: 999999 !important; }
+.mdubgwi-footer-nav:hover li ul li ul {min-width:450px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-footer-nav li a {background:transparent !important; padding:5px 5px !important;text-align:center !important;  text-decoration:none !important; border:0 !important; line-height: 18px !important; font-size:13px !important; color: #00397c; }
+.mdubgwi-footer-nav li {list-style:none !important; background:transparent !important; padding:5px 5px !important;text-align:center !important;  color: #00397c; text-decoration:none !important; border:0 !important; line-height: 18px !important; font-size:13px !important; }
+.mdubgwi-footer-nav li ul { padding:5px 5px 10px 5px !important; margin:0 !important; }
+.mdubgwi-footer-nav li ul:hover {-ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=1.0)" !important; -moz-opacity: 1.0 !important; -khtml-opacity: 1.0 ! important!important;  opacity: 1.0 !important;      -webkit-transition: opacity 1s ease!important;     -moz-transition: opacity 1s ease!important;     -o-transition: opacity 1s ease!important;     -ms-transition: opacity 1s ease!important;        transition: opacity 1s ease!important;  list-style:none !important; display: block !important; visibility: visible !important; z-index: 999999 !important; }
+.mdubgwi-footer-nav li ul:hover li ul {min-width: 450px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-footer-nav li ul li {border:none !important;background:transparent !important;overflow-x: visible !important;overflow-y: visible !important; text-align: center !important;margin:0px !important; position: relative!important; list-style:none !important; }
+.mdubgwi-footer-nav li ul li:hover ul{ display: block !important; visibility: visible !important; z-index: 999999 !important; -webkit-transition: all 1s ease-out!important; -moz-transition: all 1s ease-out!important; -o-transition: all 1s ease-out!important; -ms-transition: all 1s ease-out!important; transition: all 1s ease-out!important;}
+.mdubgwi-footer-nav li ul li ul {border:none !important;bottom:0px !important;padding: 5px 5px 15px 5px !important;  -webkit-transition: all 1s ease-out!important; -moz-transition: all 1s ease-out!important; -o-transition: all 1s ease-out!important; -ms-transition: all 1s ease-out!important; transition: all 1s ease-out!important;position: absolute !important; }
+.mdubgwi-footer-nav li ul li ul li {border:none !important; background:transparent !important; overflow-x: visible !important;overflow-y: visible !important;left:0 !important; text-align: center !important;margin:0px !important; list-style:none !important; padding:0px 5px !important; }
+.ngodkrbsitr-spacer { clear:both!important; height:5px !important; display:block!important;width:100%!important; }
+.ngodkrbsitr-social { margin: 0 3px !important; padding: 0px !important; float:left!important;	 }
+.align-left { float:left!important; border:0!important; margin-right:1% !important; margin-bottom:10px !important; }
+.align-right { float:right!important; border:0!important; margin-left:1% !important; text-align:right!important; margin-bottom:10px !important; }
+img.align-left { max-width:100%!important;" }
+.mdubgwi-sub-nav li ul  {display:none !important; visibility:hidden !important;}
+.mdubgwi-sub-nav li:hover ul {display:block !important; visibility:visible !important;}
+</style>
+'''
+                            
+                            # Insert feed-home.css.php CSS before </head>
+                            if '</head>' in full_page_html:
+                                head_pos = full_page_html.lower().find('</head>')
+                                full_page_html = full_page_html[:head_pos] + feed_home_css + full_page_html[head_pos:]
+                            else:
+                                # If no </head> found, append to the end
+                                full_page_html += feed_home_css
+                            
+                            return HTMLResponse(content=full_page_html)
+                        
+                        except Exception as e:
+                            # Log detailed error information
+                            error_msg = f"Article.php: Error building CMS homepage for domain={domain}, page_id={cmspage}, domainid={domainid}"
+                            logger.error(f"{error_msg}: {type(e).__name__}: {str(e)}")
+                            logger.error(traceback.format_exc())
+                            
+                            # Return footer code as fallback (same as validation failure)
+                            try:
+                                footer_html = build_footer_wp(domainid, domain_category, domain_settings)
+                                return HTMLResponse(content=footer_html)
+                            except Exception as footer_error:
+                                # If even footer building fails, return minimal error response
+                                logger.error(f"Article.php: Footer building also failed: {footer_error}")
+                                return HTMLResponse(content="<!-- Error building page -->", status_code=500)
+                    else:
+                        # cmspage validation failed - return footer code
+                        footer_html = build_footer_wp(domainid, domain_category, domain_settings)
+                        return HTMLResponse(content=footer_html)
+            
+            elif cmspagetype == 5 and cmspage:
+                # Get article from bwp_blog_post (Action=5 - not yet implemented)
+                # For now, return a placeholder
+                return HTMLResponse(content="<!-- CMS Blog Post (Action=5) not yet implemented -->")
+    
+    # PHP Articles.php: if script_version >= 3 and wp_plugin != 1 and iswin != 1 and usepurl != 0
+    # then return footer code
+    iswin = domain_category.get('iswin') or 0
+    usepurl = domain_category.get('usepurl') or 0
+    
+    # PHP line 172: if($domains['script_version'] >= 3 && $domains['wp_plugin'] != 1 && $domains['iswin'] != 1 && $domains['usepurl'] != 0)
+    if script_version >= 3 and wp_plugin != 1 and iswin != 1 and usepurl != 0:
+        # Generate footer HTML (similar to Articles30.php seo_automation_build_footer30)
+        footer_html = build_footer_wp(domainid, domain_category, domain_settings)
+        # Return the footer HTML
+        return HTMLResponse(content=footer_html)
+    
+    # When Action is empty, generate footer HTML for non-CMS sites
+    if action_empty and webworkscms != 1:
+        # Generate footer HTML for non-CMS sites when Action is empty
+        footer_html = build_footer_wp(domainid, domain_category, domain_settings)
+        return HTMLResponse(content=footer_html)
     
     # Handle other actions (non-WP plugin)
     if Action == '1':
