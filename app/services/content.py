@@ -2719,8 +2719,8 @@ def build_bcpage_wp(
                 # Otherwise, continue with existing logic
                 elif link.get('wp_plugin') != 1 and link.get('servicetype') == 356 and link.get('status') in ['2', '10']:
                     # PHP line 322-324: CodeURL for non-WP plugin with servicetype 356
-                    # Use current link data directly
-                    php_filename = get_domain_php_filename(domain_data)
+                    # Use linked domain's domain name, not current domain
+                    php_filename = get_domain_php_filename(link.get('domain_name', ''))
                     linkurl = linkdomain + '/' + php_filename + '?Action=2&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', '')))
                 elif link.get('wp_plugin') == 1 and link.get('servicetype') == 356 and link.get('status') in ['2', '10']:
                     # PHP line 326-331: WP plugin with servicetype 356
@@ -2878,7 +2878,8 @@ def build_bcpage_wp(
                             imageurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '/' + str(link.get('bubblefeedid', '')) + 'bc/'
                         else:
                             # CodeURL equivalent - simplified Action=2 format
-                            php_filename = get_domain_php_filename(domain_data)
+                            # Use linked domain's domain name, not current domain
+                            php_filename = get_domain_php_filename(link.get('domain_name', ''))
                             imageurl = linkdomain + '/' + php_filename + '?Action=2&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', '')))
                     elif is_bron(link.get('servicetype')):
                         # BRON service type: use bubblefeedid with 'bc' suffix
@@ -3138,7 +3139,8 @@ def build_bcpage_wp(
                             orphlink = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(orphanlinkspg.get('restitle', ''))) + '/' + str(orphanlinkspg.get('bubblefeedid', '')) + 'bc/'
                         else:
                             # CodeURL equivalent - simplified
-                            php_filename = get_domain_php_filename(domain_data)
+                            # Use linked domain's domain name, not current domain
+                            php_filename = get_domain_php_filename(link.get('domain_name', ''))
                             orphlink = linkdomain + '/' + php_filename + '?Action=2&k=' + seo_slug(seo_filter_text_custom(orphanlinkspg.get('restitle', '')))
                     elif orphanlinkspg and link.get('wp_plugin') == 1:
                         # PHP line 728-733: WP plugin orphan link
@@ -3345,7 +3347,8 @@ def build_bcpage_wp(
                     imageurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(haslinkspg_dc.get('restitle', ''))) + '/' + str(haslinkspg_dc.get('bubblefeedid', '')) + 'bc/'
                 else:
                     # CodeURL equivalent - simplified
-                    php_filename = get_domain_php_filename(domain_data)
+                    # Use linked domain's domain name, not current domain
+                    php_filename = get_domain_php_filename(linkdc.get('domain_name', ''))
                     imageurl = linkdomain + '/' + php_filename + '?Action=2&k=' + seo_slug(seo_filter_text_custom(haslinkspg_dc.get('restitle', '')))
             elif haslinkspg_dc_count > 0 and linkdc.get('wp_plugin') == 1 and linkdc.get('status') in ['2', '10', '8']:
                 # PHP line 945-947: WP plugin with haslinkspg - use toAscii(html_entity_decode(seo_text_custom(...)))
