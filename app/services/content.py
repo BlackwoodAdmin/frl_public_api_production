@@ -635,6 +635,9 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
     if keywordcnt == 0:
         keywords = [domain_data['domain_name']]
     
+    # Get wp_plugin value early to determine which structure to use
+    wp_plugin = domain_data.get('wp_plugin', 0)
+    
     # Build footer HTML
     foot = ''
     num_lnks = 0
@@ -654,7 +657,11 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
     
     if silo:
         foot += '<li>'
-        foot += '<ul class="seo-sub-nav">\n'
+        # Use mdubgwi-sub-nav for wp_plugin != 1, seo-sub-nav for wp_plugin == 1
+        if wp_plugin != 1:
+            foot += '<ul class="mdubgwi-sub-nav">\n'
+        else:
+            foot += '<ul class="seo-sub-nav">\n'
         
         for item in silo:
             import html
@@ -765,7 +772,12 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                 num_lnks += 1
         
         foot += '</ul>\n'
-        foot += 'Articles</li>\n'
+        # Make Articles a link for wp_plugin != 1, plain text for wp_plugin == 1
+        if wp_plugin != 1:
+            php_filename = get_domain_php_filename(domain_data)
+            foot += '<a href="' + linkdomain + '/' + php_filename + '?Action=1">Articles</a></li>\n'
+        else:
+            foot += 'Articles</li>\n'
     
     # Add Blog and FAQ links if configured
     if domain_settings.get('blogUrl') and len(domain_settings['blogUrl']) > 10:
@@ -793,7 +805,11 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
         
         if allbubba:
             foot += '<li>'
-            foot += '<ul class="seo-sub-nav">\n'
+            # Use mdubgwi-sub-nav for wp_plugin != 1, seo-sub-nav for wp_plugin == 1
+            if wp_plugin != 1:
+                foot += '<ul class="mdubgwi-sub-nav">\n'
+            else:
+                foot += '<ul class="seo-sub-nav">\n'
             import html
             for bubba in allbubba:
                 # Use toAscii(html_entity_decode(seo_text_custom(...))) for slug
@@ -814,25 +830,42 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
     else:
         ltest = domain_data['domain_name']
     
-    foot += '</ul><a href="' + linkdomain + '/"><div class="seo-button-paid">&copy; ' + str(datetime.now().year) + ' ' + ltest + '</div></a></li></ul>\n'
+    # Use mdubgwi-button for wp_plugin != 1, seo-button-paid for wp_plugin == 1
+    if wp_plugin != 1:
+        foot += '</ul><a href="' + linkdomain + '/"><div class="mdubgwi-button">&copy; ' + str(datetime.now().year) + ' ' + ltest + '</div></a></li></ul>\n'
+    else:
+        foot += '</ul><a href="' + linkdomain + '/"><div class="seo-button-paid">&copy; ' + str(datetime.now().year) + ' ' + ltest + '</div></a></li></ul>\n'
     
     # Prepend wrapper divs (matching PHP structure)
-    footer_html = '<div class="seo-automation-spacer"></div>\n'
-    footer_html += '<div style="display:block !important;" class="seo-footer-section ">\n'
-    footer_html += '<ul class="seo-footer-nav num-lite">\n'
-    footer_html += '<li>\n'
-    footer_html += '<ul>\n'
-    footer_html += foot
-    footer_html += '<div class="seo-automation-spacer"></div>\n'
-    footer_html += '<style>\n'
-    footer_html += '.seo-footer-nav li ul li ul {\n'
-    footer_html += '\tleft:70px !important;;\n'
-    footer_html += '}\n'
-    footer_html += '</style>\n'
-    footer_html += '</div>'
+    # Use mdubgwi-* classes and ngodkrbsitr-spacer for wp_plugin != 1, seo-* classes for wp_plugin == 1
+    if wp_plugin != 1:
+        # Use mdubgwi-* classes, ngodkrbsitr-spacer, and num-{num_lnks}
+        footer_html = '<div class="ngodkrbsitr-spacer"></div>\n'
+        footer_html += '<div style="display:block !important;" class="mdubgwi-footer-section ">\n'
+        footer_html += '<ul class="mdubgwi-footer-nav num-' + str(num_lnks) + '">\n'
+        footer_html += '<li>\n'
+        footer_html += '<ul>\n'
+        footer_html += foot
+        footer_html += '<div class="ngodkrbsitr-spacer"></div>\n'
+        footer_html += '</div>'
+    else:
+        # Use seo-* classes, seo-automation-spacer, and num-lite
+        footer_html = '<div class="seo-automation-spacer"></div>\n'
+        footer_html += '<div style="display:block !important;" class="seo-footer-section ">\n'
+        footer_html += '<ul class="seo-footer-nav num-lite">\n'
+        footer_html += '<li>\n'
+        footer_html += '<ul>\n'
+        footer_html += foot
+        footer_html += '<div class="seo-automation-spacer"></div>\n'
+        footer_html += '<style>\n'
+        footer_html += '.seo-footer-nav li ul li ul {\n'
+        footer_html += '\tleft:70px !important;;\n'
+        footer_html += '}\n'
+        footer_html += '</style>\n'
+        footer_html += '</div>'
     
     # Add feed-home.css.php CSS for wp_plugin != 1 (PHP plugin footer)
-    wp_plugin = domain_data.get('wp_plugin', 0)
+    # CSS should be prepended (at the beginning) for wp_plugin != 1
     if wp_plugin != 1:
         feed_home_css = '''<style type="text/css">
 ul.mdubgwi-footer-nav {margin:0 auto !important;padding: 0px !important;overflow:visible !important}
@@ -870,7 +903,8 @@ img.align-left { max-width:100%!important;" }
 .mdubgwi-sub-nav li:hover ul {display:block !important; visibility:visible !important;}
 </style>
 '''
-        footer_html += feed_home_css
+        # Prepend CSS to the beginning of footer_html
+        footer_html = feed_home_css + '\n' + footer_html
     
     # Return the footer HTML (will be JSON-encoded and HTML-escaped in the route handler)
     return footer_html
