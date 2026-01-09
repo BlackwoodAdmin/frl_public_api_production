@@ -1068,7 +1068,7 @@ def seo_automation_add_text_link_newbc(text: str = '', kword: str = '', iurl: st
         # If no replacement was made, append link at end
         if not replaced:
             title_attr = html.escape(title) if title else html.escape(kword_clean)
-            text = text + f' <a title="{title_attr}" {follow} target="_blank" href="{iurl}">{kword_clean}</a>'
+            text = text + f'   <a title="{title_attr}" {follow} target="_blank" href="{iurl}">{kword_clean}</a>'
         
         return text
     else:
@@ -3200,7 +3200,7 @@ def build_bcpage_wp(
                     restext = seo_automation_add_text_link_newbc(restext, restextkw, shorttext_link_url, follow)
                 elif preml == 1:
                     # PHP line 716-717: preml == 1
-                    restext = seo_automation_add_text_link_newbc(restext, restextkw, '', follow)
+                    restext = seo_automation_add_text_link_newbc(restext, restextkw, linkalone, follow)
                 elif link.get('status') == '8' or addrndfeed == 1:
                     # PHP line 718-738: Orphan link handling
                     # Simplified: removed haslinkspg_count check since we're not using haslinks logic
