@@ -1785,6 +1785,10 @@ def build_page_wp(
     
     # Fallback: try to find by keyword (PHP lines 97-108)
     if not res and keyword:
+        # Handle both slug format (hyphens) and space format - match article.py logic
+        keyword_lower = keyword.lower().strip()
+        keyword_for_matching = keyword_lower.replace('-', ' ')
+        
         sql = """
             SELECT b.id, b.restitle, b.title, b.resfulltext, b.resshorttext, b.linkouturl, 
                    b.resphone, b.resvideo, b.resaddress, b.resgooglemaps, b.resname, b.NoContent,
@@ -1793,9 +1797,14 @@ def build_page_wp(
                    IFNULL(c.bubblefeedid, '') AS bubblefeedid
             FROM bwp_bubblefeed b
             LEFT JOIN bwp_bubblefeedcategory c ON c.id = b.categoryid AND c.deleted != 1
-            WHERE b.restitle = %s AND b.domainid = %s AND b.deleted != 1
+            WHERE LOWER(b.restitle) = %s AND b.domainid = %s AND b.deleted != 1
         """
-        res = db.fetch_row(sql, (keyword, domainid))
+        # Try matching with spaces first (database format)
+        res = db.fetch_row(sql, (keyword_for_matching, domainid))
+        
+        # If not found, try with original format (might be stored as slug)
+        if not res:
+            res = db.fetch_row(sql, (keyword_lower, domainid))
     
     if not res:
         return ""
