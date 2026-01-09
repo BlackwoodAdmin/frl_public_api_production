@@ -996,6 +996,13 @@ img.align-left { max-width:100%!important;" }
         
         return HTMLResponse(content=full_page)
     elif Action == '2':
+        # #region agent log
+        import json
+        try:
+            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A,B,C,D,E","location":"article.py:998","message":"Action=2 entry","data":{"domain":domain,"domainid":domainid,"k":k,"pageid":pageid},"timestamp":int(__import__('time').time()*1000)})+'\n')
+        except: pass
+        # #endregion
         # Business Collective (non-WP) - use same function as WP but it handles wp_plugin internally
         from app.services.content import build_bcpage_wp, get_header_footer, build_metaheader, wrap_content_with_header_footer, get_domain_keywords_from_bubblefeed, get_domain_php_filename
         from fastapi.responses import RedirectResponse
@@ -1136,13 +1143,34 @@ img.align-left { max-width:100%!important;" }
                 redirect_url = f"{linkdomain}/?Action=2"
             return HTMLResponse(content=f'<meta http-equiv="refresh" content="0;URL={redirect_url}">')
         
-        wpage = build_bcpage_wp(
-            bubbleid=bubbleid,
-            domainid=domainid,
-            agent=agent or '',
-            domain_data=domain_category,
-            domain_settings=domain_settings
-        )
+        # #region agent log
+        try:
+            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1139","message":"Before build_bcpage_wp","data":{"bubbleid":bubbleid,"domainid":domainid},"timestamp":int(__import__('time').time()*1000)})+'\n')
+        except: pass
+        # #endregion
+        try:
+            wpage = build_bcpage_wp(
+                bubbleid=bubbleid,
+                domainid=domainid,
+                agent=agent or '',
+                domain_data=domain_category,
+                domain_settings=domain_settings
+            )
+            # #region agent log
+            try:
+                with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1145","message":"After build_bcpage_wp","data":{"wpage_length":len(wpage) if wpage else 0},"timestamp":int(__import__('time').time()*1000)})+'\n')
+            except: pass
+            # #endregion
+        except Exception as e:
+            # #region agent log
+            try:
+                with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1147","message":"build_bcpage_wp exception","data":{"error":str(e),"type":type(e).__name__},"timestamp":int(__import__('time').time()*1000)})+'\n')
+            except: pass
+            # #endregion
+            raise
         
         # Get header/footer and wrap content (non-WP always uses header/footer)
         header_footer_data = get_header_footer(domainid, domain_category.get('status'), keyword_param)

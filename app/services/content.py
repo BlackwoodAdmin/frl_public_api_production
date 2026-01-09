@@ -2669,11 +2669,42 @@ def build_bcpage_wp(
             AND d.domainip != %s
             ORDER BY l.relevant DESC
         """
-        links = db.fetch_all(links_sql, (domainid, res['id'], domain_data.get('domainip', '')))
+        # #region agent log
+        try:
+            import json
+            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A,D","location":"content.py:2672","message":"Before SQL query","data":{"domainid":domainid,"res_id":res.get('id')},"timestamp":int(__import__('time').time()*1000)})+'\n')
+        except: pass
+        # #endregion
+        try:
+            links = db.fetch_all(links_sql, (domainid, res['id'], domain_data.get('domainip', '')))
+            # #region agent log
+            try:
+                import json
+                with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A,D","location":"content.py:2674","message":"After SQL query","data":{"links_count":len(links) if links else 0},"timestamp":int(__import__('time').time()*1000)})+'\n')
+            except: pass
+            # #endregion
+        except Exception as e:
+            # #region agent log
+            try:
+                import json
+                with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A,D","location":"content.py:2676","message":"SQL query exception","data":{"error":str(e),"type":type(e).__name__},"timestamp":int(__import__('time').time()*1000)})+'\n')
+            except: pass
+            # #endregion
+            raise
         
         if links:
             # Process each link (header already added above)
-            for link in links:
+            for link_idx, link in enumerate(links):
+                # #region agent log
+                try:
+                    import json
+                    with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B,E","location":"content.py:2676","message":"Processing link","data":{"link_idx":link_idx,"has_skipfeedchecker":"skipfeedchecker" in link,"skipfeedchecker_val":link.get('skipfeedchecker'),"has_linkskipfeedchecker":"linkskipfeedchecker" in link,"linkskipfeedchecker_val":link.get('linkskipfeedchecker')},"timestamp":int(__import__('time').time()*1000)})+'\n')
+                except: pass
+                # #endregion
                 # Get link settings
                 link_settings_sql = "SELECT * FROM bwp_domain_settings WHERE domainid = %s"
                 link_settings = db.fetch_row(link_settings_sql, (link['id'],))
@@ -2723,6 +2754,20 @@ def build_bcpage_wp(
                 if packageoverride_val in [1, True, '1'] or (isinstance(packageoverride_val, str) and packageoverride_val.lower() == 'true'):
                     linkurl = linkalone
                 # Else if skipfeedchecker is enabled for the domain and not overridden for this link, point to homepage
+                # #region agent log
+                try:
+                    import json
+                    skipfeedchecker_val = link.get('skipfeedchecker')
+                    linkskipfeedchecker_val = link.get('linkskipfeedchecker')
+                    with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B,E","location":"content.py:2726","message":"Before skipfeedchecker check","data":{"skipfeedchecker":skipfeedchecker_val,"skipfeedchecker_type":type(skipfeedchecker_val).__name__,"linkskipfeedchecker":linkskipfeedchecker_val,"linkskipfeedchecker_type":type(linkskipfeedchecker_val).__name__,"check_result":skipfeedchecker_val == 1 and linkskipfeedchecker_val != 1},"timestamp":int(__import__('time').time()*1000)})+'\n')
+                except Exception as e:
+                    try:
+                        import json
+                        with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                            f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B,E","location":"content.py:2726","message":"skipfeedchecker check exception","data":{"error":str(e)},"timestamp":int(__import__('time').time()*1000)})+'\n')
+                    except: pass
+                # #endregion
                 elif link.get('skipfeedchecker') == 1 and link.get('linkskipfeedchecker') != 1:
                     linkurl = linkalone
                 # Else if linkouturl exists, use it
