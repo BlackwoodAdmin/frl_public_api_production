@@ -2671,8 +2671,10 @@ def build_bcpage_wp(
         """
         # #region agent log
         try:
-            import json
-            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            import json, os
+            log_path = os.path.join(os.path.dirname(__file__), '..', '..', '.cursor', 'debug.log')
+            log_path = os.path.normpath(log_path)
+            with open(log_path, 'a', encoding='utf-8') as f:
                 f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A,D","location":"content.py:2672","message":"Before SQL query","data":{"domainid":domainid,"res_id":res.get('id')},"timestamp":int(__import__('time').time()*1000)})+'\n')
         except: pass
         # #endregion
@@ -2680,16 +2682,20 @@ def build_bcpage_wp(
             links = db.fetch_all(links_sql, (domainid, res['id'], domain_data.get('domainip', '')))
             # #region agent log
             try:
-                import json
-                with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                import json, os
+                log_path = os.path.join(os.path.dirname(__file__), '..', '..', '.cursor', 'debug.log')
+                log_path = os.path.normpath(log_path)
+                with open(log_path, 'a', encoding='utf-8') as f:
                     f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A,D","location":"content.py:2674","message":"After SQL query","data":{"links_count":len(links) if links else 0},"timestamp":int(__import__('time').time()*1000)})+'\n')
             except: pass
             # #endregion
         except Exception as e:
             # #region agent log
             try:
-                import json
-                with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                import json, os
+                log_path = os.path.join(os.path.dirname(__file__), '..', '..', '.cursor', 'debug.log')
+                log_path = os.path.normpath(log_path)
+                with open(log_path, 'a', encoding='utf-8') as f:
                     f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A,D","location":"content.py:2676","message":"SQL query exception","data":{"error":str(e),"type":type(e).__name__},"timestamp":int(__import__('time').time()*1000)})+'\n')
             except: pass
             # #endregion
@@ -2700,8 +2706,10 @@ def build_bcpage_wp(
             for link_idx, link in enumerate(links):
                 # #region agent log
                 try:
-                    import json
-                    with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                    import json, os
+                    log_path = os.path.join(os.path.dirname(__file__), '..', '..', '.cursor', 'debug.log')
+                    log_path = os.path.normpath(log_path)
+                    with open(log_path, 'a', encoding='utf-8') as f:
                         f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B,E","location":"content.py:2676","message":"Processing link","data":{"link_idx":link_idx,"has_skipfeedchecker":"skipfeedchecker" in link,"skipfeedchecker_val":link.get('skipfeedchecker'),"has_linkskipfeedchecker":"linkskipfeedchecker" in link,"linkskipfeedchecker_val":link.get('linkskipfeedchecker')},"timestamp":int(__import__('time').time()*1000)})+'\n')
                 except: pass
                 # #endregion
@@ -2756,15 +2764,19 @@ def build_bcpage_wp(
                 # Else if skipfeedchecker is enabled for the domain and not overridden for this link, point to homepage
                 # #region agent log
                 try:
-                    import json
+                    import json, os
                     skipfeedchecker_val = link.get('skipfeedchecker')
                     linkskipfeedchecker_val = link.get('linkskipfeedchecker')
-                    with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
-                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B,E","location":"content.py:2726","message":"Before skipfeedchecker check","data":{"skipfeedchecker":skipfeedchecker_val,"skipfeedchecker_type":type(skipfeedchecker_val).__name__,"linkskipfeedchecker":linkskipfeedchecker_val,"linkskipfeedchecker_type":type(linkskipfeedchecker_val).__name__,"check_result":skipfeedchecker_val == 1 and linkskipfeedchecker_val != 1},"timestamp":int(__import__('time').time()*1000)})+'\n')
+                    log_path = os.path.join(os.path.dirname(__file__), '..', '..', '.cursor', 'debug.log')
+                    log_path = os.path.normpath(log_path)
+                    with open(log_path, 'a', encoding='utf-8') as f:
+                        f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B,E","location":"content.py:2726","message":"Before skipfeedchecker check","data":{"skipfeedchecker":skipfeedchecker_val,"skipfeedchecker_type":type(skipfeedchecker_val).__name__ if skipfeedchecker_val is not None else "NoneType","linkskipfeedchecker":linkskipfeedchecker_val,"linkskipfeedchecker_type":type(linkskipfeedchecker_val).__name__ if linkskipfeedchecker_val is not None else "NoneType","check_result":skipfeedchecker_val == 1 and linkskipfeedchecker_val != 1},"timestamp":int(__import__('time').time()*1000)})+'\n')
                 except Exception as e:
                     try:
-                        import json
-                        with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                        import json, os
+                        log_path = os.path.join(os.path.dirname(__file__), '..', '..', '.cursor', 'debug.log')
+                        log_path = os.path.normpath(log_path)
+                        with open(log_path, 'a', encoding='utf-8') as f:
                             f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"B,E","location":"content.py:2726","message":"skipfeedchecker check exception","data":{"error":str(e)},"timestamp":int(__import__('time').time()*1000)})+'\n')
                     except: pass
                 # #endregion

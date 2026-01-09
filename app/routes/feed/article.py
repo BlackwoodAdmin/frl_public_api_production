@@ -997,9 +997,11 @@ img.align-left { max-width:100%!important;" }
         return HTMLResponse(content=full_page)
     elif Action == '2':
         # #region agent log
-        import json
+        import json, os
         try:
-            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            log_path = os.path.join(os.path.dirname(__file__), '..', '..', '.cursor', 'debug.log')
+            log_path = os.path.normpath(log_path)
+            with open(log_path, 'a', encoding='utf-8') as f:
                 f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"A,B,C,D,E","location":"article.py:998","message":"Action=2 entry","data":{"domain":domain,"domainid":domainid,"k":k,"pageid":pageid},"timestamp":int(__import__('time').time()*1000)})+'\n')
         except: pass
         # #endregion
@@ -1145,7 +1147,10 @@ img.align-left { max-width:100%!important;" }
         
         # #region agent log
         try:
-            with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            import os
+            log_path = os.path.join(os.path.dirname(__file__), '..', '..', '.cursor', 'debug.log')
+            log_path = os.path.normpath(log_path)
+            with open(log_path, 'a', encoding='utf-8') as f:
                 f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1139","message":"Before build_bcpage_wp","data":{"bubbleid":bubbleid,"domainid":domainid},"timestamp":int(__import__('time').time()*1000)})+'\n')
         except: pass
         # #endregion
@@ -1159,14 +1164,20 @@ img.align-left { max-width:100%!important;" }
             )
             # #region agent log
             try:
-                with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                import os
+                log_path = os.path.join(os.path.dirname(__file__), '..', '..', '.cursor', 'debug.log')
+                log_path = os.path.normpath(log_path)
+                with open(log_path, 'a', encoding='utf-8') as f:
                     f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1145","message":"After build_bcpage_wp","data":{"wpage_length":len(wpage) if wpage else 0},"timestamp":int(__import__('time').time()*1000)})+'\n')
             except: pass
             # #endregion
         except Exception as e:
             # #region agent log
             try:
-                with open(r'c:\Users\seowe\Saved Games\frl-python-api\.cursor\debug.log', 'a', encoding='utf-8') as f:
+                import os
+                log_path = os.path.join(os.path.dirname(__file__), '..', '..', '.cursor', 'debug.log')
+                log_path = os.path.normpath(log_path)
+                with open(log_path, 'a', encoding='utf-8') as f:
                     f.write(json.dumps({"sessionId":"debug-session","runId":"run1","hypothesisId":"C","location":"article.py:1147","message":"build_bcpage_wp exception","data":{"error":str(e),"type":type(e).__name__},"timestamp":int(__import__('time').time()*1000)})+'\n')
             except: pass
             # #endregion
