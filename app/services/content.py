@@ -2936,38 +2936,42 @@ def build_bcpage_wp(
                 
                 # Build image URL - use current link data directly
                 # PHP line 386-405: Simplified to always use current link data
-                # Check status as both string and integer (PHP uses integer comparison)
-                link_status = link.get('status')
-                status_valid = (link_status in ['2', '10', '8'] or link_status in [2, 10, 8])
-                # Build feedtext URL if status is valid (restitle and bubblefeedid will be handled with defaults)
-                if status_valid:
-                    # Build feedtext URL using current link's data
-                    if link.get('wp_plugin') != 1:
-                        # Non-WP plugin: build Action=2 URL
-                        script_version_num = get_script_version_num(link.get('script_version'))
-                        if script_version_num >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
-                            # Use vardomain format with 'bc' suffix
-                            imageurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '/' + str(link.get('bubblefeedid', '')) + 'bc/'
-                        else:
-                            # CodeURL equivalent - simplified Action=2 format
-                            # Use linked domain's domain name, not current domain
-                            php_filename = get_domain_php_filename(link.get('domain_name', ''))
-                            imageurl = linkdomain + '/' + php_filename + '?Action=2&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', '')))
-                    elif is_bron(link.get('servicetype')):
-                        # BRON service type: use bubblefeedid with 'bc' suffix
-                        imageurl = linkdomain + '/' + str(link.get('bubblefeedid', '')) + 'bc/'
-                    else:
-                        # WordPress plugin: build slug-based URL with 'bc' suffix
-                        import html
-                        slug_text = seo_text_custom(link.get('restitle', ''))
-                        slug_text = html.unescape(slug_text)
-                        slug_text = to_ascii(slug_text)
-                        slug_text = slug_text.lower()
-                        slug_text = slug_text.replace(' ', '-')
-                        imageurl = linkdomain + '/' + slug_text + '-' + str(link.get('bubblefeedid', '')) + 'bc/'
-                else:
-                    # Status doesn't allow feedtext URL, default to homepage
+                # Check skipfeedchecker first - if enabled, point image to homepage
+                if link.get('skipfeedchecker') == 1 and link.get('linkskipfeedchecker') != 1:
                     imageurl = linkalone
+                else:
+                    # Check status as both string and integer (PHP uses integer comparison)
+                    link_status = link.get('status')
+                    status_valid = (link_status in ['2', '10', '8'] or link_status in [2, 10, 8])
+                    # Build feedtext URL if status is valid (restitle and bubblefeedid will be handled with defaults)
+                    if status_valid:
+                        # Build feedtext URL using current link's data
+                        if link.get('wp_plugin') != 1:
+                            # Non-WP plugin: build Action=2 URL
+                            script_version_num = get_script_version_num(link.get('script_version'))
+                            if script_version_num >= 3 and link.get('wp_plugin') != 1 and link.get('iswin') != 1 and link.get('usepurl') != 0:
+                                # Use vardomain format with 'bc' suffix
+                                imageurl = linkdomain + '/' + bcvardomain + '/' + seo_slug(seo_filter_text_custom(link.get('restitle', ''))) + '/' + str(link.get('bubblefeedid', '')) + 'bc/'
+                            else:
+                                # CodeURL equivalent - simplified Action=2 format
+                                # Use linked domain's domain name, not current domain
+                                php_filename = get_domain_php_filename(link.get('domain_name', ''))
+                                imageurl = linkdomain + '/' + php_filename + '?Action=2&k=' + seo_slug(seo_filter_text_custom(link.get('restitle', '')))
+                        elif is_bron(link.get('servicetype')):
+                            # BRON service type: use bubblefeedid with 'bc' suffix
+                            imageurl = linkdomain + '/' + str(link.get('bubblefeedid', '')) + 'bc/'
+                        else:
+                            # WordPress plugin: build slug-based URL with 'bc' suffix
+                            import html
+                            slug_text = seo_text_custom(link.get('restitle', ''))
+                            slug_text = html.unescape(slug_text)
+                            slug_text = to_ascii(slug_text)
+                            slug_text = slug_text.lower()
+                            slug_text = slug_text.replace(' ', '-')
+                            imageurl = linkdomain + '/' + slug_text + '-' + str(link.get('bubblefeedid', '')) + 'bc/'
+                    else:
+                        # Status doesn't allow feedtext URL, default to homepage
+                        imageurl = linkalone
                 
                 # Build citation container if address/name exists
                 preml = 0
@@ -3037,9 +3041,11 @@ def build_bcpage_wp(
                         bcpage += f'<img itemprop="image" src="//imagehosting.space/feed/pageimage.php?domain={link["domain_name"]}" alt="{link["domain_name"]}" style="display:none !important;">\n'
                     else:
                         # For sites without map: image link should point to feedtext page
-                        # Use imageurl variable (already built with correct logic) and check packageoverride
+                        # Use imageurl variable (already built with correct logic) and check packageoverride and skipfeedchecker
                         packageoverride_val = link.get('packageoverride')
                         if packageoverride_val in [1, True, '1'] or (isinstance(packageoverride_val, str) and packageoverride_val.lower() == 'true'):
+                            image_link_url = linkalone
+                        elif link.get('skipfeedchecker') == 1 and link.get('linkskipfeedchecker') != 1:
                             image_link_url = linkalone
                         else:
                             image_link_url = imageurl
@@ -3182,9 +3188,11 @@ def build_bcpage_wp(
                 if map_val == 1:
                     # PHP line 714-715: map == 1
                     # For sites with map: shorttext link should point to feedtext page
-                    # Use imageurl variable (already built with correct logic) and check packageoverride
+                    # Use imageurl variable (already built with correct logic) and check packageoverride and skipfeedchecker
                     packageoverride_val = link.get('packageoverride')
                     if packageoverride_val in [1, True, '1'] or (isinstance(packageoverride_val, str) and packageoverride_val.lower() == 'true'):
+                        shorttext_link_url = linkalone
+                    elif link.get('skipfeedchecker') == 1 and link.get('linkskipfeedchecker') != 1:
                         shorttext_link_url = linkalone
                     else:
                         shorttext_link_url = imageurl
