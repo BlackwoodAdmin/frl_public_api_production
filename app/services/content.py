@@ -2647,7 +2647,7 @@ def build_bcpage_wp(
     if domain_status_str in ['1', '2', '8', '10']:
         links_sql = """
             SELECT d.*, b.restitle, b.resshorttext, b.resfulltext, b.linkouturl, b.resname, b.resaddress, b.resphone, 
-                   l.linkformat, l.deeplink, l.relevant, b.id AS bubblefeedid, b.title, b.categoryid,
+                   l.linkformat, l.deeplink, l.relevant, l.linkskipfeedchecker, b.id AS bubblefeedid, b.title, b.categoryid,
                    s.servicetype AS servicename, s.price, d.servicetype,
                    bc.category AS bubblecat, bc.bubblefeedid AS bubblecatid,
                    c.category AS subcat,
@@ -2717,10 +2717,13 @@ def build_bcpage_wp(
                 # Determine link URL
                 # Build link URL - match PHP logic exactly
                 # PHP line 322-376: Complex conditional logic for link URL building
-                # Priority check: packageoverride -> linkouturl -> existing logic
+                # Priority check: packageoverride -> skipfeedchecker -> linkouturl -> existing logic
                 # If packageoverride is true, link points to homepage
                 packageoverride_val = link.get('packageoverride')
                 if packageoverride_val in [1, True, '1'] or (isinstance(packageoverride_val, str) and packageoverride_val.lower() == 'true'):
+                    linkurl = linkalone
+                # Else if skipfeedchecker is enabled for the domain and not overridden for this link, point to homepage
+                elif link.get('skipfeedchecker') == 1 and link.get('linkskipfeedchecker') != 1:
                     linkurl = linkalone
                 # Else if linkouturl exists, use it
                 elif link.get('linkouturl') and len(str(link.get('linkouturl', '')).strip()) > 5:
