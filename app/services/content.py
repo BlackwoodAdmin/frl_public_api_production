@@ -668,13 +668,21 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                     if is_bron_val:
                         bclink = linkdomain + '/' + str(item['id']) + 'bc/'
                     else:
-                        # Use toAscii(html_entity_decode(seo_text_custom(...))) for slug
-                        slug_text = seo_text_custom(item['restitle'])  # seo_text_custom
-                        slug_text = html.unescape(slug_text)  # html_entity_decode
-                        slug_text = to_ascii(slug_text)  # toAscii
-                        slug_text = slug_text.lower()  # strtolower
-                        slug_text = slug_text.replace(' ', '-')  # str_replace(' ', '-', ...)
-                        bclink = linkdomain + '/' + slug_text + '-' + str(item['id']) + 'bc/'
+                        # Check if WordPress plugin or PHP plugin to use correct URL structure
+                        wp_plugin = domain_data.get('wp_plugin', 0)
+                        if wp_plugin == 1:
+                            # WordPress plugin format: /slug-idbc/
+                            slug_text = seo_text_custom(item['restitle'])  # seo_text_custom
+                            slug_text = html.unescape(slug_text)  # html_entity_decode
+                            slug_text = to_ascii(slug_text)  # toAscii
+                            slug_text = slug_text.lower()  # strtolower
+                            slug_text = slug_text.replace(' ', '-')  # str_replace(' ', '-', ...)
+                            bclink = linkdomain + '/' + slug_text + '-' + str(item['id']) + 'bc/'
+                        else:
+                            # PHP plugin format: /{domain_filename}.php?Action=2&k=keyword-slug
+                            keyword_slug = seo_filter_text_custom(item['restitle']).lower().replace(' ', '-')
+                            php_filename = get_domain_php_filename(domain_data)
+                            bclink = linkdomain + '/' + php_filename + '?Action=2&k=' + keyword_slug
                     newsf = ' <a style="padding-left: 0px !important;" href="' + bclink + '">Resources</a>'
                 else:
                     newsf = ''
@@ -713,12 +721,21 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
                         if is_bron_val:
                             bclink = linkdomain + '/' + str(item['id']) + 'bc/'
                         else:
-                            slug_text = seo_text_custom(item['restitle'])
-                            slug_text = html.unescape(slug_text)
-                            slug_text = to_ascii(slug_text)
-                            slug_text = slug_text.lower()
-                            slug_text = slug_text.replace(' ', '-')
-                            bclink = linkdomain + '/' + slug_text + '-' + str(item['id']) + 'bc/'
+                            # Check if WordPress plugin or PHP plugin to use correct URL structure
+                            wp_plugin = domain_data.get('wp_plugin', 0)
+                            if wp_plugin == 1:
+                                # WordPress plugin format: /slug-idbc/
+                                slug_text = seo_text_custom(item['restitle'])
+                                slug_text = html.unescape(slug_text)
+                                slug_text = to_ascii(slug_text)
+                                slug_text = slug_text.lower()
+                                slug_text = slug_text.replace(' ', '-')
+                                bclink = linkdomain + '/' + slug_text + '-' + str(item['id']) + 'bc/'
+                            else:
+                                # PHP plugin format: /{domain_filename}.php?Action=2&k=keyword-slug
+                                keyword_slug = seo_filter_text_custom(item['restitle']).lower().replace(' ', '-')
+                                php_filename = get_domain_php_filename(domain_data)
+                                bclink = linkdomain + '/' + php_filename + '?Action=2&k=' + keyword_slug
                     foot += '<li><a style="padding-right: 0px !important;" href="' + bclink + '">' + clean_title(seo_filter_text_custom(item['restitle'])) + '</a></li>\n'
                 
                 num_lnks += 1
@@ -726,13 +743,21 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
             elif len(item.get('linkouturl', '').strip()) > 5:
                 # External link case - build Resources link if links_per_page >= 1
                 if item.get('links_per_page', 0) >= 1:
-                    # Use seo_filter_text_custom for this case (line 235 in PHP)
-                    slug_text = seo_filter_text_custom(item['restitle'])
-                    slug_text = html.unescape(slug_text)
-                    slug_text = to_ascii(slug_text)
-                    slug_text = slug_text.lower()
-                    slug_text = slug_text.replace(' ', '-')
-                    bclink = linkdomain + '/' + slug_text + '-' + str(item.get('id', '')) + 'bc/'
+                    # Check if WordPress plugin or PHP plugin to use correct URL structure
+                    wp_plugin = domain_data.get('wp_plugin', 0)
+                    if wp_plugin == 1:
+                        # WordPress plugin format: /slug-idbc/
+                        slug_text = seo_filter_text_custom(item['restitle'])
+                        slug_text = html.unescape(slug_text)
+                        slug_text = to_ascii(slug_text)
+                        slug_text = slug_text.lower()
+                        slug_text = slug_text.replace(' ', '-')
+                        bclink = linkdomain + '/' + slug_text + '-' + str(item.get('id', '')) + 'bc/'
+                    else:
+                        # PHP plugin format: /{domain_filename}.php?Action=2&k=keyword-slug
+                        keyword_slug = seo_filter_text_custom(item['restitle']).lower().replace(' ', '-')
+                        php_filename = get_domain_php_filename(domain_data)
+                        bclink = linkdomain + '/' + php_filename + '?Action=2&k=' + keyword_slug
                     newsf = ' <a style="padding-left: 0px !important;" href="' + bclink + '">Resources</a>'
                 else:
                     newsf = ''
@@ -805,6 +830,47 @@ def build_footer_wp(domainid: int, domain_data: Dict[str, Any], domain_settings:
     footer_html += '}\n'
     footer_html += '</style>\n'
     footer_html += '</div>'
+    
+    # Add feed-home.css.php CSS for wp_plugin != 1 (PHP plugin footer)
+    wp_plugin = domain_data.get('wp_plugin', 0)
+    if wp_plugin != 1:
+        feed_home_css = '''<style type="text/css">
+ul.mdubgwi-footer-nav {margin:0 auto !important;padding: 0px !important;overflow:visible !important}
+
+#mdubgwi-hidden-button {  height:0px !important; width:0px !important;	 }
+
+.mdubgwi-button { display:block!important; visibility:visible!important; height:20px !important; width:250px !important; margin:0px !important; padding:0 !important; }
+
+.mdubgwi-footer-section {z-index: 99999999 !important; overflow:visible !important; display:block !important; position: relative !important; bottom: 0px !important; width: 250px !important; margin:0 auto !important; }
+.mdubgwi-footer-section.plain ul {list-style: none !important; margin:0 auto !important; text-align:center!important;}
+
+.mdubgwi-footer-nav li ul li {border:none !important;overflow-x: visible !important;overflow-y: visible !important;text-align:center !important; margin:0px !important;position: relative!important; color: #00397c !important; padding:0px !important; display:block !important; }
+.mdubgwi-footer-section.num-plain li {list-style: none !important; display:inline !important;}
+.num-lite li ul  { position: absolute !important; bottom: 45px !important; }
+.mdubgwi-footer-nav li ul  {position: absolute !important;left:53% !important; min-width:100px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-sub-nav {width:450px;}
+.mdubgwi-footer-nav li ul li ul {min-width:450px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-footer-nav:hover li ul {-ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; list-style:none !important; display: block !important; visibility: visible !important; z-index: 999999 !important; }
+.mdubgwi-footer-nav:hover li ul li ul {min-width:450px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important!important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-footer-nav li a {background:transparent !important; padding:5px 5px !important;text-align:center !important;  text-decoration:none !important; border:0 !important; line-height: 18px !important; font-size:13px !important; color: #00397c; }
+.mdubgwi-footer-nav li {list-style:none !important; background:transparent !important; padding:5px 5px !important;text-align:center !important;  color: #00397c; text-decoration:none !important; border:0 !important; line-height: 18px !important; font-size:13px !important; }
+.mdubgwi-footer-nav li ul { padding:5px 5px 10px 5px !important; margin:0 !important; }
+.mdubgwi-footer-nav li ul:hover {-ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=1.0)" !important; -moz-opacity: 1.0 !important; -khtml-opacity: 1.0 ! important!important;  opacity: 1.0 !important;      -webkit-transition: opacity 1s ease!important;     -moz-transition: opacity 1s ease!important;     -o-transition: opacity 1s ease!important;     -ms-transition: opacity 1s ease!important;        transition: opacity 1s ease!important;  list-style:none !important; display: block !important; visibility: visible !important; z-index: 999999 !important; }
+.mdubgwi-footer-nav li ul:hover li ul {min-width: 450px !important; -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0.8)" !important; -moz-opacity: 0.8 !important; -khtml-opacity: 0.8 ! important;  opacity: 0.8 !important; font-size: 13px !important;  float:none !important; margin:0px !important;  list-style: none !important; line-height: 18px !important; background: #fff !important; display: none !important; visibility: hidden !important; z-index: -1 !important; }
+.mdubgwi-footer-nav li ul li {border:none !important;background:transparent !important;overflow-x: visible !important;overflow-y: visible !important; text-align: center !important;margin:0px !important; position: relative!important; list-style:none !important; }
+.mdubgwi-footer-nav li ul li:hover ul{ display: block !important; visibility: visible !important; z-index: 999999 !important; -webkit-transition: all 1s ease-out!important; -moz-transition: all 1s ease-out!important; -o-transition: all 1s ease-out!important; -ms-transition: all 1s ease-out!important; transition: all 1s ease-out!important;}
+.mdubgwi-footer-nav li ul li ul {border:none !important;bottom:0px !important;padding: 5px 5px 15px 5px !important;  -webkit-transition: all 1s ease-out!important; -moz-transition: all 1s ease-out!important; -o-transition: all 1s ease-out!important; -ms-transition: all 1s ease-out!important; transition: all 1s ease-out!important;position: absolute !important; }
+.mdubgwi-footer-nav li ul li ul li {border:none !important; background:transparent !important; overflow-x: visible !important;overflow-y: visible !important;left:0 !important; text-align: center !important;margin:0px !important; list-style:none !important; padding:0px 5px !important; }
+.ngodkrbsitr-spacer { clear:both!important; height:5px !important; display:block!important;width:100%!important; }
+.ngodkrbsitr-social { margin: 0 3px !important; padding: 0px !important; float:left!important;	 }
+.align-left { float:left!important; border:0!important; margin-right:1% !important; margin-bottom:10px !important; }
+.align-right { float:right!important; border:0!important; margin-left:1% !important; text-align:right!important; margin-bottom:10px !important; }
+img.align-left { max-width:100%!important;" }
+.mdubgwi-sub-nav li ul  {display:none !important; visibility:hidden !important;}
+.mdubgwi-sub-nav li:hover ul {display:block !important; visibility:visible !important;}
+</style>
+'''
+        footer_html += feed_home_css
     
     # Return the footer HTML (will be JSON-encoded and HTML-escaped in the route handler)
     return footer_html
