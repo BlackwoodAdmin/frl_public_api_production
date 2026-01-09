@@ -2647,7 +2647,7 @@ def build_bcpage_wp(
     if domain_status_str in ['1', '2', '8', '10']:
         links_sql = """
             SELECT d.*, b.restitle, b.resshorttext, b.resfulltext, b.linkouturl, b.resname, b.resaddress, b.resphone, 
-                   l.linkformat, l.deeplink, l.relevant, l.linkskipfeedchecker, b.id AS bubblefeedid, b.title, b.categoryid,
+                   l.linkformat, l.deeplink, l.relevant, l.skipfeedchecker AS linkskipfeedchecker, b.id AS bubblefeedid, b.title, b.categoryid,
                    s.servicetype AS servicename, s.price, d.servicetype,
                    bc.category AS bubblecat, bc.bubblefeedid AS bubblecatid,
                    c.category AS subcat,
